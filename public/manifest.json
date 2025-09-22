@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Whatsapify v2.0",
+  "version": "2.0",
+  "description": "Makes Enhancement on WhatsApp Web.",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["https://web.whatsapp.com/", "https://api1.shopilam.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_title": "Web Enhancement Whatsapify"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/*",
+        "node_modules/react/umd/react.production.min.js",
+        "node_modules/react-dom/umd/react-dom.production.min.js",
+        "https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      ],
+      "matches": ["https://web.whatsapp.com/*"]
+    }
+  ]
+}
