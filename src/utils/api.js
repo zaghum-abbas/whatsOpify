@@ -1,26 +1,23 @@
 // src/utils/api.js
 export const fetchProducts = async () => {
   try {
-    // Get token from localStorage
-    const tokenData = JSON.parse(localStorage.getItem('whatsopify_token'));
-    const token = tokenData?.data?.token;
-    
-    if (!token) throw new Error('No auth token found');
+    console.log(
+      "[API] Fetching products using session-based authentication..."
+    );
 
-    // Send message to background script
+    // Send message to background script with session-based auth
     const response = await chrome.runtime.sendMessage({
-      action: 'FETCH_PRODUCTS',
-      token: token
+      action: "FETCH_PRODUCTS",
     });
 
     if (!response.success) {
-      throw new Error(response.error || 'Failed to fetch products');
+      throw new Error(response.error || "Failed to fetch products");
     }
 
+    console.log("[API] Products fetched successfully:", response.products);
     return response.products;
-    
   } catch (error) {
-    console.error('Product fetch failed:', error);
+    console.error("[API] Product fetch failed:", error);
     throw error; // Re-throw for components to handle
   }
 };

@@ -10,8 +10,18 @@ import "./App.css"; // Your main CSS file
 
 import { requireAuth, useAuthState } from "./components/authMiddleware.jsx";
 import LoginModal from "./components/LoginModal";
+import {
+  debugSessionAuth,
+  testCookieDomains,
+  checkMainDomainCookies,
+} from "../utils/debugSession.js";
 
 console.log("🚀 Whatsapofy content script loaded at 12:30 PM PKT, 17/07/2025");
+
+// Global debug functions for session authentication
+window.debugSessionAuth = debugSessionAuth;
+window.testCookieDomains = testCookieDomains;
+window.checkMainDomainCookies = checkMainDomainCookies;
 
 // --- Global State Variables ---
 // Initialize caches to null to indicate data hasn't been fetched yet
@@ -938,32 +948,9 @@ async function fetchProductsFromAPI() {
   productsError = null;
 
   try {
-    console.log("[PRODUCTS] Fetching user-specific products from API...");
-    let token = null;
-    try {
-      const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
-      if (whatsopifyTokenRaw) {
-        const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
-        if (
-          whatsopifyTokenObj &&
-          whatsopifyTokenObj.data &&
-          whatsopifyTokenObj.data.token
-        ) {
-          token = whatsopifyTokenObj.data.token;
-        }
-      }
-    } catch (err) {
-      console.warn("[PRODUCTS] Error extracting token from localStorage:", err);
-    }
-
-    if (!token) {
-      console.warn("[PRODUCTS] No token found, cannot fetch user products.");
-      productsCache = []; // Ensure cache is empty if no token
-      productsLoading = false;
-      productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
-      productsListeners = []; // Clear listeners
-      return;
-    }
+    console.log(
+      "[PRODUCTS] Fetching user-specific products from API using session-based auth..."
+    );
 
     // Ensure stores are loaded before attempting to filter products by storeId
     if (storesCache === null && !storesLoading) {
@@ -993,10 +980,9 @@ async function fetchProductsFromAPI() {
     let allUserProducts = []; // Array to hold products fetched from the API
 
     try {
-      // Use background script to fetch products (bypasses CORS issues)
+      // Use background script to fetch products with session-based auth (bypasses CORS issues)
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_PRODUCTS",
-        token: token,
       });
 
       if (response.success) {
@@ -1399,26 +1385,7 @@ function observeActiveChat() {
 }
 
 window.toggleWhatsappSidebar = async (open) => {
-  // Only require auth if opening the sidebar, not when closing
-  if (open !== false) {
-    if (
-      !requireAuth(() => {
-        console.log("Login required to open sidebar");
-        // Show login modal if not logged in
-        const loginModalContainer =
-          document.getElementById("login-modal-root") ||
-          document.createElement("div");
-        loginModalContainer.id = "login-modal-root";
-        document.body.appendChild(loginModalContainer);
-        const loginRoot = createRoot(loginModalContainer);
-        loginRoot.render(
-          <LoginModal isOpen={true} onClose={() => loginRoot.unmount()} />
-        );
-      })
-    ) {
-      return; // Exit if user is not authenticated
-    }
-  }
+  // Allow sidebar to open without authentication - show login modal only when user tries to use features that require auth
   isSidebarOpen = typeof open === "boolean" ? open : !isSidebarOpen;
   console.log(`Toggling sidebar: ${isSidebarOpen ? "Open" : "Closed"}`);
 
@@ -2228,4 +2195,198 @@ Object.assign(window.whatsapofyProducts, {
   getProducts,
   storesCache, // This will be updated by fetchStoresForUser
   whatsapofyUserInfo, // This object holds userInfoCache
+});
+
+// Auto-send WhatsApp message functionality using chrome.storage.local
+let autoSendAttempted = false; // Flag to prevent multiple sends
+
+window.whatsopifyAutoSendCheck = () => {
+  chrome.storage.local.get(
+    [
+      "whatsopify_auto_send",
+      "whatsopify_auto_message",
+      "whatsopify_auto_phone",
+      "whatsopify_auto_timestamp",
+    ],
+    (result) => {
+      if (result.whatsopify_auto_send === true && !autoSendAttempted) {
+        console.log("[CONTENT] Auto-send flag detected on page load...");
+
+        const autoSendWhatsAppMessage = () => {
+          try {
+            // Check if we already attempted to send
+            if (autoSendAttempted) {
+              console.log("[CONTENT] Auto-send already attempted, skipping...");
+              return;
+            }
+
+            const autoMessage = result.whatsopify_auto_message;
+            const timestamp = result.whatsopify_auto_timestamp;
+
+            if (!autoMessage) return;
+
+            // Check if the request is not too old (within 30 seconds)
+            const now = Date.now();
+            const requestTime = parseInt(timestamp || "0");
+            if (now - requestTime > 30000) {
+              // Clear old request
+              chrome.storage.local.remove([
+                "whatsopify_auto_send",
+                "whatsopify_auto_message",
+                "whatsopify_auto_phone",
+                "whatsopify_auto_timestamp",
+              ]);
+              return;
+            }
+
+            console.log(
+              "[CONTENT] Attempting to auto-send WhatsApp message..."
+            );
+
+            // Find the text input field first
+            const messageInput =
+              document.querySelector(
+                '[data-testid="conversation-compose-box-input"]'
+              ) ||
+              document.querySelector(
+                'div[contenteditable="true"][data-tab="10"]'
+              ) ||
+              document.querySelector('[data-testid="compose-box-input"]');
+
+            if (!messageInput) {
+              console.log(
+                "[CONTENT] ⚠️ Message input field not found, will retry..."
+              );
+              return;
+            }
+
+            // Ensure we're in text mode (not voice mode)
+            const textTab = document.querySelector('[data-tab="10"]');
+            if (textTab && !textTab.classList.contains("selected")) {
+              console.log("[CONTENT] Switching to text mode...");
+              textTab.click();
+              return; // Wait for next attempt after switching to text mode
+            }
+
+            // Check if message is already in the input field
+            const currentText =
+              messageInput.textContent || messageInput.innerText || "";
+            if (currentText.trim() !== autoMessage.trim()) {
+              console.log("[CONTENT] Setting message text...");
+              // Clear and set the message text
+              messageInput.textContent = autoMessage;
+              messageInput.innerText = autoMessage;
+
+              // Trigger input events
+              const inputEvent = new Event("input", { bubbles: true });
+              messageInput.dispatchEvent(inputEvent);
+
+              return; // Wait for next attempt after setting text
+            }
+
+            // Now find the send button (only text send button)
+            const sendButtonSelectors = [
+              '[data-tab="11"]', // Send button for text messages
+              'button[aria-label="Send"]:not([data-tab="12"])', // Exclude voice send button
+              '[data-testid="send"]:not([data-tab="12"])',
+            ];
+
+            let sendButton = null;
+            for (const selector of sendButtonSelectors) {
+              sendButton = document.querySelector(selector);
+              if (sendButton && sendButton.offsetParent !== null) {
+                console.log(
+                  `[CONTENT] ✅ Found text send button with selector: ${selector}`
+                );
+                break;
+              }
+            }
+
+            if (sendButton) {
+              console.log(
+                "[CONTENT] ✅ Found text send button, auto-clicking..."
+              );
+
+              // Mark as attempted to prevent multiple sends
+              autoSendAttempted = true;
+
+              // Try direct click first (most reliable)
+              if (sendButton.click) {
+                sendButton.click();
+                console.log("[CONTENT] ✅ Direct click successful");
+              }
+
+              // Clear the auto-send flags
+              chrome.storage.local.remove([
+                "whatsopify_auto_send",
+                "whatsopify_auto_message",
+                "whatsopify_auto_phone",
+                "whatsopify_auto_timestamp",
+              ]);
+
+              console.log("[CONTENT] ✅ Auto-send completed");
+            } else {
+              console.log(
+                "[CONTENT] ⚠️ Text send button not found, will retry..."
+              );
+            }
+          } catch (error) {
+            console.error(
+              "[CONTENT] Error auto-sending WhatsApp message:",
+              error
+            );
+          }
+        };
+
+        // Set up auto-send with fewer attempts and longer intervals
+        setTimeout(() => autoSendWhatsAppMessage(), 3000);
+        setTimeout(() => autoSendWhatsAppMessage(), 6000);
+        setTimeout(() => autoSendWhatsAppMessage(), 10000);
+      }
+    }
+  );
+};
+
+// Call auto-send check on page load
+window.whatsopifyAutoSendCheck();
+
+// Also set up a MutationObserver to detect when WhatsApp interface is ready
+const observer = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (
+      mutation.type === "childList" &&
+      mutation.addedNodes.length > 0 &&
+      !autoSendAttempted
+    ) {
+      // Check if WhatsApp interface elements are being added
+      const hasWhatsAppElements = Array.from(mutation.addedNodes).some(
+        (node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            return (
+              node.querySelector &&
+              (node.querySelector(
+                '[data-testid="conversation-compose-box-input"]'
+              ) ||
+                node.querySelector('[aria-label="Send"]') ||
+                node.querySelector('div[contenteditable="true"]'))
+            );
+          }
+          return false;
+        }
+      );
+
+      if (hasWhatsAppElements) {
+        console.log(
+          "[CONTENT] WhatsApp interface elements detected, checking for auto-send..."
+        );
+        setTimeout(() => window.whatsopifyAutoSendCheck(), 1000);
+      }
+    }
+  });
+});
+
+// Start observing
+observer.observe(document.body, {
+  childList: true,
+  subtree: true,
 });

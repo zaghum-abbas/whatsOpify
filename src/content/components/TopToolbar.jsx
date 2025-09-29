@@ -74,6 +74,15 @@ const TopToolbar = (props) => {
       if (typeof window.toggleWhatsappSidebar === "function") {
         window.toggleWhatsappSidebar(true);
       }
+    } else if (label === "Orders") {
+      // Open orders section in sidebar
+      if (typeof window.showOrdersSection === "function") {
+        window.showOrdersSection();
+      }
+      // Ensure sidebar is open
+      if (typeof window.toggleWhatsappSidebar === "function") {
+        window.toggleWhatsappSidebar(true);
+      }
     } else {
       setActiveTabLabel(label); // update active tab
       await clickWhatsAppFilterButton(label);
@@ -245,8 +254,7 @@ const TopToolbar = (props) => {
             background: "transparent",
             border: "none",
             cursor: "pointer",
-            marginLeft: "8px",
-            padding: "8px 12px",
+            padding: "8px 0px",
             borderRadius: "6px",
             fontSize: "14px",
             fontWeight: "500",
@@ -261,6 +269,30 @@ const TopToolbar = (props) => {
           }}
         >
           🛒 Create Order
+        </button>
+        <button
+          onClick={() => handleClick("Orders")}
+          style={{
+            color: "#4a5568",
+            transition: "all 0.2s",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: "8px 0px",
+            borderRadius: "6px",
+            fontSize: "14px",
+            fontWeight: "500",
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.color = "#2563EB";
+            e.target.style.backgroundColor = "#f0f9ff";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.color = "#4a5568";
+            e.target.style.backgroundColor = "transparent";
+          }}
+        >
+          📋 Orders
         </button>
 
         <div

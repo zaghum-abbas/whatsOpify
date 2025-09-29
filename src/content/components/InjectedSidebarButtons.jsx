@@ -422,16 +422,15 @@ const InjectedSidebarButtons = ({ onToggleSidebar }) => {
         title="Export Contacts" // Changed title for clarity
         onClick={handleExportClick} // Will show the popup
       >
-               {" "}
+        {" "}
         <div className={whatsappDivClasses}>
-                   {" "}
+          {" "}
           <div className={whatsappInnerDivClasses} style={{ flexGrow: 1 }}>
-                       {" "}
+            {" "}
             <div>
-                           {" "}
+              {" "}
               <span aria-hidden="true" data-icon="custom-export" className="">
-                                {/* SVG for an export/download icon */}         
-                     {" "}
+                {/* SVG for an export/download icon */}{" "}
                 <svg
                   viewBox="0 0 24 24"
                   height="24"
@@ -440,25 +439,18 @@ const InjectedSidebarButtons = ({ onToggleSidebar }) => {
                   className=""
                   fill="none"
                 >
-                                    <title>Export Contacts</title>             
-                     {" "}
+                  <title>Export Contacts</title>{" "}
                   <path
                     fillRule="evenodd"
                     clipRule="evenodd"
                     d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 17.5228 22 12C22 17.5228 17.5228 22 12 22ZM11 17V14H8L12 10L16 14H13V17H11Z"
                     fill={whatsappIconColor}
-                  ></path>
-                                 {" "}
-                </svg>
-                             {" "}
-              </span>
-                         {" "}
-            </div>
-                     {" "}
-          </div>
-                 {" "}
-        </div>
-             {" "}
+                  ></path>{" "}
+                </svg>{" "}
+              </span>{" "}
+            </div>{" "}
+          </div>{" "}
+        </div>{" "}
       </button>
       {showChatPopup && (
         <div style={popupOverlayStyle}>

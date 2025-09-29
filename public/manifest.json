@@ -7,8 +7,11 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["storage", "scripting"],
-  "host_permissions": ["https://web.whatsapp.com/", "https://api1.shopilam.com/*"],
+  "permissions": ["storage", "scripting", "cookies", "tabs"],
+  "host_permissions": [
+    "https://web.whatsapp.com/",
+    "https://api1.shopilam.com/*"
+  ],
   "content_scripts": [
     {
       "matches": ["https://web.whatsapp.com/"],

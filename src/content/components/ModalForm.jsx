@@ -418,8 +418,7 @@ const ModalForm = ({ onClose }) => {
   return (
     <form onSubmit={handleSubmit} style={inlineFormStyle}>
       <div style={scrollableContentStyle}>
-        <h2 style={headerStyle}>Create New Order</h2>
-
+        {/* <h2 style={headerStyle}>Create New Order</h2> */}
         {/* Show loading spinner if data is still being fetched */}
         {isLoading ? (
           <div style={loadingStyle}>
@@ -431,7 +430,7 @@ const ModalForm = ({ onClose }) => {
           <div style={sectionContainerStyle}>
             {/* Customer Information Section */}
             <div style={sectionStyle}>
-              <h3 style={sectionHeaderStyle}>Customer Information</h3>
+              {/* <h3 style={sectionHeaderStyle}>Customer Information</h3> */}
               <div style={fieldGroupStyle}>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Full Name*</label>

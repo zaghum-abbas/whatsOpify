@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import ModalForm from "./ModalForm";
 import CustomerSupportMessages from "./CustomerSupportMessages";
+import OrdersSection from "./OrdersSection";
 const getTheme = () => {
   // Try to detect WhatsApp dark mode from body class or style
   const body = document.body;
@@ -323,51 +324,147 @@ const InjectedSidebarContent = ({
   const theme = useMemo(getTheme, []);
   const [isLoading, setIsLoading] = useState(true);
   const [contact, setContact] = useState(null);
+  const [showOrders, setShowOrders] = useState(false);
 
   useEffect(() => {
     const extractContactInfo = () => {
       try {
-        // Find the contact info panel
-        const contactInfoHeader = Array.from(
-          document.querySelectorAll("div")
-        ).find((el) => el.textContent.trim() === "User info");
+        console.log("[CONTACT_EXTRACTION] Starting contact info extraction...");
 
-        if (!contactInfoHeader) {
-          throw new Error("Contact info panel not found");
+        // Try multiple selectors to find contact info
+        let contactInfoPanel = null;
+        let name = "Unknown";
+        let phone = "Not available";
+        let about = "No status available";
+
+        // Method 1: Look for contact info header
+        const contactInfoHeaders = [
+          "User info",
+          "Contact info",
+          "Profile",
+          "Contact details",
+        ];
+
+        for (const headerText of contactInfoHeaders) {
+          const contactInfoHeader = Array.from(
+            document.querySelectorAll("div, span")
+          ).find((el) => el.textContent.trim() === headerText);
+
+          if (contactInfoHeader) {
+            console.log(`[CONTACT_EXTRACTION] Found header: ${headerText}`);
+            contactInfoPanel =
+              contactInfoHeader.closest("header")?.parentElement
+                ?.parentElement ||
+              contactInfoHeader.closest("div[data-testid*='contact']") ||
+              contactInfoHeader.closest("div[role='region']");
+            break;
+          }
         }
 
-        const contactInfoPanel =
-          contactInfoHeader.closest("header")?.parentElement?.parentElement;
+        // Method 2: Look for conversation header directly
         if (!contactInfoPanel) {
-          throw new Error("Could not locate contact info container");
+          const conversationHeader =
+            document.querySelector('[data-testid="conversation-header"]') ||
+            document.querySelector('header[role="banner"]') ||
+            document.querySelector('[data-testid="chat-header"]');
+
+          if (conversationHeader) {
+            console.log("[CONTACT_EXTRACTION] Found conversation header");
+            contactInfoPanel = conversationHeader;
+          }
         }
 
-        // Extract Name
-        const nameElement = contactInfoPanel.querySelector(
-          'span[dir="auto"].x1rg5ohu'
-        );
-        const name = nameElement?.textContent.trim() || "Unknown";
+        // Method 3: Look for any header with contact-like content
+        if (!contactInfoPanel) {
+          const allHeaders = document.querySelectorAll(
+            'header, [role="banner"], [data-testid*="header"]'
+          );
+          for (const header of allHeaders) {
+            const hasContactInfo =
+              header.textContent.includes("+") ||
+              header.querySelector('span[dir="auto"]') ||
+              header.textContent.trim().length > 0;
+            if (hasContactInfo) {
+              console.log(
+                "[CONTACT_EXTRACTION] Found potential contact header"
+              );
+              contactInfoPanel = header;
+              break;
+            }
+          }
+        }
 
-        // Extract Phone Number
-        const phoneElement = Array.from(
-          contactInfoPanel.querySelectorAll('span[dir="auto"]')
-        ).find((el) => el.textContent.match(/\+[\d\s]+/));
-        const phone = phoneElement?.textContent.trim() || "Not available";
+        if (contactInfoPanel) {
+          console.log(
+            "[CONTACT_EXTRACTION] Contact panel found, extracting info..."
+          );
 
-        // Extract About
-        const aboutHeader = Array.from(
-          contactInfoPanel.querySelectorAll("div")
-        ).find((el) => el.textContent.trim() === "About");
-        const about =
-          aboutHeader
-            ?.closest("div")
-            ?.nextElementSibling?.querySelector('span[dir="auto"]')
-            ?.textContent.trim() || "No status";
+          // Extract Name - try multiple selectors
+          const nameSelectors = [
+            'span[dir="auto"].x1rg5ohu',
+            'span[dir="auto"]',
+            '[data-testid="conversation-header"] span',
+            'header span[dir="auto"]:first-child',
+          ];
+
+          for (const selector of nameSelectors) {
+            const nameElement = contactInfoPanel.querySelector(selector);
+            if (
+              nameElement &&
+              nameElement.textContent.trim() &&
+              !nameElement.textContent.match(/\+[\d\s]+/)
+            ) {
+              name = nameElement.textContent.trim();
+              console.log(`[CONTACT_EXTRACTION] Found name: ${name}`);
+              break;
+            }
+          }
+
+          // Extract Phone Number - look for + pattern
+          const phoneElement = Array.from(
+            contactInfoPanel.querySelectorAll('span[dir="auto"], div')
+          ).find((el) => el.textContent.match(/\+[\d\s\-\(\)]+/));
+
+          if (phoneElement) {
+            phone = phoneElement.textContent.trim();
+            console.log(`[CONTACT_EXTRACTION] Found phone: ${phone}`);
+          }
+
+          // Extract About/Status - look for status section
+          const aboutHeaders = ["About", "Status", "Bio"];
+          for (const aboutHeaderText of aboutHeaders) {
+            const aboutHeader = Array.from(
+              contactInfoPanel.querySelectorAll("div, span")
+            ).find((el) => el.textContent.trim() === aboutHeaderText);
+
+            if (aboutHeader) {
+              const aboutText = aboutHeader
+                .closest("div")
+                ?.nextElementSibling?.querySelector('span[dir="auto"]')
+                ?.textContent.trim();
+              if (aboutText) {
+                about = aboutText;
+                console.log(`[CONTACT_EXTRACTION] Found about: ${about}`);
+                break;
+              }
+            }
+          }
+        } else {
+          console.warn(
+            "[CONTACT_EXTRACTION] No contact info panel found, using defaults"
+          );
+        }
 
         setContact({ name, phone, about });
         setIsLoading(false);
+        console.log(
+          "[CONTACT_EXTRACTION] Contact extraction completed successfully"
+        );
       } catch (error) {
-        console.error("Error extracting contact info:", error);
+        console.error(
+          "[CONTACT_EXTRACTION] Error extracting contact info:",
+          error
+        );
         setContact({
           name: "Unknown contact",
           phone: "Not available",
@@ -377,11 +474,16 @@ const InjectedSidebarContent = ({
       }
     };
 
-    // Initial extraction
-    extractContactInfo();
+    // Initial extraction with delay to ensure DOM is ready
+    const timeoutId = setTimeout(extractContactInfo, 1000);
 
     // Set up observer to detect when contact info changes
-    const observer = new MutationObserver(extractContactInfo);
+    const observer = new MutationObserver(() => {
+      // Debounce the extraction to avoid too many calls
+      clearTimeout(timeoutId);
+      setTimeout(extractContactInfo, 500);
+    });
+
     observer.observe(document.body, {
       childList: true,
       subtree: true,
@@ -389,7 +491,21 @@ const InjectedSidebarContent = ({
       characterData: false,
     });
 
-    return () => observer.disconnect();
+    return () => {
+      clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, []);
+
+  // Set up global function to show orders section
+  useEffect(() => {
+    window.showOrdersSection = () => {
+      setShowOrders(true);
+    };
+
+    return () => {
+      delete window.showOrdersSection;
+    };
   }, []);
 
   return (
@@ -516,21 +632,36 @@ const InjectedSidebarContent = ({
             </span>
           </div>
           <div>
-            <strong>Address:</strong>{" "}
+            <strong>About:</strong>{" "}
             <span
-              style={{ color: contact?.phone ? theme.text : theme.subText }}
+              style={{ color: contact?.about ? theme.text : theme.subText }}
             >
-              {contact?.phone || "Not available"}
+              {contact?.about || "Not available"}
             </span>
           </div>
-          <div>
-            <strong>City:</strong>{" "}
-            <span
-              style={{ color: contact?.phone ? theme.text : theme.subText }}
-            >
-              {contact?.phone || "Not available"}
-            </span>
-          </div>
+        </div>
+      </section>
+
+      {/* Orders Section - Always visible */}
+      <section style={{ marginBottom: "28px" }}>
+        <h2
+          style={{
+            marginBottom: "12px",
+            fontSize: "1.1rem",
+            color: theme.text,
+          }}
+        >
+          Orders
+        </h2>
+        <div
+          style={{
+            background: theme.card,
+            borderRadius: "10px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+            border: `1px solid ${theme.border}`,
+          }}
+        >
+          <OrdersSection />
         </div>
       </section>
 
@@ -620,7 +751,7 @@ const InjectedSidebarContent = ({
                   color: theme.subText,
                   cursor: "pointer",
                   fontSize: "1.2rem",
-                  padding: "4px",
+                  // padding: "4px",
                 }}
               >
                 ✕
