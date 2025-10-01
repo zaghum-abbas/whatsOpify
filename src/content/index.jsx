@@ -713,18 +713,36 @@ async function fetchUserInfo() {
       const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
       if (whatsopifyTokenRaw) {
         const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
+
+        // Handle both old and new token structures
         if (
           whatsopifyTokenObj &&
           whatsopifyTokenObj.data &&
           whatsopifyTokenObj.data.token
         ) {
+          // New structure: { data: { token: "...", user: {...}, stores: [...] } }
           token = whatsopifyTokenObj.data.token;
           if (whatsopifyTokenObj.data.user) {
             console.log(
-              "[USER] Found user info in token data:",
+              "[USER] Found user info in token data (new structure):",
               whatsopifyTokenObj.data.user
             );
             userInfoCache = whatsopifyTokenObj.data.user;
+            window.whatsapofyUserInfo.userInfo = userInfoCache;
+            userInfoLoading = false;
+            userInfoListeners.forEach((fn) => fn(userInfoCache)); // Pass data to listeners
+            userInfoListeners = []; // Clear listeners
+            return;
+          }
+        } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
+          // Old structure: { token: "...", user: {...}, stores: [...] }
+          token = whatsopifyTokenObj.token;
+          if (whatsopifyTokenObj.user) {
+            console.log(
+              "[USER] Found user info in token data (old structure):",
+              whatsopifyTokenObj.user
+            );
+            userInfoCache = whatsopifyTokenObj.user;
             window.whatsapofyUserInfo.userInfo = userInfoCache;
             userInfoLoading = false;
             userInfoListeners.forEach((fn) => fn(userInfoCache)); // Pass data to listeners
@@ -747,31 +765,18 @@ async function fetchUserInfo() {
       return;
     }
 
-    const corsProxy = "https://corsproxy.io/?";
-    const apiUrl = "https://api1.shopilam.com/api/v1/auth/me";
-    const fetchOptions = { headers: { Authorization: `Bearer ${token}` } };
+    // Use background script for API call with token authentication
+    console.log("[USER] Fetching user info via background script...");
 
-    console.log("[USER] Fetching from API:", apiUrl);
-    const response = await fetch(
-      corsProxy + encodeURIComponent(apiUrl),
-      fetchOptions
-    );
+    const response = await chrome.runtime.sendMessage({
+      action: "FETCH_USER_INFO",
+    });
 
-    if (response.ok) {
-      const text = await response.text();
-      const data = JSON.parse(text);
-      console.log("[USER] API response:", data);
-
-      if (data && data.user) {
-        userInfoCache = data.user;
-      } else if (data && (data.name || data.email)) {
-        userInfoCache = data;
-      } else {
-        console.warn("[USER] Unexpected response structure:", data);
-        userInfoCache = null;
-      }
+    if (response.success) {
+      console.log("[USER] User info fetched successfully:", response.userInfo);
+      userInfoCache = response.userInfo;
     } else {
-      console.warn("[USER] API request failed:", response.status);
+      console.warn("[USER] Failed to fetch user info:", response.error);
       userInfoCache = null;
     }
 
@@ -818,82 +823,103 @@ async function fetchStoresForUser() {
   storesLoading = true;
   storesError = null;
   try {
-    let token = null;
+    console.log("[STORES] Checking for stores in localStorage first...");
+
+    // First check if stores are available in localStorage (from login response)
     try {
-      const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
-      if (whatsopifyTokenRaw) {
-        const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
+      const tokenData = localStorage.getItem("whatsopify_token");
+      if (tokenData) {
+        const parsed = JSON.parse(tokenData);
+
+        // Check both old and new structures for stores
+        let storesFromToken = null;
+        if (parsed && parsed.data && parsed.data.stores) {
+          // New structure
+          storesFromToken = parsed.data.stores;
+        } else if (parsed && parsed.stores) {
+          // Old structure
+          storesFromToken = parsed.stores;
+        }
+
         if (
-          whatsopifyTokenObj &&
-          whatsopifyTokenObj.data &&
-          whatsopifyTokenObj.data.token
+          storesFromToken &&
+          Array.isArray(storesFromToken) &&
+          storesFromToken.length > 0
         ) {
-          token = whatsopifyTokenObj.data.token;
+          console.log(
+            "[STORES] Found stores in localStorage:",
+            storesFromToken
+          );
+          storesCache = storesFromToken;
+
+          // Set the active store ID globally
+          if (storesCache.length > 0) {
+            window.whatsapofyProducts.storeId =
+              storesCache[0]._id ||
+              storesCache[0].id ||
+              storesCache[0].storeId ||
+              storesCache[0].store_id;
+            console.log(
+              "[STORES] Global active store ID set from localStorage:",
+              window.whatsapofyProducts.storeId
+            );
+          }
+
+          storesLoading = false;
+          storesListeners.forEach((fn) => fn(storesCache)); // Pass data to listeners
+          storesListeners = []; // Clear listeners
+          return;
         }
       }
     } catch (err) {
-      console.warn("[STORES] Error extracting token from localStorage:", err);
+      console.warn("[STORES] Error reading stores from localStorage:", err);
     }
-    if (!token) {
-      console.warn("[STORES] No token found, cannot fetch stores.");
-      storesCache = [];
-      storesLoading = false;
-      storesListeners.forEach((fn) => fn(storesCache)); // Pass data to listeners
-      storesListeners = []; // Clear listeners
-      return;
-    }
-    const corsProxy = "https://corsproxy.io/?";
-    const apiUrl = "https://api1.shopilam.com/api/v1/stores/";
-    const fetchOptions = { headers: { Authorization: `Bearer ${token}` } };
-    const response = await fetch(
-      corsProxy + encodeURIComponent(apiUrl),
-      fetchOptions
+
+    console.log(
+      "[STORES] No stores in localStorage, fetching via background script..."
     );
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const text = await response.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      console.error("[STORES] API response is not valid JSON:", text);
-      storesCache = [];
-      storesLoading = false;
-      storesListeners.forEach((fn) => fn(storesCache)); // Pass data to listeners
-      storesListeners = []; // Clear listeners
-      return;
-    }
-    storesCache = Array.isArray(data) ? data : [];
-    console.log("[STORES] Stores fetched for user:", storesCache);
-    console.log("[STORES] Store details for status debugging:");
-    storesCache.forEach((store, index) => {
-      console.log(`[STORES] Store ${index + 1}:`, {
-        name: store.name || store.store_name,
-        status: store.status,
-        isActive: store.isActive,
-        active: store.active,
-        state: store.state,
-        enabled: store.enabled,
-        is_active: store.is_active,
-        allFields: Object.keys(store),
-      });
+
+    // Use background script for API call with token authentication
+    const response = await chrome.runtime.sendMessage({
+      action: "FETCH_STORES",
     });
 
-    // Set the active store ID globally
-    if (storesCache.length > 0) {
-      window.whatsapofyProducts.storeId =
-        storesCache[0]._id ||
-        storesCache[0].id ||
-        storesCache[0].storeId ||
-        storesCache[0].store_id;
-      console.log(
-        "[STORES] Global active store ID set:",
-        window.whatsapofyProducts.storeId
-      );
+    if (response.success) {
+      console.log("[STORES] Stores fetched successfully:", response.stores);
+      storesCache = Array.isArray(response.stores) ? response.stores : [];
+
+      console.log("[STORES] Store details for status debugging:");
+      storesCache.forEach((store, index) => {
+        console.log(`[STORES] Store ${index + 1}:`, {
+          name: store.name || store.store_name,
+          status: store.status,
+          isActive: store.isActive,
+          active: store.active,
+          state: store.state,
+          enabled: store.enabled,
+          is_active: store.is_active,
+          allFields: Object.keys(store),
+        });
+      });
+
+      // Set the active store ID globally
+      if (storesCache.length > 0) {
+        window.whatsapofyProducts.storeId =
+          storesCache[0]._id ||
+          storesCache[0].id ||
+          storesCache[0].storeId ||
+          storesCache[0].store_id;
+        console.log(
+          "[STORES] Global active store ID set:",
+          window.whatsapofyProducts.storeId
+        );
+      } else {
+        window.whatsapofyProducts.storeId = null;
+        console.warn("[STORES] No stores found, active store ID set to null.");
+      }
     } else {
-      window.whatsapofyProducts.storeId = null;
-      console.warn("[STORES] No stores found, active store ID set to null.");
+      console.warn("[STORES] Failed to fetch stores:", response.error);
+      storesCache = [];
     }
 
     storesLoading = false;

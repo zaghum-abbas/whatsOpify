@@ -5,8 +5,8 @@ function handleCreateOrder(request, sender, sendResponse) {
 
   const orderApiUrl = "https://api1.shopilam.com/api/v1/orders";
 
-  // Use enhanced cookie handling
-  handleApiCallWithCookies(
+  // Use token-based authentication
+  handleApiCallWithToken(
     orderApiUrl,
     {
       method: "POST",
@@ -27,8 +27,8 @@ function handleFetchOrders(request, sender, sendResponse) {
   const { status, page = 1, limit = 50 } = request;
   const ordersApiUrl = `https://api1.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}`;
 
-  // Enhanced cookie handling
-  handleApiCallWithCookies(
+  // Token-based authentication
+  handleApiCallWithToken(
     ordersApiUrl,
     {
       method: "GET",
@@ -40,144 +40,89 @@ function handleFetchOrders(request, sender, sendResponse) {
   );
 }
 
-// Enhanced API call handler with proper cookie management
-function handleApiCallWithCookies(url, options, sendResponse) {
-  console.log("[BG] Making API call with enhanced cookie handling:", url);
+// Token-based API call handler
+function handleApiCallWithToken(url, options, sendResponse) {
+  console.log("[BG] Making API call with token authentication:", url);
 
-  // Check cookies for all relevant domains
-  Promise.all([
-    new Promise((resolve) =>
-      chrome.cookies.getAll({ domain: "shopilam.com" }, resolve)
-    ),
-    new Promise((resolve) =>
-      chrome.cookies.getAll({ domain: ".shopilam.com" }, resolve)
-    ),
-    new Promise((resolve) =>
-      chrome.cookies.getAll({ domain: "api1.shopilam.com" }, resolve)
-    ),
-    new Promise((resolve) =>
-      chrome.cookies.getAll({ domain: "www.shopilam.com" }, resolve)
-    ),
-  ])
-    .then(([mainCookies, parentCookies, apiCookies, wwwCookies]) => {
-      console.log("[BG] Main domain cookies:", mainCookies);
-      console.log("[BG] Parent domain cookies:", parentCookies);
-      console.log("[BG] API domain cookies:", apiCookies);
-      console.log("[BG] WWW domain cookies:", wwwCookies);
+  // Get token from storage
+  chrome.storage.local.get(["whatsopify_token"], (result) => {
+    let token = null;
 
-      // Combine all cookies
-      const allCookies = [
-        ...mainCookies,
-        ...parentCookies,
-        ...apiCookies,
-        ...wwwCookies,
-      ];
-      const uniqueCookies = allCookies.filter(
-        (cookie, index, self) =>
-          index ===
-          self.findIndex(
-            (c) => c.name === cookie.name && c.domain === cookie.domain
-          )
-      );
+    try {
+      if (result.whatsopify_token) {
+        const tokenData = JSON.parse(result.whatsopify_token);
 
-      console.log("[BG] All unique cookies:", uniqueCookies);
-
-      // Check if we have session cookies
-      const sessionCookies = uniqueCookies.filter(
-        (cookie) =>
-          cookie.name.toLowerCase().includes("session") ||
-          cookie.name.toLowerCase().includes("auth") ||
-          cookie.name.toLowerCase().includes("token")
-      );
-
-      console.log("[BG] Session cookies found:", sessionCookies);
-
-      // If we have session cookies on main domain but not API domain, copy them
-      if (sessionCookies.length > 0) {
-        const apiHasSession = apiCookies.some(
-          (cookie) =>
-            cookie.name.toLowerCase().includes("session") ||
-            cookie.name.toLowerCase().includes("auth")
-        );
-
-        if (!apiHasSession) {
-          console.log("[BG] Copying session cookies to API domain...");
-          sessionCookies.forEach((cookie) => {
-            chrome.cookies.set({
-              url: "https://api1.shopilam.com",
-              name: cookie.name,
-              value: cookie.value,
-              domain: "api1.shopilam.com",
-              secure: true,
-              httpOnly: false,
-              sameSite: "none",
-              path: "/",
-            });
-          });
+        // Handle both old and new token structures
+        if (tokenData && tokenData.data && tokenData.data.token) {
+          // New structure: { data: { token: "...", user: {...}, stores: [...] } }
+          token = tokenData.data.token;
+        } else if (tokenData && tokenData.token) {
+          // Old structure: { token: "...", user: {...}, stores: [...] }
+          token = tokenData.token;
         }
       }
+    } catch (err) {
+      console.warn("[BG] Error parsing token from storage:", err);
+    }
 
-      // Build cookie string
-      const cookieString = uniqueCookies
-        .map((cookie) => `${cookie.name}=${cookie.value}`)
-        .join("; ");
-
-      console.log("[BG] Cookie string:", cookieString);
-
-      // Make the API call with enhanced options
-      const fetchOptions = {
-        ...options,
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Cookie: cookieString,
-          ...options.headers,
-        },
-      };
-
-      console.log("[BG] Making fetch request with options:", fetchOptions);
-
-      fetch(url, fetchOptions)
-        .then((response) => {
-          return response.json().then((data) => ({
-            status: response.status,
-            ok: response.ok,
-            data: data,
-          }));
-        })
-        .then(({ status, ok, data }) => {
-          console.log("[BG] API Response Status:", status);
-          console.log("[BG] API Response Data:", data);
-
-          if (ok) {
-            console.log("[BG] API call successful:", data);
-            sendResponse({
-              success: true,
-              ...(url.includes("orders")
-                ? { orders: data }
-                : { products: data }),
-            });
-          } else {
-            const errorMessage =
-              data && (data.detail || data.message)
-                ? data.detail || data.message
-                : `API error (Status: ${status})`;
-            console.log("[BG] API call failed:", errorMessage);
-            sendResponse({ success: false, error: errorMessage, data: data });
-          }
-        })
-        .catch((error) => {
-          console.error("[BG] Fetch error:", error);
-          sendResponse({ success: false, error: error.message });
-        });
-    })
-    .catch((error) => {
-      console.error("[BG] Cookie handling error:", error);
+    if (!token) {
+      console.warn("[BG] No valid token found, API call will fail");
       sendResponse({
         success: false,
-        error: "Cookie handling failed: " + error.message,
+        error: "Authentication token not found. Please login again.",
       });
-    });
+      return;
+    }
+
+    console.log(
+      "[BG] Using token for API call:",
+      token.substring(0, 20) + "..."
+    );
+
+    // Make the API call with token in Authorization header
+    const fetchOptions = {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      },
+    };
+
+    console.log("[BG] Making fetch request with token auth:", fetchOptions);
+
+    fetch(url, fetchOptions)
+      .then((response) => {
+        return response.json().then((data) => ({
+          status: response.status,
+          ok: response.ok,
+          data: data,
+        }));
+      })
+      .then(({ status, ok, data }) => {
+        console.log("[BG] API Response Status:", status);
+        console.log("[BG] API Response Data:", data);
+
+        if (ok) {
+          console.log("[BG] API call successful:", data);
+          sendResponse({
+            success: true,
+            ...(url.includes("orders") ? { orders: data } : { products: data }),
+          });
+        } else {
+          const errorMessage =
+            data && (data.detail || data.message)
+              ? data.detail || data.message
+              : `API error (Status: ${status})`;
+          console.log("[BG] API call failed:", errorMessage);
+          sendResponse({ success: false, error: errorMessage, data: data });
+        }
+      })
+      .catch((error) => {
+        console.error("[BG] Fetch error:", error);
+        sendResponse({ success: false, error: error.message });
+      });
+  });
 }
 
 function handleUpdateOrderStatus(request, sender, sendResponse) {
@@ -190,8 +135,8 @@ function handleUpdateOrderStatus(request, sender, sendResponse) {
     status: status,
   };
 
-  // Use enhanced cookie handling
-  handleApiCallWithCookies(
+  // Token-based authentication
+  handleApiCallWithToken(
     updateApiUrl,
     {
       method: "PUT",
@@ -201,6 +146,64 @@ function handleUpdateOrderStatus(request, sender, sendResponse) {
       body: JSON.stringify(bodyData),
     },
     sendResponse
+  );
+
+  return true; // Required for async sendResponse
+}
+
+function handleFetchUserInfo(request, sender, sendResponse) {
+  console.log("[BG] Fetch user info request received:", request);
+
+  const userInfoApiUrl = "https://api1.shopilam.com/api/v1/auth/me";
+
+  // Token-based authentication
+  handleApiCallWithToken(
+    userInfoApiUrl,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+    (response) => {
+      if (response.success) {
+        sendResponse({
+          success: true,
+          userInfo: response.data,
+        });
+      } else {
+        sendResponse(response);
+      }
+    }
+  );
+
+  return true; // Required for async sendResponse
+}
+
+function handleFetchStores(request, sender, sendResponse) {
+  console.log("[BG] Fetch stores request received:", request);
+
+  const storesApiUrl = "https://api1.shopilam.com/api/v1/stores/";
+
+  // Token-based authentication
+  handleApiCallWithToken(
+    storesApiUrl,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+    (response) => {
+      if (response.success) {
+        sendResponse({
+          success: true,
+          stores: response.data,
+        });
+      } else {
+        sendResponse(response);
+      }
+    }
   );
 
   return true; // Required for async sendResponse
@@ -319,11 +322,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return handleUpdateOrderStatus(request, sender, sendResponse);
     case "SEND_WHATSAPP_MESSAGE":
       return handleSendWhatsAppMessage(request, sender, sendResponse);
+    case "FETCH_USER_INFO":
+      return handleFetchUserInfo(request, sender, sendResponse);
+    case "FETCH_STORES":
+      return handleFetchStores(request, sender, sendResponse);
     case "FETCH_PRODUCTS":
       const productsApiUrl = "https://api1.shopilam.com/api/v1/products";
 
-      // Use enhanced cookie handling
-      handleApiCallWithCookies(
+      // Token-based authentication
+      handleApiCallWithToken(
         productsApiUrl,
         {
           method: "GET",

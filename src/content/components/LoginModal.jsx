@@ -25,23 +25,23 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             "Content-Type": "application/json",
             Accept: "application/json",
             "User-Agent": "WhatsappWeb-Extension/1.0",
+            user: "ext",
           },
           body: JSON.stringify(requestData),
         }
       );
 
       if (response.ok) {
-        const token = await response.json();
+        const responseData = await response.json();
 
-        localStorage.setItem("whatsopify_token", token);
-
-        console.log("token", token);
+        // Save the entire response data structure
+        localStorage.setItem("whatsopify_token", JSON.stringify(responseData));
 
         // Force storage event for all listeners (including same tab)
         window.dispatchEvent(
           new StorageEvent("storage", {
             key: "whatsopify_token",
-            newValue: token,
+            newValue: responseData?.data,
           })
         );
 

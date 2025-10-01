@@ -70,8 +70,20 @@ const OrdersSection = () => {
 
   // Check if user is authenticated
   const isAuthenticated = () => {
-    const token = localStorage.getItem("whatsopify_token");
-    return !!token;
+    try {
+      const tokenData = localStorage.getItem("whatsopify_token");
+      if (tokenData) {
+        const parsed = JSON.parse(tokenData);
+        // Check both old and new token structures
+        return !!(
+          parsed &&
+          ((parsed.data && parsed.data.token) || parsed.token)
+        );
+      }
+    } catch (err) {
+      console.warn("[ORDERS] Error checking authentication:", err);
+    }
+    return false;
   };
 
   // Function to fetch orders from API

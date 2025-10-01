@@ -665,18 +665,32 @@ const InjectedSidebarContent = ({
         </div>
       </section>
 
-      {/* <section style={{ marginBottom: '28px' }}>
-        <h2 style={{ marginBottom: '12px', fontSize: '1.1rem', color: theme.text }}>My Stores</h2>
-        <div style={{ background: theme.card, borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.07)', padding: '16px', border: `1px solid ${theme.border}` }}>
+      <section style={{ marginBottom: "28px" }}>
+        <h2
+          style={{
+            marginBottom: "12px",
+            fontSize: "1.1rem",
+            color: theme.text,
+          }}
+        >
+          My Stores
+        </h2>
+        <div
+          style={{
+            background: theme.card,
+            borderRadius: "10px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+            padding: "16px",
+            border: `1px solid ${theme.border}`,
+          }}
+        >
           {stores && stores.length > 0 ? (
-            stores.map((store, idx) => (
-              <StoreItem store={store} key={idx} />
-            ))
+            stores.map((store, idx) => <StoreItem store={store} key={idx} />)
           ) : (
             <div style={{ color: theme.subText }}>No stores available.</div>
           )}
         </div>
-      </section> */}
+      </section>
 
       <section style={{ marginBottom: "28px" }}>
         <h2
@@ -769,7 +783,7 @@ const InjectedSidebarContent = ({
         </section>
       )}
 
-      <section>
+      <section style={{ marginBottom: "28px" }}>
         <h2
           style={{
             marginBottom: "12px",
