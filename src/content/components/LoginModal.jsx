@@ -41,7 +41,7 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         window.dispatchEvent(
           new StorageEvent("storage", {
             key: "whatsopify_token",
-            newValue: responseData?.data,
+            newValue: responseData,
           })
         );
 

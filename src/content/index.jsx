@@ -10,18 +10,8 @@ import "./App.css"; // Your main CSS file
 
 import { requireAuth, useAuthState } from "./components/authMiddleware.jsx";
 import LoginModal from "./components/LoginModal";
-import {
-  debugSessionAuth,
-  testCookieDomains,
-  checkMainDomainCookies,
-} from "../utils/debugSession.js";
 
 console.log("🚀 Whatsapofy content script loaded at 12:30 PM PKT, 17/07/2025");
-
-// Global debug functions for session authentication
-window.debugSessionAuth = debugSessionAuth;
-window.testCookieDomains = testCookieDomains;
-window.checkMainDomainCookies = checkMainDomainCookies;
 
 // --- Global State Variables ---
 // Initialize caches to null to indicate data hasn't been fetched yet
@@ -1006,9 +996,51 @@ async function fetchProductsFromAPI() {
     let allUserProducts = []; // Array to hold products fetched from the API
 
     try {
-      // Use background script to fetch products with session-based auth (bypasses CORS issues)
+      // Get token from localStorage first
+      let token = null;
+      try {
+        const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
+        if (whatsopifyTokenRaw) {
+          const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
+
+          // Handle both old and new token structures
+          if (
+            whatsopifyTokenObj &&
+            whatsopifyTokenObj.data &&
+            whatsopifyTokenObj.data.token
+          ) {
+            // New structure: { data: { token: "...", user: {...}, stores: [...] } }
+            token = whatsopifyTokenObj.data.token;
+          } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
+            // Old structure: { token: "...", user: {...}, stores: [...] }
+            token = whatsopifyTokenObj.token;
+          }
+        }
+      } catch (err) {
+        console.warn(
+          "[PRODUCTS] Error extracting token from localStorage:",
+          err
+        );
+      }
+
+      if (!token) {
+        console.warn("[PRODUCTS] No token found, cannot fetch products.");
+        allUserProducts = [];
+        productsLoading = false;
+        productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
+        productsListeners = []; // Clear listeners
+        return;
+      }
+
+      console.log(
+        "[PRODUCTS] Using token for API call:",
+        token.substring(0, 20) + "..."
+      );
+
+      // Use background script to fetch products with token authentication (bypasses CORS issues)
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_PRODUCTS",
+        token: token,
       });
 
       if (response.success) {
@@ -2078,7 +2110,7 @@ window.testNewProductsAPI = function () {
     vendor: "",
     search: "",
   });
-  const apiUrl = `https://api1.shopilam.com/api/v1/products?${apiParams.toString()}`;
+  const apiUrl = `https://api.shopilam.com/api/v1/products?${apiParams.toString()}`;
 
   console.log("[PRODUCTS] Testing API URL:", apiUrl);
 
@@ -2194,6 +2226,59 @@ window.debugMessageInput = function () {
       console.log(`[DEBUG] Input ${index + 1}:`, input);
     }
   });
+};
+
+window.debugTokenIssue = function () {
+  console.log("[DEBUG] 🔑 Token debugging:");
+
+  // Check localStorage
+  const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
+  console.log("[DEBUG] Raw token from localStorage:", whatsopifyTokenRaw);
+
+  if (whatsopifyTokenRaw) {
+    try {
+      const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
+      console.log("[DEBUG] Parsed token object:", whatsopifyTokenObj);
+
+      let token = null;
+      if (
+        whatsopifyTokenObj &&
+        whatsopifyTokenObj.data &&
+        whatsopifyTokenObj.data.token
+      ) {
+        token = whatsopifyTokenObj.data.token;
+        console.log(
+          "[DEBUG] Token from new structure:",
+          token ? token.substring(0, 20) + "..." : "undefined"
+        );
+      } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
+        token = whatsopifyTokenObj.token;
+        console.log(
+          "[DEBUG] Token from old structure:",
+          token ? token.substring(0, 20) + "..." : "undefined"
+        );
+      } else {
+        console.log("[DEBUG] No token found in either structure");
+      }
+
+      if (token) {
+        console.log("[DEBUG] Testing API call with token...");
+        chrome.runtime.sendMessage(
+          {
+            action: "FETCH_PRODUCTS",
+            token: token,
+          },
+          (response) => {
+            console.log("[DEBUG] API response:", response);
+          }
+        );
+      }
+    } catch (err) {
+      console.error("[DEBUG] Error parsing token:", err);
+    }
+  } else {
+    console.log("[DEBUG] No token found in localStorage");
+  }
 };
 
 // --- Initial Data Fetches (run once when script loads) ---

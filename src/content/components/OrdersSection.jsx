@@ -92,7 +92,7 @@ const OrdersSection = () => {
       setLoading(true);
       setError(null);
 
-      // Use background script to fetch orders with session cookies
+      // Use background script to fetch orders with token authentication
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_ORDERS",
         status: status,
