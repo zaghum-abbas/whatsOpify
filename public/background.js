@@ -327,7 +327,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case "FETCH_STORES":
       return handleFetchStores(request, sender, sendResponse);
     case "FETCH_PRODUCTS":
-      const productsApiUrl = "https://api1.shopilam.com/api/v1/products";
+      const productsApiUrl =
+        "https://api1.shopilam.com/api/v1/products?limit=50&page=1&status=active";
 
       // Token-based authentication
       handleApiCallWithToken(
