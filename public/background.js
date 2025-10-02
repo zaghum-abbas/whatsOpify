@@ -182,7 +182,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       const productsApiUrl =
-        "https://api.shopilam.com/api/v1/products?limit=50&page=1&status=active";
+        "https://api1.shopilam.com/api/v1/products?limit=50&page=1&status=active";
 
       const productsHeaders = {
         Authorization: `Bearer ${token}`,
@@ -216,7 +216,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           console.log("[BG] API success response:", productsData);
           console.log(
             "[BG] Products count:",
-            Array.isArray(productsData) ? productsData.length : "Not an array"
+            Array.isArray(productsData?.data)
+              ? productsData?.data?.length
+              : "Not an array",
+            productsData
           );
           sendResponse({ success: true, products: productsData });
         })

@@ -1043,6 +1043,8 @@ async function fetchProductsFromAPI() {
         token: token,
       });
 
+      console.log("[PRODUCTS] Response:", response);
+
       if (response.success) {
         console.log(
           "[PRODUCTS] ✅ Products fetched successfully via background script"
