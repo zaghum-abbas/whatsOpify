@@ -229,10 +229,29 @@ const OrdersSection = () => {
   // const handleWhatsAppRedirect = (order) => {
   //   const cleanedNumber = order.phoneNumber.replace(/[^0-9]/g, "");
   //   if (cleanedNumber) {
-  //     const url = `https://web.whatsapp.com/send?phone=${cleanedNumber}&text=${encodeURIComponent(
-  //       `Hello ${order.customerName}, Your order #${order.id} has been successfully placed! We're processing it and will keep you updated as it moves forward. Thank you for choosing us!`
-  //     )}`;
-  //     window.open(url, "_self");
+  //     console.log("[ORDERS] Sending WhatsApp message request:", {
+  //       phoneNumber: cleanedNumber,
+  //       customerName: order.customerName,
+  //       orderId: order.id,
+  //     });
+
+  //     chrome.runtime.sendMessage(
+  //       {
+  //         action: "SEND_WHATSAPP_MESSAGE",
+  //         phoneNumber: cleanedNumber,
+  //         message: `Hello ${order.customerName}, Your order #${order.id} has been successfully placed! We're processing it and will keep you updated as it moves forward. Thank you for choosing us!`,
+  //       },
+  //       (response) => {
+  //         if (chrome.runtime.lastError) {
+  //           console.error(
+  //             "[ORDERS] Error sending message:",
+  //             chrome.runtime.lastError
+  //           );
+  //         } else {
+  //           console.log("[ORDERS] Message sent successfully:", response);
+  //         }
+  //       }
+  //     );
   //   }
   // };
 
