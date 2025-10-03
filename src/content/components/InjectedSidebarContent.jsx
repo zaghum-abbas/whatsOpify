@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import ModalForm from "./ModalForm";
 import CustomerSupportMessages from "./CustomerSupportMessages";
 import OrdersSection from "./OrdersSection";
+import { formatPrice } from "../../core/utils/helperFunctions";
 const getTheme = () => {
   // Try to detect WhatsApp dark mode from body class or style
   const body = document.body;
@@ -189,7 +190,7 @@ const CatalogItem = ({ item }) => {
         gap: "12px",
         background: theme.card,
         borderRadius: "8px",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+        // boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         padding: "12px",
         marginBottom: "12px",
         border: `1px solid ${theme.border}`,
@@ -205,14 +206,13 @@ const CatalogItem = ({ item }) => {
         e.target.style.boxShadow = "0 1px 4px rgba(0,0,0,0.07)";
       }}
     >
-      {/* Product Image */}
       <div
         style={{
           width: "50px",
           height: "50px",
           borderRadius: "6px",
           overflow: "hidden",
-          backgroundColor: theme.bg,
+          // backgroundColor: theme.bg,
           border: `1px solid ${theme.border}`,
           flexShrink: 0,
           display: "flex",
@@ -220,37 +220,38 @@ const CatalogItem = ({ item }) => {
           justifyContent: "center",
         }}
       >
-        {item.image ? (
+        {item.images && item.images.length > 0 ? (
           <img
-            src={item.image}
+            // src={item.images[0]?.url}
+            src={"/pent.jpeg"}
             alt={item.name}
             style={{
               width: "100%",
               height: "100%",
               objectFit: "cover",
             }}
-            onError={(e) => {
-              e.target.style.display = "none";
-              e.target.nextSibling.style.display = "flex";
-            }}
+            // onError={(e) => {
+            //   e.target.style.display = "none";
+            //   e.target.nextSibling.style.display = "flex";
+            // }}
           />
-        ) : null}
-        <div
-          style={{
-            display: item.image ? "none" : "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "100%",
-            height: "100%",
-            fontSize: "1.2em",
-            color: theme.accent,
-          }}
-        >
-          🛒
-        </div>
+        ) : (
+          <div
+            style={{
+              display: item.image ? "none" : "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              height: "100%",
+              fontSize: "1.2em",
+              color: theme.accent,
+            }}
+          >
+            🛒
+          </div>
+        )}
       </div>
 
-      {/* Product Details */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -263,7 +264,7 @@ const CatalogItem = ({ item }) => {
             whiteSpace: "nowrap",
           }}
         >
-          {item.name}
+          {item?.title}
         </div>
         {/* {item.description && (
           <div
@@ -313,7 +314,7 @@ const CatalogItem = ({ item }) => {
             marginBottom: "4px",
           }}
         >
-          {item.price}
+          Rs. {formatPrice(item?.variants?.[0]?.price)}
         </div>
         <div
           style={{

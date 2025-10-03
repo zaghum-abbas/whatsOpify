@@ -10,6 +10,7 @@ import "./App.css"; // Your main CSS file
 
 import { requireAuth, useAuthState } from "./components/authMiddleware.jsx";
 import LoginModal from "./components/LoginModal";
+import { getToken } from "../core/utils/helperFunctions.js";
 
 console.log("🚀 Whatsapofy content script loaded at 12:30 PM PKT, 17/07/2025");
 
@@ -925,7 +926,6 @@ async function fetchStoresForUser() {
   }
 }
 
-// Helper to get stores for sidebar or other UI
 function getStoresForUser(callback) {
   if (storesCache !== null) {
     callback(storesCache);
@@ -938,26 +938,20 @@ function getStoresForUser(callback) {
 }
 
 function getProducts(callback) {
-  // If products are already in cache, return immediately
   if (productsCache !== null) {
-    // Check for null, not just empty array
     callback(productsCache);
     return;
   }
 
-  // If a fetch is in progress, add callback to listeners
   if (productsLoading) {
     productsListeners.push(callback);
     return;
   }
-
-  // Otherwise, start the fetch, and add the callback to listeners
   productsListeners.push(callback);
   fetchProductsFromAPI();
 }
 
 async function fetchProductsFromAPI() {
-  // Prevent multiple simultaneous fetches
   if (productsLoading) return;
 
   productsLoading = true;
@@ -993,40 +987,12 @@ async function fetchProductsFromAPI() {
           .filter(Boolean)
       : [];
 
-    let allUserProducts = []; // Array to hold products fetched from the API
+    let allUserProducts = [];
 
     try {
-      // Get token from localStorage first
-      let token = null;
-      try {
-        const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
-        if (whatsopifyTokenRaw) {
-          const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
-
-          // Handle both old and new token structures
-          if (
-            whatsopifyTokenObj &&
-            whatsopifyTokenObj.data &&
-            whatsopifyTokenObj.data.token
-          ) {
-            // New structure: { data: { token: "...", user: {...}, stores: [...] } }
-            token = whatsopifyTokenObj.data.token;
-          } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
-            // Old structure: { token: "...", user: {...}, stores: [...] }
-            token = whatsopifyTokenObj.token;
-          }
-        }
-      } catch (err) {
-        console.warn(
-          "[PRODUCTS] Error extracting token from localStorage:",
-          err
-        );
-      }
-
-      // Use background script to fetch products with token authentication (bypasses CORS issues)
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_PRODUCTS",
-        token: token,
+        token: getToken(),
       });
 
       console.log("[PRODUCTS] Response:", response);
@@ -1100,31 +1066,7 @@ async function fetchProductsFromAPI() {
       allUserProducts = [];
     }
 
-    // Process the fetched products, ensuring the 'variants' array is preserved
-    productsCache = allUserProducts.map((p) => {
-      const processedProduct = {
-        id: p._id || p.id, // Use a consistent ID for keying in React
-        name: p.title || p.name || "Unnamed", // Use title, then name, then 'Unnamed'
-        vendor: p.vendor || "",
-        category: p.category || "",
-        description: p.description || "",
-        storeId: p.storeId || p.store_id,
-        // The critical change: pass the original 'variants' array directly
-        variants: Array.isArray(p.variants) ? p.variants : [],
-        // Provide a default price and image for products without variants,
-        // or for quick display before a specific variant is selected.
-        price:
-          p.price ||
-          (Array.isArray(p.variants) && p.variants.length > 0
-            ? p.variants[0].price
-            : "N/A"),
-        image:
-          Array.isArray(p.images) && p.images.length > 0
-            ? p.images[0].url
-            : null,
-      };
-      return processedProduct;
-    });
+    productsCache = allUserProducts;
 
     console.log(
       `[PRODUCTS] 📊 Final result: ${productsCache.length} products processed`

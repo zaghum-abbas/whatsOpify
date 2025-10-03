@@ -9,12 +9,15 @@
   },
   "permissions": ["storage", "scripting", "tabs"],
   "host_permissions": [
-    "https://web.whatsapp.com/",
-    "https://api1.shopilam.com/*"
+    "https://web.whatsapp.com/*",
+    "https://*.whatsapp.net/*",
+    "https://mmg.whatsapp.net/*",
+    "https://api1.shopilam.com/*",
+    "https://files.static.shopilam.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://web.whatsapp.com/"],
+      "matches": ["https://web.whatsapp.com/*"],
       "js": ["content.js"]
     }
   ],
@@ -31,5 +34,8 @@
       ],
       "matches": ["https://web.whatsapp.com/*"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' https: data:"
+  }
 }

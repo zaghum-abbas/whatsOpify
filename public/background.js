@@ -52,7 +52,7 @@ function handleCreateOrder(request, sender, sendResponse) {
       sendResponse({ success: false, error: error.message });
     });
 
-  return true; // Required for async sendResponse
+  return true;
 }
 
 function handleSendWhatsAppMessage(request, sender, sendResponse) {
@@ -162,7 +162,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
     case "CREATE_ORDER":
       return handleCreateOrder(request, sender, sendResponse);
-
     case "SEND_WHATSAPP_MESSAGE":
       return handleSendWhatsAppMessage(request, sender, sendResponse);
     case "FETCH_PRODUCTS":
@@ -182,7 +181,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       const productsApiUrl =
-        "https://api1.shopilam.com/api/v1/products?limit=50&page=7&status=active";
+        "https://api1.shopilam.com/api/v1/products?limit=50&page=1&status=active";
 
       const productsHeaders = {
         Authorization: `Bearer ${token}`,
@@ -225,6 +224,75 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })
         .catch((error) => {
           console.error("[BG] Fetch error:", error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true;
+
+    case "FETCH_ORDERS":
+      const ordersToken = request.token;
+      const { status, page = 1, limit = 50 } = request;
+
+      console.log("[BG] FETCH_ORDERS request received:", {
+        status,
+        page,
+        limit,
+        token: ordersToken ? ordersToken.substring(0, 20) + "..." : "undefined",
+      });
+
+      if (!ordersToken) {
+        console.error("[BG] No token provided in FETCH_ORDERS request");
+        sendResponse({
+          success: false,
+          error: "No authentication token provided",
+        });
+        return false;
+      }
+
+      const ordersApiUrl = `https://api1.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}`;
+
+      const ordersHeaders = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ordersToken}`,
+      };
+
+      console.log("[BG] Making fetch request to:", ordersApiUrl);
+      console.log("[BG] Request headers:", ordersHeaders);
+
+      fetch(ordersApiUrl, {
+        method: "GET",
+        headers: ordersHeaders,
+      })
+        .then((response) => {
+          console.log("[BG] Orders API response status:", response.status);
+          console.log(
+            "[BG] Orders API response headers:",
+            Object.fromEntries(response.headers.entries())
+          );
+
+          if (!response.ok) {
+            return response.text().then((text) => {
+              console.error("[BG] Orders API error response:", text);
+              throw new Error(
+                `HTTP error! status: ${response.status}, message: ${text}`
+              );
+            });
+          }
+          return response.json();
+        })
+        .then((ordersData) => {
+          console.log("[BG] Orders API success response:", ordersData);
+          console.log(
+            "[BG] Orders count:",
+            Array.isArray(ordersData?.data)
+              ? ordersData?.data?.length
+              : Array.isArray(ordersData)
+              ? ordersData.length
+              : "Not an array"
+          );
+          sendResponse({ success: true, orders: ordersData });
+        })
+        .catch((error) => {
+          console.error("[BG] Orders fetch error:", error);
           sendResponse({ success: false, error: error.message });
         });
       return true;

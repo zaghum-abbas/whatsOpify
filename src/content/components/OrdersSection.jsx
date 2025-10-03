@@ -1,5 +1,10 @@
 // src/components/OrdersSection.jsx
 import React, { useState, useEffect } from "react";
+import {
+  formatDate,
+  formatPrice,
+  getToken,
+} from "../../core/utils/helperFunctions";
 
 const OrdersSection = () => {
   const [activeTab, setActiveTab] = useState("new");
@@ -10,95 +15,55 @@ const OrdersSection = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Dummy orders data
-  const dummyOrders = {
-    new: [
-      {
-        id: "ORD-001",
-        orderNumber: "WO-2024-001",
-        dateTime: "2024-01-15 10:30 AM",
-        customerName: "Ahmed Ali",
-        phoneNumber: "+923039551524",
-        status: "new",
-        total: "$150.00",
-        items: ["Product A", "Product B"],
-      },
-      {
-        id: "ORD-002",
-        orderNumber: "WO-2024-002",
-        dateTime: "2024-01-15 11:45 AM",
-        customerName: "Fatima Khan",
-        phoneNumber: "+923039551524",
-        status: "new",
-        total: "$85.50",
-        items: ["Product C"],
-      },
-      {
-        id: "ORD-003",
-        orderNumber: "WO-2024-003",
-        dateTime: "2024-01-15 02:15 PM",
-        customerName: "Muhammad Hassan",
-        phoneNumber: "+923039551524",
-        status: "new",
-        total: "$200.00",
-        items: ["Product D", "Product E", "Product F"],
-      },
-    ],
-    pending: [
-      {
-        id: "ORD-004",
-        orderNumber: "WO-2024-004",
-        dateTime: "2024-01-14 09:20 AM",
-        customerName: "Aisha Ahmed",
-        phoneNumber: "+923039551524",
-        status: "pending",
-        total: "$120.00",
-        items: ["Product G"],
-      },
-      {
-        id: "ORD-005",
-        orderNumber: "WO-2024-005",
-        dateTime: "2024-01-14 03:45 PM",
-        customerName: "Omar Sheikh",
-        phoneNumber: "+923039551524",
-        status: "pending",
-        total: "$75.25",
-        items: ["Product H", "Product I"],
-      },
-    ],
-  };
-
-  // Check if user is authenticated
-  const isAuthenticated = () => {
+  // Debug function to test orders API
+  const testOrdersAPI = async (status = "open") => {
+    console.log(`🧪 Testing Orders API for status: ${status}`);
     try {
-      const tokenData = localStorage.getItem("whatsopify_token");
-      if (tokenData) {
-        const parsed = JSON.parse(tokenData);
-        // Check both old and new token structures
-        return !!(
-          parsed &&
-          ((parsed.data && parsed.data.token) || parsed.token)
-        );
-      }
-    } catch (err) {
-      console.warn("[ORDERS] Error checking authentication:", err);
+      const result = await fetchOrders(status);
+      console.log(`✅ Orders API test successful for ${status}:`, result);
+      return result;
+    } catch (error) {
+      console.error(`❌ Orders API test failed for ${status}:`, error);
+      return null;
     }
-    return false;
   };
 
-  // Function to fetch orders from API
+  // Expose debug function to window for testing
+  React.useEffect(() => {
+    window.testOrdersAPI = testOrdersAPI;
+  }, []);
+
   const fetchOrders = async (status, page = 1, limit = 50) => {
     try {
       setLoading(true);
       setError(null);
+      const tokenData = localStorage.getItem("whatsopify_token");
+      if (!tokenData) {
+        throw new Error("No authentication token found");
+      }
+
+      const parsedToken = JSON.parse(tokenData);
+      const token = parsedToken?.data?.token || parsedToken?.token;
+
+      if (!token) {
+        throw new Error("Invalid authentication token");
+      }
+
+      console.log(
+        `[ORDERS] Fetching ${status} orders with token:`,
+        token.substring(0, 20) + "..."
+      );
 
       // Use background script to fetch orders with token authentication
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_ORDERS",
+        token: token,
         status: status,
         page: page,
         limit: limit,
       });
+
+      console.log(`[ORDERS] API Response for ${status}:`, response);
 
       if (response.success) {
         console.log(
@@ -106,32 +71,30 @@ const OrdersSection = () => {
           response.orders
         );
 
-        // Process the orders data
-        const processedOrders = Array.isArray(response.orders)
-          ? response.orders.map((order) => ({
-              id: order._id || order.id || order.orderId,
-              orderNumber:
-                order.orderNumber || order.order_number || order.order_id,
-              dateTime:
-                order.createdAt || order.created_at || order.date || "N/A",
-              customerName:
-                order.customerName ||
-                order.customer_name ||
-                order.customer?.name ||
-                "Unknown",
-              phoneNumber:
-                order.customerPhone ||
-                order.customer_phone ||
-                order.customer?.phone ||
-                "N/A",
-              status: status,
-              // Include any additional fields you might need
-              total: order.total || order.totalAmount || "N/A",
-              items: order.items || order.products || [],
-            }))
-          : [];
+        let ordersData = [];
 
-        return processedOrders;
+        // Handle different response structures
+        if (Array.isArray(response.orders)) {
+          ordersData = response.orders;
+        } else if (
+          response.orders?.data &&
+          Array.isArray(response.orders.data)
+        ) {
+          ordersData = response.orders.data;
+        } else if (
+          response.orders?.orders &&
+          Array.isArray(response.orders.orders)
+        ) {
+          ordersData = response.orders.orders;
+        } else {
+          console.warn(
+            `[ORDERS] Unexpected response structure for ${status}:`,
+            response.orders
+          );
+          ordersData = [];
+        }
+
+        return ordersData;
       } else {
         throw new Error(response.error || "Failed to fetch orders");
       }
@@ -143,144 +106,166 @@ const OrdersSection = () => {
     }
   };
 
-  // Load orders when component mounts or tab changes
+  // Load orders when component mounts
   useEffect(() => {
     const loadOrders = async () => {
       try {
         console.log("[ORDERS] Loading orders...");
-        console.log("[ORDERS] Authentication check:", isAuthenticated());
-        console.log(
-          "[ORDERS] Token in localStorage:",
-          localStorage.getItem("whatsopify_token")
-        );
+        console.log("[ORDERS] Authentication check:", getToken());
 
-        // For now, always show dummy data to ensure it's visible
-        console.log("[ORDERS] Using dummy orders data");
-        setOrders(dummyOrders);
-
-        // TODO: Uncomment this when authentication is properly set up
-        /*
-        if (isAuthenticated()) {
+        if (getToken()) {
           // Fetch real orders from API if authenticated
-          const [newOrders, pendingOrders] = await Promise.all([
-            fetchOrders("open"),
-            fetchOrders("pending"),
-          ]);
+          console.log("[ORDERS] Fetching real orders from API...");
 
-          setOrders({
-            new: newOrders,
-            pending: pendingOrders,
-          });
+          try {
+            const [newOrders, pendingOrders] = await Promise.all([
+              fetchOrders("open"), // Map "new" tab to "open" status
+              fetchOrders("pending"), // Map "pending" tab to "pending" status
+            ]);
+
+            setOrders({
+              new: newOrders,
+              pending: pendingOrders,
+            });
+
+            console.log(
+              `[ORDERS] ✅ Loaded ${newOrders.length} new orders and ${pendingOrders.length} pending orders`
+            );
+          } catch (apiError) {
+            console.error(
+              "[ORDERS] API fetch failed, falling back to dummy data:",
+              apiError
+            );
+            setError(apiError.message);
+          }
         } else {
           // Use dummy data if not authenticated
           console.log("[ORDERS] Using dummy orders data (not authenticated)");
-          setOrders(dummyOrders);
         }
-        */
       } catch (err) {
         setError(err.message);
         console.error("[ORDERS] Error loading orders:", err);
+        // Fallback to dummy data on any error
       }
     };
 
     loadOrders();
   }, []);
 
-  // Reload orders when tab changes
   useEffect(() => {
     const reloadCurrentTab = async () => {
       try {
-        // For now, always use dummy data for tab switching
-        console.log(`[ORDERS] Reloading ${activeTab} tab with dummy data`);
-        setOrders((prev) => ({
-          ...prev,
-          [activeTab]: dummyOrders[activeTab],
-        }));
+        // Only reload if we don't have data for this tab
+        if (orders[activeTab].length > 0) {
+          console.log(
+            `[ORDERS] ${activeTab} tab already has data, skipping reload`
+          );
+          return;
+        }
 
-        // TODO: Uncomment this when authentication is properly set up
-        /*
+        console.log(`[ORDERS] Reloading ${activeTab} tab...`);
+
         if (isAuthenticated()) {
+          // Map tab names to API status values
           const status = activeTab === "new" ? "open" : "pending";
-          const newOrders = await fetchOrders(status);
+          console.log(
+            `[ORDERS] Fetching ${status} orders for ${activeTab} tab`
+          );
 
-          setOrders((prev) => ({
-            ...prev,
-            [activeTab]: newOrders,
-          }));
+          try {
+            const newOrders = await fetchOrders(status);
+
+            setOrders((prev) => ({
+              ...prev,
+              [activeTab]: newOrders,
+            }));
+
+            console.log(
+              `[ORDERS] ✅ Reloaded ${newOrders.length} orders for ${activeTab} tab`
+            );
+          } catch (apiError) {
+            console.error(
+              `[ORDERS] API fetch failed for ${activeTab} tab, using cached data:`,
+              apiError
+            );
+            // Don't update orders if API fails, keep existing data
+          }
         } else {
-          // Use dummy data for the current tab if not authenticated
+          // Use empty data for the current tab if not authenticated
+          console.log(
+            `[ORDERS] Using empty data for ${activeTab} tab (not authenticated)`
+          );
           setOrders((prev) => ({
             ...prev,
-            [activeTab]: dummyOrders[activeTab],
+            [activeTab]: [],
           }));
         }
-        */
       } catch (err) {
         console.error(`[ORDERS] Error reloading ${activeTab} orders:`, err);
       }
     };
 
     // Only reload if we don't have data for this tab
-    if (orders[activeTab].length === 0) {
-      reloadCurrentTab();
-    }
+    reloadCurrentTab();
   }, [activeTab]);
 
-  // const handleWhatsAppRedirect = (order) => {
-  //   const cleanedNumber = order.phoneNumber.replace(/[^0-9]/g, "");
-  //   if (cleanedNumber) {
-  //     console.log("[ORDERS] Sending WhatsApp message request:", {
-  //       phoneNumber: cleanedNumber,
-  //       customerName: order.customerName,
-  //       orderId: order.id,
-  //     });
-
-  //     chrome.runtime.sendMessage(
-  //       {
-  //         action: "SEND_WHATSAPP_MESSAGE",
-  //         phoneNumber: cleanedNumber,
-  //         message: `Hello ${order.customerName}, Your order #${order.id} has been successfully placed! We're processing it and will keep you updated as it moves forward. Thank you for choosing us!`,
-  //       },
-  //       (response) => {
-  //         if (chrome.runtime.lastError) {
-  //           console.error(
-  //             "[ORDERS] Error sending message:",
-  //             chrome.runtime.lastError
-  //           );
-  //         } else {
-  //           console.log("[ORDERS] Message sent successfully:", response);
-  //         }
-  //       }
-  //     );
-  //   }
-  // };
-
   const handleWhatsAppRedirect = (order) => {
-    const cleanedNumber = order.phoneNumber.replace(/[^0-9]/g, "");
-    if (cleanedNumber) {
-      console.log("[ORDERS] Sending WhatsApp message request:", {
-        phoneNumber: cleanedNumber,
-        customerName: order.customerName,
-        orderId: order.id,
-      });
+    const phoneNumber = order?.shipmentDetails?.addresses[0]?.phone;
+    const customerName = order?.shipmentDetails?.addresses[0]?.name;
+    const orderId = order?.name;
+    const storeName = order?.lineItems[0]?.vendor;
+    const productName = order?.lineItems?.[0]?.name;
+    const orderTotal = formatPrice(order?.pricing?.currentTotalPrice);
 
-      chrome.runtime.sendMessage(
-        {
-          action: "SEND_WHATSAPP_MESSAGE",
-          phoneNumber: cleanedNumber,
-          message: `Hello ${order.customerName}, Your order #${order.id} has been successfully placed! We're processing it and will keep you updated as it moves forward. Thank you for choosing us!`,
-        },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.error(
-              "[ORDERS] Error sending message:",
-              chrome.runtime.lastError
-            );
-          } else {
-            console.log("[ORDERS] Message sent successfully:", response);
+    if (phoneNumber) {
+      const cleanedNumber = "92" + phoneNumber?.slice(1);
+      if (cleanedNumber) {
+        const message =
+          activeTab === "new"
+            ? `Hello ${customerName}, 👋  
+
+We’ve received your order ${orderId} at ${storeName}.  
+
+🛒 Product: ${productName}  
+💰 Order Total: ${orderTotal}  
+
+Please reply with *YES* to confirm your order, or *NO* if you’d like to cancel/change it.  
+
+Thank you for choosing us!  
+– ${storeName} Team`
+            : `Hello ${customerName}, ⏰  
+
+Your order ${orderId} at ${storeName} is still awaiting confirmation.  
+
+🛒 Product: ${productName}  
+💰 Order Total: ${orderTotal}  
+
+Please reply with *YES* to confirm or *NO* to cancel/change.  
+We’ll only process the order once we get your response.  
+
+Thank you!  
+– ${storeName} Team`;
+
+        chrome.runtime.sendMessage(
+          {
+            action: "SEND_WHATSAPP_MESSAGE",
+            phoneNumber: cleanedNumber,
+            message: message,
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.error(
+                "[ORDERS] Error sending message:",
+                chrome.runtime.lastError
+              );
+            } else {
+              console.log("[ORDERS] Message sent successfully:", response);
+            }
           }
-        }
-      );
+        );
+      }
+    } else {
+      console.warn("[ORDERS] No phone number found for order:", order);
     }
   };
 
@@ -288,18 +273,73 @@ const OrdersSection = () => {
 
   return (
     <div className="orders-section" style={{ padding: "16px" }}>
-      <h2
+      <div
         style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: "16px",
-          fontSize: "18px",
-          fontWeight: "bold",
-          color: "#333",
         }}
       >
-        Orders Management
-      </h2>
+        <h2
+          style={{
+            fontSize: "18px",
+            fontWeight: "bold",
+            color: "#333",
+            margin: 0,
+          }}
+        >
+          Orders Management
+        </h2>
+        <button
+          onClick={async () => {
+            console.log("[ORDERS] Manual refresh triggered for both tabs");
+            setError(null);
+            try {
+              if (isAuthenticated()) {
+                console.log(
+                  "[ORDERS] Fetching fresh data for both new and pending orders..."
+                );
 
-      {/* Loading State */}
+                const [newOrders, pendingOrders] = await Promise.all([
+                  fetchOrders("open"), // Map "new" tab to "open" status
+                  fetchOrders("pending"), // Map "pending" tab to "pending" status
+                ]);
+
+                setOrders({
+                  new: newOrders,
+                  pending: pendingOrders,
+                });
+              } else {
+                console.log(
+                  "[ORDERS] Manual refresh: not authenticated, clearing both tabs"
+                );
+                setOrders({
+                  new: [],
+                  pending: [],
+                });
+              }
+            } catch (err) {
+              console.error("[ORDERS] Manual refresh failed:", err);
+              setError(err.message);
+            }
+          }}
+          disabled={loading}
+          style={{
+            padding: "6px 12px",
+            backgroundColor: loading ? "#ccc" : "#25D366",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontSize: "12px",
+            fontWeight: "500",
+          }}
+        >
+          {loading ? "Loading..." : "Refresh"}
+        </button>
+      </div>
+
       {loading && (
         <div
           style={{
@@ -313,7 +353,6 @@ const OrdersSection = () => {
         </div>
       )}
 
-      {/* Error State */}
       {error && (
         <div
           style={{
@@ -346,7 +385,6 @@ const OrdersSection = () => {
         </div>
       )}
 
-      {/* Tabs */}
       <div
         style={{
           display: "flex",
@@ -390,7 +428,6 @@ const OrdersSection = () => {
         </button>
       </div>
 
-      {/* Orders Table */}
       <div
         style={{
           overflowX: "auto",
@@ -418,7 +455,7 @@ const OrdersSection = () => {
                 >
                   Order ID
                 </th>
-                <th
+                {/* <th
                   style={{
                     padding: "12px 8px",
                     textAlign: "left",
@@ -427,7 +464,7 @@ const OrdersSection = () => {
                   }}
                 >
                   Order Number
-                </th>
+                </th> */}
                 <th
                   style={{
                     padding: "12px 8px",
@@ -473,9 +510,9 @@ const OrdersSection = () => {
                       fontSize: "12px",
                     }}
                   >
-                    {order.id}
+                    {order.name}
                   </td>
-                  <td style={{ padding: "12px 8px" }}>{order.orderNumber}</td>
+                  {/* <td style={{ padding: "12px 8px" }}>{order.orderNumber}</td> */}
                   <td
                     style={{
                       padding: "12px 8px",
@@ -483,12 +520,12 @@ const OrdersSection = () => {
                       color: "#666",
                     }}
                   >
-                    {order.dateTime}
+                    {formatDate(order.createdAt)}
                   </td>
                   <td style={{ padding: "12px 8px" }}>
                     <div>
                       <div style={{ fontWeight: "500" }}>
-                        {order.customerName}
+                        {order?.shipmentDetails?.addresses[0]?.name}
                       </div>
                       <div
                         style={{
@@ -499,7 +536,7 @@ const OrdersSection = () => {
                         }}
                         title="Click to open WhatsApp"
                       >
-                        {order.phoneNumber}
+                        {order?.shipmentDetails?.addresses[0]?.phone}
                       </div>
                     </div>
                   </td>
@@ -509,12 +546,12 @@ const OrdersSection = () => {
                       textAlign: "center",
                     }}
                   >
-                    {/* Show Confirm button for both new and pending orders */}
                     <button
                       onClick={() => handleWhatsAppRedirect(order)}
                       style={{
                         padding: "6px 12px",
-                        backgroundColor: "#25D366",
+                        backgroundColor:
+                          activeTab === "new" ? "#25D366" : "#FFA500",
                         color: "white",
                         border: "none",
                         borderRadius: "4px",
@@ -523,7 +560,7 @@ const OrdersSection = () => {
                         fontWeight: "500",
                       }}
                     >
-                      Confirm
+                      {activeTab === "new" ? "Confirm" : "Resend"}
                     </button>
                   </td>
                 </tr>
