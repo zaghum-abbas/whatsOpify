@@ -133,33 +133,50 @@ const StoreItem = ({ store }) => {
 const CatalogItem = ({ item }) => {
   const theme = getTheme();
 
+  const formatDescription = (desc) => {
+    if (!desc) return "";
+
+    // Replace <b> or <strong> with *
+    let formatted = desc.replace(/<\/?(b|strong)>/gi, "*");
+
+    // Replace <i> or <em> with _
+    formatted = formatted.replace(/<\/?(i|em)>/gi, "_");
+
+    // Replace <u> with ~ (WhatsApp doesn't support underline, using strikethrough as fallback)
+    formatted = formatted.replace(/<\/?u>/gi, "~");
+
+    // Replace <br> or <p> with newline
+    formatted = formatted.replace(/<br\s*\/?>/gi, "\n");
+    formatted = formatted.replace(/<\/?p>/gi, "\n");
+
+    // Remove any remaining HTML tags
+    formatted = formatted.replace(/<\/?[^>]+(>|$)/g, "");
+
+    return formatted.trim();
+  };
+
   const handleProductClick = () => {
     console.log("[PRODUCT] Product clicked:", item.name);
 
-    // Create product message with details
+    const formattedDesc = item.description
+      ? formatDescription(item.description)
+      : "";
+
     const productMessage =
       `🛒 *${item.name}*\n\n` +
       `💰 *Price:* ${item.price}\n` +
-      (item.description ? `📝 *Description:* ${item.description}\n` : "") +
+      (formattedDesc ? `📝 *Description:* ${formattedDesc}\n` : "") +
       (item.vendor ? `👤 *Vendor:* ${item.vendor}\n` : "") +
       (item.category ? `🏷️ *Category:* ${item.category}\n` : "") +
       `\n✨ _Sent from Whatsopify Product Catalog_`;
 
-    // Send message to current chat (including image if available)
     if (window.sendMessageToCurrentChat) {
       window.sendMessageToCurrentChat(productMessage, item);
     } else {
-      console.warn("[PRODUCT] sendMessageToCurrentChat function not available");
-      // Fallback: copy to clipboard
-      navigator.clipboard
-        .writeText(productMessage)
-        .then(() => {
-          console.log("[PRODUCT] Product details copied to clipboard");
-          alert("Product details copied to clipboard! Paste in the chat.");
-        })
-        .catch((err) => {
-          console.error("[PRODUCT] Failed to copy to clipboard:", err);
-        });
+      console.warn("[PRODUCT] sendMessageToCurrentChat not available");
+      navigator.clipboard.writeText(productMessage).then(() => {
+        alert("Product details copied to clipboard! Paste in the chat.");
+      });
     }
   };
 
@@ -248,7 +265,7 @@ const CatalogItem = ({ item }) => {
         >
           {item.name}
         </div>
-        {item.description && (
+        {/* {item.description && (
           <div
             style={{
               color: theme.subText,
@@ -261,7 +278,7 @@ const CatalogItem = ({ item }) => {
           >
             {item.description}
           </div>
-        )}
+        )} */}
         <div
           style={{
             display: "flex",
@@ -593,7 +610,7 @@ const InjectedSidebarContent = ({
         </section>
       )}
 
-      <section style={{ marginBottom: "28px" }}>
+      {/* <section style={{ marginBottom: "28px" }}>
         <h2
           style={{
             marginBottom: "12px",
@@ -640,7 +657,7 @@ const InjectedSidebarContent = ({
             </span>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Orders Section - Always visible */}
       <section style={{ marginBottom: "28px" }}>
@@ -706,11 +723,12 @@ const InjectedSidebarContent = ({
           style={{
             background: theme.card,
             borderRadius: "10px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+            // boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
             padding: "16px",
             border: `1px solid ${theme.border}`,
           }}
         >
+          {console.log("@@@@catalog", catalog)}
           {catalog && catalog.length > 0 ? (
             catalog.map((item, idx) => <CatalogItem item={item} key={idx} />)
           ) : (

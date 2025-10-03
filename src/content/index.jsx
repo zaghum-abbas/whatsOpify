@@ -1023,20 +1023,6 @@ async function fetchProductsFromAPI() {
         );
       }
 
-      if (!token) {
-        console.warn("[PRODUCTS] No token found, cannot fetch products.");
-        allUserProducts = [];
-        productsLoading = false;
-        productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
-        productsListeners = []; // Clear listeners
-        return;
-      }
-
-      console.log(
-        "[PRODUCTS] Using token for API call:",
-        token.substring(0, 20) + "..."
-      );
-
       // Use background script to fetch products with token authentication (bypasses CORS issues)
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_PRODUCTS",

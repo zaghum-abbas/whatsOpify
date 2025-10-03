@@ -182,7 +182,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       const productsApiUrl =
-        "https://api1.shopilam.com/api/v1/products?limit=50&page=1&status=active";
+        "https://api1.shopilam.com/api/v1/products?limit=50&page=7&status=active";
 
       const productsHeaders = {
         Authorization: `Bearer ${token}`,
