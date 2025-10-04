@@ -2,7 +2,8 @@ import React, { useMemo, useState, useEffect } from "react";
 import ModalForm from "./ModalForm";
 import CustomerSupportMessages from "./CustomerSupportMessages";
 import OrdersSection from "./OrdersSection";
-import { formatPrice } from "../../core/utils/helperFunctions";
+import { formatPrice, getToken } from "../../core/utils/helperFunctions";
+import { useDebounce } from "../../hooks/useDebounce";
 const getTheme = () => {
   // Try to detect WhatsApp dark mode from body class or style
   const body = document.body;
@@ -131,59 +132,12 @@ const StoreItem = ({ store }) => {
   );
 };
 
-const CatalogItem = ({ item }) => {
+const CatalogItem = ({ item, handleProductClick }) => {
   const theme = getTheme();
-
-  const formatDescription = (desc) => {
-    if (!desc) return "";
-
-    // Replace <b> or <strong> with *
-    let formatted = desc.replace(/<\/?(b|strong)>/gi, "*");
-
-    // Replace <i> or <em> with _
-    formatted = formatted.replace(/<\/?(i|em)>/gi, "_");
-
-    // Replace <u> with ~ (WhatsApp doesn't support underline, using strikethrough as fallback)
-    formatted = formatted.replace(/<\/?u>/gi, "~");
-
-    // Replace <br> or <p> with newline
-    formatted = formatted.replace(/<br\s*\/?>/gi, "\n");
-    formatted = formatted.replace(/<\/?p>/gi, "\n");
-
-    // Remove any remaining HTML tags
-    formatted = formatted.replace(/<\/?[^>]+(>|$)/g, "");
-
-    return formatted.trim();
-  };
-
-  const handleProductClick = () => {
-    console.log("[PRODUCT] Product clicked:", item.name);
-
-    const formattedDesc = item.description
-      ? formatDescription(item.description)
-      : "";
-
-    const productMessage =
-      `🛒 *${item.name}*\n\n` +
-      `💰 *Price:* ${item.price}\n` +
-      (formattedDesc ? `📝 *Description:* ${formattedDesc}\n` : "") +
-      (item.vendor ? `👤 *Vendor:* ${item.vendor}\n` : "") +
-      (item.category ? `🏷️ *Category:* ${item.category}\n` : "") +
-      `\n✨ _Sent from Whatsopify Product Catalog_`;
-
-    if (window.sendMessageToCurrentChat) {
-      window.sendMessageToCurrentChat(productMessage, item);
-    } else {
-      console.warn("[PRODUCT] sendMessageToCurrentChat not available");
-      navigator.clipboard.writeText(productMessage).then(() => {
-        alert("Product details copied to clipboard! Paste in the chat.");
-      });
-    }
-  };
 
   return (
     <div
-      onClick={handleProductClick}
+      onClick={() => handleProductClick(item)}
       style={{
         display: "flex",
         alignItems: "center",
@@ -222,18 +176,17 @@ const CatalogItem = ({ item }) => {
       >
         {item.images && item.images.length > 0 ? (
           <img
-            // src={item.images[0]?.url}
-            src={"/pent.jpeg"}
+            src={item.images[0]?.url}
             alt={item.name}
             style={{
               width: "100%",
               height: "100%",
               objectFit: "cover",
             }}
-            // onError={(e) => {
-            //   e.target.style.display = "none";
-            //   e.target.nextSibling.style.display = "flex";
-            // }}
+            onError={(e) => {
+              e.target.style.display = "none";
+              e.target.nextSibling.style.display = "flex";
+            }}
           />
         ) : (
           <div
@@ -343,6 +296,12 @@ const InjectedSidebarContent = ({
   const [isLoading, setIsLoading] = useState(true);
   const [contact, setContact] = useState(null);
   const [showOrders, setShowOrders] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filteredCatalog, setFilteredCatalog] = useState(catalog);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Debounce search input
+  const debouncedSearch = useDebounce(search, 500);
 
   useEffect(() => {
     const extractContactInfo = () => {
@@ -520,11 +479,120 @@ const InjectedSidebarContent = ({
     window.showOrdersSection = () => {
       setShowOrders(true);
     };
-
     return () => {
       delete window.showOrdersSection;
     };
   }, []);
+
+  const handleSearchChange = (e) => {
+    const searchTerm = e.target.value;
+    setSearch(searchTerm);
+    setIsSearching(true);
+  };
+
+  const searchProducts = async (searchTerm) => {
+    try {
+      console.log(`[CATALOG] Searching products with term: "${searchTerm}"`);
+
+      const response = await chrome.runtime.sendMessage({
+        action: "SEARCH_PRODUCTS",
+        token: getToken(),
+        searchTerm: searchTerm,
+      });
+
+      console.log("[CATALOG] Search API Response:", response);
+
+      if (response.success) {
+        let products = [];
+
+        // Handle different response structures
+        if (Array.isArray(response.products)) {
+          products = response.products;
+        } else if (
+          response.products?.data &&
+          Array.isArray(response.products.data)
+        ) {
+          products = response.products.data;
+        } else if (
+          response.products?.products &&
+          Array.isArray(response.products.products)
+        ) {
+          products = response.products.products;
+        } else {
+          console.warn(
+            "[CATALOG] Unexpected search response structure:",
+            response.products
+          );
+          products = [];
+        }
+
+        console.log(
+          `[CATALOG] ✅ Found ${products.length} products for search: "${searchTerm}"`
+        );
+        return products;
+      } else {
+        console.error("[CATALOG] Search API failed:", response.error);
+        return [];
+      }
+    } catch (error) {
+      console.error("[CATALOG] Error searching products:", error);
+      return [];
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Effect to handle debounced search
+  useEffect(() => {
+    const performSearch = async () => {
+      if (debouncedSearch.trim() === "") {
+        setFilteredCatalog(catalog);
+        setIsSearching(false);
+        return;
+      }
+
+      const searchResults = await searchProducts(debouncedSearch);
+      setFilteredCatalog(searchResults);
+    };
+
+    performSearch();
+  }, [debouncedSearch, catalog]);
+
+  // Update filtered catalog when catalog prop changes
+  useEffect(() => {
+    if (search.trim() === "") {
+      setFilteredCatalog(catalog);
+    }
+  }, [catalog]);
+
+  const formattedDescription = (description) => {
+    if (!description) return "";
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(description, "text/html");
+    return doc.body.textContent || "";
+  };
+
+  const handleProductClick = (item) => {
+    console.log("[PRODUCT] Product clicked:", item);
+
+    const productMessage =
+      `🛒 *${item.title}*\n\n` +
+      `**Product Description**\n` +
+      `${formattedDescription(item.description)}\n` +
+      `**Price**\n` +
+      `Rs ${item?.variants?.[0]?.price}\n`;
+
+    if (window.sendMessageToCurrentChat) {
+      window.sendMessageToCurrentChat(productMessage, item);
+    } else {
+      console.warn("[PRODUCT] sendMessageToCurrentChat not available");
+      navigator.clipboard.writeText(productMessage).then(() => {
+        alert("Product details copied to clipboard! Paste in the chat.");
+      });
+    }
+  };
+
+  console.log(catalog, "catalog");
 
   return (
     <div
@@ -729,9 +797,70 @@ const InjectedSidebarContent = ({
             border: `1px solid ${theme.border}`,
           }}
         >
-          {console.log("@@@@catalog", catalog)}
-          {catalog && catalog.length > 0 ? (
-            catalog.map((item, idx) => <CatalogItem item={item} key={idx} />)
+          <div style={{ position: "relative", marginBottom: "16px" }}>
+            <input
+              type="text"
+              name="search"
+              value={search}
+              onChange={handleSearchChange}
+              placeholder="Search for a product..."
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                paddingRight: isSearching ? "40px" : "12px",
+                borderRadius: "6px",
+                border: `1px solid ${theme.border}`,
+                fontSize: "0.95rem",
+                boxSizing: "border-box",
+                backgroundColor: theme.bg,
+                color: theme.text,
+              }}
+            />
+            {isSearching && (
+              <div
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: theme.accent,
+                  fontSize: "14px",
+                }}
+              >
+                🔍
+              </div>
+            )}
+          </div>
+          {isSearching ? (
+            <div
+              style={{
+                color: theme.subText,
+                textAlign: "center",
+                padding: "20px",
+                fontSize: "14px",
+              }}
+            >
+              Searching products...
+            </div>
+          ) : filteredCatalog && filteredCatalog.length > 0 ? (
+            filteredCatalog?.map((item, idx) => (
+              <CatalogItem
+                item={item}
+                key={idx}
+                handleProductClick={handleProductClick}
+              />
+            ))
+          ) : search.trim() ? (
+            <div
+              style={{
+                color: theme.subText,
+                textAlign: "center",
+                padding: "20px",
+                fontSize: "14px",
+              }}
+            >
+              No products found for "{search}"
+            </div>
           ) : (
             <div style={{ color: theme.subText }}>No products available.</div>
           )}
@@ -762,20 +891,11 @@ const InjectedSidebarContent = ({
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
+                justifyContent: "flex-end",
                 alignItems: "center",
                 marginBottom: "16px",
               }}
             >
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: "1rem",
-                  color: theme.text,
-                }}
-              >
-                Order Details
-              </h3>
               <button
                 onClick={() => onOrderFormToggle && onOrderFormToggle(false)}
                 style={{

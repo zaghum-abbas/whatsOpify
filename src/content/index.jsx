@@ -6,6 +6,8 @@ import TopToolbar from "./components/TopToolbar";
 import ChatHeaderHover from "./components/ChatHeaderHover";
 import ChatListEnhancer from "./components/ChatListEnhancer";
 import InjectedSidebarContent from "./components/InjectedSidebarContent";
+import DefaultSidebar from "./components/DefaultSidebar";
+import ChatSidebar from "./components/ChatSidebar";
 import "./App.css"; // Your main CSS file
 
 import { requireAuth, useAuthState } from "./components/authMiddleware.jsx";
@@ -85,6 +87,7 @@ const SIDEBAR_WIDTH = "400px"; // Define sidebar width once
 let isSidebarOpen = true;
 let sidebarRoot = null; // Store the React root for the sidebar
 let mainAppContent = null; // Reference to the main WhatsApp content div that needs resizing
+let sidebarMode = "default"; // "default" or "chat"
 let sidebarProps = {
   contact: {},
   catalog: [],
@@ -97,599 +100,96 @@ let sidebarProps = {
 };
 let lastActiveChatId = null;
 
-// Function to toggle sidebar visibility and adjust WhatsApp UI
-// This function is exposed globally to be called by React components
-// Helper: Extract contact info from active chat
-// Async: Always open contact info panel, wait for it, extract details, close panel
-async function getActiveChatDetails() {
+// Function to switch sidebar mode
+const switchSidebarMode = (mode) => {
+  sidebarMode = mode;
+  console.log(`🔄 Sidebar mode switched to: ${mode}`);
+
+  if (sidebarRoot && isSidebarOpen) {
+    renderSidebar();
+  }
+};
+
+// Function to render the appropriate sidebar based on mode
+const renderSidebar = () => {
+  if (!sidebarRoot) return;
+
+  if (sidebarMode === "default") {
+    console.log("🎨 Rendering Default Sidebar");
+    sidebarRoot.render(<DefaultSidebar {...sidebarProps} />);
+  } else if (sidebarMode === "chat") {
+    console.log("🎨 Rendering Chat Sidebar");
+    sidebarRoot.render(<ChatSidebar {...sidebarProps} />);
+  }
+};
+
+const getActiveChatDetails = async () => {
   console.log("🔍 Starting contact extraction...");
-
-  // Try multiple selectors to find the chat panel
-  const chatPanelSelectors = [
-    'div[role="main"]',
-    '[data-testid="conversation-panel"]',
-    'div[data-testid="conversation-panel-wrapper"]',
-    'div[class*="conversation-panel"]',
-    "main",
-    "#main",
-  ];
-
-  let chatPanel = null;
-  for (const selector of chatPanelSelectors) {
-    chatPanel = document.querySelector(selector);
-    if (chatPanel) {
-      console.log("✅ Found chat panel with selector:", selector);
-      break;
-    }
-  }
-
-  if (!chatPanel) {
-    console.log("❌ No chat panel found with any selector");
-    return null;
-  }
-
-  // Check if there's actually a chat conversation open (not just the main panel)
-  const headerSelectors = [
-    "header",
-    '[data-testid="conversation-header"]',
-    'div[data-testid="conversation-info-header"]',
-    'div[class*="chat-header"]',
-    'div[class*="conversation-header"]',
-  ];
-
-  let chatHeader = null;
-  for (const selector of headerSelectors) {
-    chatHeader = chatPanel.querySelector(selector);
-    if (chatHeader) {
-      console.log("✅ Found chat header with selector:", selector);
-      break;
-    }
-  }
-
-  const messageAreaSelectors = [
-    '[data-testid="conversation-panel-messages"]',
-    '[role="log"]',
-    'div[class*="message"]',
-    '[data-testid="conversation-panel-body"]',
-    'div[class*="conversation-panel"]',
-  ];
-
-  let messageArea = null;
-  for (const selector of messageAreaSelectors) {
-    messageArea = chatPanel.querySelector(selector);
-    if (messageArea) {
-      console.log("✅ Found message area with selector:", selector);
-      break;
-    }
-  }
-
-  if (!chatHeader || !messageArea) {
-    console.log(
-      "❌ No active chat conversation found (no header or message area)"
-    );
-    console.log(
-      "Header found:",
-      !!chatHeader,
-      "Message area found:",
-      !!messageArea
-    );
-    return null;
-  }
-
-  console.log("✅ Active chat detected, proceeding with extraction...");
 
   let name = "";
   let phone = "";
 
-  // Reset phone number at the start to ensure fresh extraction for each chat
-  phone = "";
-
-  // Try to extract name from header with multiple selectors
   const nameSelectors = [
     "header span[title]",
-    "header h1",
-    'header [data-testid="conversation-info-header-chat-title"]',
-    'header span[dir="auto"]:not([role="button"])',
-    'header div[class*="chat-title"]',
-    'header span[class*="selectable-text"]:not([role="button"])',
-    'header span:first-child:not([role="button"])',
-    'header div:first-child span:not([role="button"])',
+    "header div[role='button'] span[dir='auto']",
+    "header h2[title]",
   ];
 
-  let nameElement = null;
+  // 🧩 Step 1 — Find and click contact name
   for (const selector of nameSelectors) {
-    nameElement = chatHeader.querySelector(selector);
-    if (nameElement && nameElement.textContent?.trim()) {
-      const extractedText =
-        nameElement.textContent?.trim() || nameElement.title?.trim() || "";
-      // Skip if it's a button text, generic text, or business account text
-      if (
-        extractedText &&
-        !extractedText.toLowerCase().includes("click here") &&
-        !extractedText.toLowerCase().includes("contact info") &&
-        !extractedText.toLowerCase().includes("online") &&
-        !extractedText.toLowerCase().includes("last seen") &&
-        !extractedText.toLowerCase().includes("business account") &&
-        !extractedText.toLowerCase().includes("verified business") &&
-        !extractedText.toLowerCase().includes("business profile") &&
-        extractedText.length > 1
-      ) {
-        name = extractedText;
-        console.log("📝 Found name with selector:", selector, "- Name:", name);
-        break;
-      }
-    }
-  }
+    const element = document.querySelector(selector);
+    if (element && element.textContent.trim().length > 0) {
+      name = element.textContent.trim();
+      console.log("📝 Found name:", name);
 
-  // If we got "Business Account" or similar, try to find the actual contact name
-  if (
-    !name ||
-    name.toLowerCase().includes("business") ||
-    name.toLowerCase().includes("account")
-  ) {
-    console.log("🔍 Generic name detected, looking for actual contact name...");
-
-    // Try more specific selectors for the actual contact name
-    const specificNameSelectors = [
-      'header div[class*="copyable-text"] span',
-      'header span[class*="copyable-text"]',
-      'header div[title]:not([title*="Business"]):not([title*="Account"])',
-      'header span[title]:not([title*="Business"]):not([title*="Account"])',
-      'header div[class*="chat-title"]',
-      'header span[class*="chat-title"]',
-      'header div[data-testid*="name"]',
-      'header span[data-testid*="name"]',
-    ];
-
-    for (const selector of specificNameSelectors) {
-      const element = chatHeader.querySelector(selector);
-      if (element && element.textContent && element.textContent.trim()) {
-        const extractedText = element.textContent.trim();
-
-        if (
-          extractedText &&
-          !extractedText.toLowerCase().includes("business") &&
-          !extractedText.toLowerCase().includes("account") &&
-          !extractedText.toLowerCase().includes("click here") &&
-          !extractedText.toLowerCase().includes("contact info") &&
-          extractedText.length > 1
-        ) {
-          name = extractedText;
-          console.log(
-            "📝 Found specific name with selector:",
-            selector,
-            "- Name:",
-            name
-          );
-          break;
-        }
-      }
+      element.click(); // open contact info
+      break;
     }
   }
 
   if (!name) {
+    console.warn("⚠️ Could not find name element!");
+    return { name: "", phone: "" };
+  }
+
+  // 🕐 Step 2 — Wait for the contact panel to load
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  const elementsToHide = document.querySelectorAll(
+    "div._aig-._as6h.x9f619.x1n2onr6.x5yr21d.x6ikm8r.x10wlt62.x17dzmu4.x1i1dayz.x2ipvbc.x1w8yi2h.xpilrb4.x1t7ytsu.x1m2ixmg.x1c4vz4f.x2lah0s.x1oy9qf3.xwfak60.x5hsz1j.x17dq4o0.x10e4vud"
+  );
+
+  if (elementsToHide.length > 0) {
+    elementsToHide.forEach((el) => {
+      el.style.display = "none";
+    });
     console.log(
-      "⚠️ No name found with selectors, trying to find title attribute..."
+      `🙈 Hidden ${elementsToHide.length} element(s) with given classes`
     );
-    // Look for title attributes which often contain the contact name
-    const titleElements = chatHeader.querySelectorAll("[title]");
-    for (const element of titleElements) {
-      const titleText = element.getAttribute("title")?.trim();
-      if (
-        titleText &&
-        !titleText.toLowerCase().includes("click here") &&
-        !titleText.toLowerCase().includes("contact info") &&
-        !titleText.toLowerCase().includes("business account") &&
-        !titleText.toLowerCase().includes("verified business") &&
-        titleText.length > 1
-      ) {
-        name = titleText;
-        console.log("📝 Found name in title attribute:", name);
-        break;
-      }
-    }
+  } else {
+    console.warn("⚠️ No matching element found to hide");
   }
 
-  // Quick extraction first - if we have a good name, try to get phone from URL first
-  if (name && name.length > 2 && !name.toLowerCase().includes("business")) {
-    // Try to extract phone from URL before returning quickly
-    try {
-      const url = window.location.href;
-      const phoneMatch = url.match(/(\d{10,15})/);
-      if (phoneMatch) {
-        phone = "+" + phoneMatch[1];
-      }
-    } catch (error) {
-      console.warn("⚠️ Error extracting phone from URL:", error);
-    }
-    console.log("✅ Got good name from header, phone from URL:", name, phone);
-    const result = { name: name || "", phone: phone || "" };
-    console.log("📋 Quick extracted contact details:", result);
-    return result;
+  const phoneElement = Array.from(
+    document.querySelectorAll("[dir='auto'].copyable-text")
+  ).find((el) => {
+    const text = el.innerText.trim().replace(/\s+/g, "");
+    return /^\+?\d{7,}$/.test(text);
+  });
+
+  if (phoneElement) {
+    phone = phoneElement.innerText.trim().replace(/\s+/g, "");
+    console.log("📞 Found phone:", phone);
+  } else {
+    console.warn("⚠️ Phone number not found!");
   }
 
-  // Only extract more info if we really need it
-  const needsMoreInfo =
-    !name || name.toLowerCase().includes("business") || !phone;
-
-  if (needsMoreInfo) {
-    console.log(
-      "🔍 Need more contact info, attempting to open contact info panel..."
-    );
-    const clickableSelectors = [
-      'header [data-testid="conversation-info-header"]',
-      'header img[src*="avatar"]',
-      "header span[title]",
-      'header div[role="button"]',
-      "header > div:first-child",
-      "header",
-    ];
-    let clickableElement = null;
-    for (const selector of clickableSelectors) {
-      clickableElement = chatHeader.querySelector(selector);
-      if (clickableElement) {
-        console.log("✅ Found clickable header element:", selector);
-        break;
-      }
-    }
-    if (clickableElement) {
-      console.log("🖱️ Clicking to open contact info...");
-      clickableElement.click();
-      let attempts = 0;
-      const maxAttempts = 15; // Reduced from 30
-      const contactPanelSelectors = [
-        'div[data-testid="contact-info-drawer"]',
-        'div[role="dialog"]',
-        'aside[class*="drawer"]',
-        'div[class*="contact-info"]',
-        'div[class*="drawer"]',
-        'div[aria-label="Contact info"]',
-        'div[role="complementary"]',
-        'div[role="region"]',
-        'div[tabindex="-1"]',
-      ];
-      while (attempts < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Reduced from 200ms
-        attempts++;
-        let contactInfoPanel = null;
-        for (const sel of contactPanelSelectors) {
-          const panel = document.querySelector(sel);
-          if (
-            panel &&
-            (panel.textContent?.toLowerCase().includes("contact info") ||
-              panel.querySelector('h1, [data-testid="contact-name"]'))
-          ) {
-            contactInfoPanel = panel;
-            break;
-          }
-        }
-        if (contactInfoPanel) {
-          console.log("✅ Found contact info panel");
-
-          // Reset phone number for each new contact info panel
-          phone = "";
-
-          // Extract name from contact info panel if we don't have a good one
-          if (!name || name.toLowerCase().includes("business")) {
-            const nameSelectors = [
-              "h1",
-              '[data-testid="contact-name"]',
-              'span[dir="auto"]:first-child',
-              "div:first-child h1",
-              'div:first-child span[dir="auto"]',
-              'div[role="dialog"] h1',
-              'div[aria-label="Contact info"] h1',
-            ];
-            for (const selector of nameSelectors) {
-              const nameEl = contactInfoPanel.querySelector(selector);
-              if (nameEl && nameEl.textContent?.trim()) {
-                const extractedName = nameEl.textContent.trim();
-                if (
-                  !extractedName.toLowerCase().includes("contact") &&
-                  !extractedName.toLowerCase().includes("info") &&
-                  !extractedName.toLowerCase().includes("business account") &&
-                  extractedName.length > 1
-                ) {
-                  name = extractedName;
-                  console.log("📝 Extracted name from panel:", name);
-                  break;
-                }
-              }
-            }
-          }
-
-          // Extract phone number specifically from contact info drawer's phone field
-          try {
-            // First try to find phone section by data-testid
-            const phoneContainers = Array.from(
-              contactInfoPanel.querySelectorAll(
-                '[data-testid*="contact-info-phone"], [data-testid*="cell-frame-title"]'
-              )
-            );
-
-            for (const container of phoneContainers) {
-              const text = container.textContent?.trim();
-              if (text && text.includes("+")) {
-                const match = text.match(/(\+\d{2}\s*\d{3}\s*\d{7,})/);
-                if (match) {
-                  phone = match[1].trim();
-                  console.log("📱 Found phone number in contact info:", phone);
-                  break;
-                }
-              }
-            }
-
-            // If not found, try more specific approach
-            if (!phone) {
-              // Look for the heading/label that says "Phone"
-              const phoneLabel = Array.from(
-                contactInfoPanel.querySelectorAll("div, span")
-              ).find(
-                (el) =>
-                  el.textContent?.trim().toLowerCase() === "phone" ||
-                  el.textContent?.trim().toLowerCase() === "phone number"
-              );
-
-              if (phoneLabel) {
-                // Look in siblings and parent's children for phone number
-                const parent = phoneLabel.parentElement;
-                const siblings = parent ? Array.from(parent.children) : [];
-
-                for (const el of siblings) {
-                  const text = el.textContent?.trim();
-                  if (text && text.includes("+")) {
-                    const match = text.match(/(\+\d{2}\s*\d{3}\s*\d{7,})/);
-                    if (match) {
-                      phone = match[1].trim();
-                      console.log("📱 Found phone number after label:", phone);
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-          } catch (err) {
-            console.error("Error extracting phone:", err);
-          }
-          // Look specifically for elements with phone number (with proper label/section)
-          const phoneLabels = Array.from(
-            contactInfoPanel.querySelectorAll("div, span")
-          ).filter(
-            (el) =>
-              el.textContent?.toLowerCase().includes("phone number") ||
-              el.textContent?.toLowerCase().includes("phone") ||
-              el.getAttribute("aria-label")?.toLowerCase().includes("phone")
-          );
-
-          for (const label of phoneLabels) {
-            // Look for phone number in the next sibling elements
-            let nextEl = label.nextElementSibling;
-            while (nextEl) {
-              const text = nextEl.textContent?.trim();
-              if (text) {
-                // Match international phone format
-                const phoneMatch = text.match(
-                  /(?:\+|PK\s*)?(\d{2,}[\s\-]?\d{3}[\s\-]?\d{6,})/
-                );
-                if (phoneMatch) {
-                  phone = phoneMatch[0].trim();
-                  if (!phone.startsWith("+")) {
-                    phone = "+" + phone.replace(/^PK\s*/, "");
-                  }
-                  console.log("📞 Found phone in contact info:", phone);
-                  break;
-                }
-              }
-              nextEl = nextEl.nextElementSibling;
-            }
-            if (phone) break;
-          }
-
-          // Close the contact info panel
-          console.log("🔒 Closing contact info panel...");
-          const closeButton = contactInfoPanel.querySelector(
-            '[data-testid="x"], button[aria-label*="Close"], button[aria-label*="close"], .close, [class*="close"]'
-          );
-          if (closeButton) {
-            closeButton.click();
-          } else {
-            document.dispatchEvent(
-              new KeyboardEvent("keydown", {
-                key: "Escape",
-                keyCode: 27,
-                bubbles: true,
-              })
-            );
-          }
-          await new Promise((resolve) => setTimeout(resolve, 200)); // Reduced from 350ms
-          break;
-        }
-      }
-      if (attempts >= maxAttempts) {
-        console.warn("⚠️ Contact info panel did not appear within timeout");
-      }
-    } else {
-      console.log("❌ No clickable header element found");
-    }
-  }
-
-  // If we still don't have a phone number, we must open contact info to get the contact's actual phone
-  if (!phone) {
-    console.log(
-      "🔍 No phone found, must open contact info panel to get contact phone number..."
-    );
-
-    // Force opening contact info panel to get the actual contact phone number
-    const clickableSelectors = [
-      'header [data-testid="conversation-info-header"]',
-      'header img[src*="avatar"]',
-      "header span[title]",
-      'header div[role="button"]',
-      "header > div:first-child",
-      "header",
-    ];
-
-    let clickableElement = null;
-    for (const selector of clickableSelectors) {
-      clickableElement = chatHeader.querySelector(selector);
-      if (clickableElement) {
-        console.log(
-          "✅ Found clickable header element for phone extraction:",
-          selector
-        );
-        break;
-      }
-    }
-
-    if (clickableElement) {
-      console.log(" ️ Clicking to open contact info for phone number...");
-      clickableElement.click();
-
-      // Wait for contact info panel to appear
-      let attempts = 0;
-      const maxAttempts = 20;
-
-      while (attempts < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Reduced from 200ms
-        attempts++;
-
-        // Look for contact info panel with more specific selectors
-        const contactInfoSelectors = [
-          'div[data-testid="contact-info-drawer"]',
-          'div[role="dialog"]',
-          'aside[class*="drawer"]',
-          'div[class*="contact-info"]',
-          'div[class*="drawer"]',
-        ];
-
-        let contactInfoPanel = null;
-        for (const selector of contactInfoSelectors) {
-          const panel = document.querySelector(selector);
-          if (
-            panel &&
-            (panel.textContent?.includes("Contact info") ||
-              panel.textContent?.includes("Phone") ||
-              panel.querySelector('h1, [data-testid="contact-name"]'))
-          ) {
-            contactInfoPanel = panel;
-            console.log("✅ Found contact info panel for phone:", selector);
-            break;
-          }
-        }
-
-        if (contactInfoPanel) {
-          console.log("📞 Extracting phone number from contact info panel...");
-
-          // Look specifically for phone number sections
-          const phoneSelectors = [
-            'div[class*="phone"]',
-            'span[class*="phone"]',
-            'a[href^="tel:"]',
-            'div:contains("Phone")',
-            'span:contains("Phone")',
-          ];
-
-          // First try specific phone selectors
-          for (const selector of phoneSelectors) {
-            const phoneEl = contactInfoPanel.querySelector(selector);
-            if (phoneEl && phoneEl.textContent) {
-              const text = phoneEl.textContent.trim();
-              const phoneMatch = text.match(
-                /(\+?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4})/
-              );
-              if (phoneMatch && phoneMatch[1].replace(/\D/g, "").length >= 7) {
-                phone = phoneMatch[1].trim();
-                console.log(
-                  "📞 Found contact phone with selector:",
-                  selector,
-                  "- Phone:",
-                  phone
-                );
-                break;
-              }
-            }
-          }
-
-          // If not found, search all text elements but be more selective
-          if (!phone) {
-            const allTextElements = Array.from(
-              contactInfoPanel.querySelectorAll("div, span, p, a")
-            );
-            for (const el of allTextElements) {
-              if (el.textContent) {
-                const text = el.textContent.trim();
-                // More specific phone number regex for contact info
-                const phoneMatch = text.match(
-                  /(\+\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4})/
-                );
-                if (
-                  phoneMatch &&
-                  phoneMatch[1].replace(/\D/g, "").length >= 10
-                ) {
-                  // Verify this looks like a real phone number (not a timestamp or other number)
-                  const cleanPhone = phoneMatch[1].replace(/\D/g, "");
-                  if (cleanPhone.length >= 10 && cleanPhone.length <= 15) {
-                    phone = phoneMatch[1].trim();
-                    console.log("📞 Found contact phone in panel text:", phone);
-                    break;
-                  }
-                }
-              }
-            }
-          }
-
-          // Close the contact info panel
-          console.log("🔒 Closing contact info panel...");
-
-          // Try multiple methods to close
-          const closeButton = contactInfoPanel.querySelector(
-            '[data-testid="x"], button[aria-label*="Close"], button[aria-label*="close"], .close, [class*="close"]'
-          );
-          if (closeButton) {
-            closeButton.click();
-          } else {
-            // Try clicking outside the panel
-            const backdrop = document.querySelector(
-              'div[class*="backdrop"], div[class*="overlay"]'
-            );
-            if (backdrop) {
-              backdrop.click();
-            } else {
-              // Fallback to Escape key
-              document.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                  key: "Escape",
-                  keyCode: 27,
-                  bubbles: true,
-                })
-              );
-            }
-          }
-
-          // Wait for panel to close
-          await new Promise((resolve) => setTimeout(resolve, 200)); // Reduced from 500ms
-          break;
-        }
-      }
-
-      if (attempts >= maxAttempts) {
-        console.warn(
-          "⚠️ Contact info panel did not appear within timeout for phone extraction"
-        );
-      }
-    } else {
-      console.log("❌ No clickable header element found for phone extraction");
-    }
-  }
-
-  // Do NOT extract about/status from header/status, only from contact info panel
-
-  const result = { name: name || "", phone: phone || "" };
-  console.log("📋 Final extracted contact details:", result);
+  // 📋 Step 6 — Return final result
+  const result = { name, phone };
+  console.log("✅ Final extracted contact details:", result);
   return result;
-}
+};
 
-// Fetch user information for the logged-in user
 async function fetchUserInfo() {
   if (userInfoLoading) return;
 
@@ -1271,7 +771,10 @@ function observeActiveChat() {
             // Always update sidebar with fresh contact info - even without phone number
             lastActiveChatId = contact.name || "unknown";
             sidebarProps.contact = contact;
-            console.log("🔄 Updating sidebar with contact:", contact);
+            console.log("🔄 Switching to chat mode with contact:", contact);
+
+            // Switch to chat mode
+            switchSidebarMode("chat");
 
             // Fetch user info, stores, and products, then render sidebar
             getUserInfo((userInfo) => {
@@ -1284,12 +787,10 @@ function observeActiveChat() {
                   sidebarProps.onNotesChange = handleNotesChange;
                   if (sidebarRoot) {
                     console.log(
-                      "🎨 Rendering sidebar with props:",
+                      "🎨 Rendering chat sidebar with props:",
                       sidebarProps
                     );
-                    sidebarRoot.render(
-                      <InjectedSidebarContent {...sidebarProps} />
-                    );
+                    renderSidebar();
                   } else {
                     console.warn("⚠️ sidebarRoot is null, cannot render");
                   }
@@ -1303,16 +804,17 @@ function observeActiveChat() {
               );
             }
           } else if (contact === null) {
-            console.log("ℹ️ No active chat detected, clearing sidebar");
-            // Clear the sidebar when no chat is active
+            console.log(
+              "ℹ️ No active chat detected, switching to default mode"
+            );
+            // Switch back to default mode when no chat is active
             lastActiveChatId = null;
             sidebarProps.contact = { name: "", phone: "", about: "" };
-            sidebarProps.catalog = [];
-            sidebarProps.stores = [];
             sidebarProps.notes = "";
-            // Keep userInfo as it doesn't change per chat
+            // Keep userInfo, stores, and catalog as they don't change per chat
+            switchSidebarMode("default");
             if (sidebarRoot) {
-              sidebarRoot.render(<InjectedSidebarContent {...sidebarProps} />);
+              renderSidebar();
             }
           } else {
             console.log(
@@ -1347,6 +849,9 @@ function observeActiveChat() {
             lastActiveChatId = contact.name || "unknown";
             sidebarProps.contact = contact;
 
+            // Switch to chat mode
+            switchSidebarMode("chat");
+
             // Fetch user info, stores, and products, then render sidebar
             getUserInfo((userInfo) => {
               sidebarProps.userInfo = userInfo;
@@ -1357,9 +862,7 @@ function observeActiveChat() {
                   sidebarProps.notes = getNotesForContact(contact.name);
                   sidebarProps.onNotesChange = handleNotesChange;
                   if (sidebarRoot) {
-                    sidebarRoot.render(
-                      <InjectedSidebarContent {...sidebarProps} />
-                    );
+                    renderSidebar();
                   }
                 });
               });
@@ -1388,10 +891,11 @@ window.toggleWhatsappSidebar = async (open) => {
 
   if (isSidebarOpen) {
     // Open sidebar
-    const renderSidebarWithContact = async () => {
-      // Don't extract contact data on initial sidebar render
-      // Just render with empty data - contact extraction will happen when user clicks on a chat
+    const renderSidebarWithData = async () => {
+      // Initialize with default mode and empty contact data
+      sidebarMode = "default";
       sidebarProps.contact = { name: "", phone: "", about: "" };
+
       // Fetch user info, stores, and products for initial render
       getUserInfo((userInfo) => {
         sidebarProps.userInfo = userInfo;
@@ -1403,15 +907,11 @@ window.toggleWhatsappSidebar = async (open) => {
             sidebarProps.onNotesChange = handleNotesChange;
             sidebarProps.onOrderFormToggle = (show) => {
               sidebarProps.showOrderForm = show;
-              if (sidebarRoot) {
-                sidebarRoot.render(
-                  <InjectedSidebarContent {...sidebarProps} />
-                );
-              }
+              renderSidebar();
             };
             if (sidebarRoot) {
-              console.log("🎨 Initial sidebar render with empty contact data");
-              sidebarRoot.render(<InjectedSidebarContent {...sidebarProps} />);
+              console.log("🎨 Initial sidebar render in default mode");
+              renderSidebar();
             }
           });
         });
@@ -1437,12 +937,12 @@ window.toggleWhatsappSidebar = async (open) => {
       });
       document.body.appendChild(sidebarContainer);
       sidebarRoot = createRoot(sidebarContainer);
-      await renderSidebarWithContact();
+      await renderSidebarWithData();
       observeActiveChat();
-      console.log("✅ InjectedSidebarContent rendered in sidebar container.");
+      console.log("✅ Sidebar rendered in container.");
     } else {
       sidebarContainer.style.display = "flex";
-      await renderSidebarWithContact();
+      await renderSidebarWithData();
       console.log("✅ Sidebar container shown and updated.");
     }
 
@@ -2040,7 +1540,9 @@ window.testNewProductsAPI = function () {
     vendor: "",
     search: "",
   });
-  const apiUrl = `https://api.shopilam.com/api/v1/products?${apiParams.toString()}`;
+  const apiUrl = `${
+    import.meta.env.VITE_API_URL
+  }/api/v1/products?${apiParams.toString()}`;
 
   console.log("[PRODUCTS] Testing API URL:", apiUrl);
 
@@ -2223,6 +1725,24 @@ window.showOrderForm = (show) => {
   if (sidebarRoot && sidebarProps.onOrderFormToggle) {
     sidebarProps.onOrderFormToggle(show);
   }
+};
+
+// --- Global Sidebar Mode Control ---
+window.switchToDefaultSidebar = () => {
+  console.log("🔄 Switching to default sidebar mode");
+  switchSidebarMode("default");
+};
+
+window.switchToChatSidebar = (contact) => {
+  console.log("🔄 Switching to chat sidebar mode with contact:", contact);
+  if (contact) {
+    sidebarProps.contact = contact;
+  }
+  switchSidebarMode("chat");
+};
+
+window.getCurrentSidebarMode = () => {
+  return sidebarMode;
 };
 
 // --- Global API Exposure ---

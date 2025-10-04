@@ -13,6 +13,7 @@
     "https://*.whatsapp.net/*",
     "https://mmg.whatsapp.net/*",
     "https://api1.shopilam.com/*",
+    "https://api.shopilam.com/*",
     "https://files.static.shopilam.com/*"
   ],
   "content_scripts": [

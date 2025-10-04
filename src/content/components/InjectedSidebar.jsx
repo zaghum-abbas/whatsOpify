@@ -217,6 +217,7 @@ function injectTopToolbarIntoWhatsAppBody() {
 
       Object.assign(toolbarContainer.style, {
         height: TOOLBAR_HEIGHT,
+        marginRight: SIDEBAR_WIDTH,
         width: "100%",
         boxSizing: "border-box",
         backgroundColor: "white",

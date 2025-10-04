@@ -14,6 +14,7 @@ const OrdersSection = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [updatingOrder, setUpdatingOrder] = useState(null);
 
   // Debug function to test orders API
   const testOrdersAPI = async (status = "open") => {
@@ -37,27 +38,11 @@ const OrdersSection = () => {
     try {
       setLoading(true);
       setError(null);
-      const tokenData = localStorage.getItem("whatsopify_token");
-      if (!tokenData) {
-        throw new Error("No authentication token found");
-      }
-
-      const parsedToken = JSON.parse(tokenData);
-      const token = parsedToken?.data?.token || parsedToken?.token;
-
-      if (!token) {
-        throw new Error("Invalid authentication token");
-      }
-
-      console.log(
-        `[ORDERS] Fetching ${status} orders with token:`,
-        token.substring(0, 20) + "..."
-      );
 
       // Use background script to fetch orders with token authentication
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_ORDERS",
-        token: token,
+        token: getToken(),
         status: status,
         page: page,
         limit: limit,
@@ -165,7 +150,7 @@ const OrdersSection = () => {
 
         console.log(`[ORDERS] Reloading ${activeTab} tab...`);
 
-        if (isAuthenticated()) {
+        if (getToken()) {
           // Map tab names to API status values
           const status = activeTab === "new" ? "open" : "pending";
           console.log(
@@ -209,13 +194,76 @@ const OrdersSection = () => {
     reloadCurrentTab();
   }, [activeTab]);
 
-  const handleWhatsAppRedirect = (order) => {
+  // Function to update order status
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      console.log(`[ORDERS] Updating order ${orderId} status to ${newStatus}`);
+
+      const tokenData = localStorage.getItem("whatsopify_token");
+      if (!tokenData) {
+        throw new Error("No authentication token found");
+      }
+
+      const parsedToken = JSON.parse(tokenData);
+      const token = parsedToken?.data?.token || parsedToken?.token;
+
+      if (!token) {
+        throw new Error("Invalid authentication token");
+      }
+
+      const response = await chrome.runtime.sendMessage({
+        action: "UPDATE_ORDER_STATUS",
+        token: token,
+        orderId: orderId,
+        newStatus: newStatus,
+      });
+
+      console.log(`[ORDERS] Update status response:`, response);
+
+      if (response.success) {
+        console.log(
+          `[ORDERS] ✅ Order ${orderId} status updated to ${newStatus}`
+        );
+        return true;
+      } else {
+        throw new Error(response.error || "Failed to update order status");
+      }
+    } catch (err) {
+      console.error(`[ORDERS] ❌ Error updating order status:`, err);
+      throw err;
+    }
+  };
+
+  const handleWhatsAppRedirect = async (order) => {
     const phoneNumber = order?.shipmentDetails?.addresses[0]?.phone;
     const customerName = order?.shipmentDetails?.addresses[0]?.name;
     const orderId = order?.name;
     const storeName = order?.lineItems[0]?.vendor;
     const productName = order?.lineItems?.[0]?.name;
     const orderTotal = formatPrice(order?.pricing?.currentTotalPrice);
+
+    if (activeTab === "new") {
+      try {
+        setUpdatingOrder(order?._id);
+        await updateOrderStatus(order?._id, "pending");
+        setOrders((prev) => ({
+          ...prev,
+          new: prev.new.filter((o) => (o.name || o._id || o.id) !== orderId),
+          pending: [...prev.pending, { ...order, status: "pending" }],
+        }));
+
+        console.log(`[ORDERS] ✅ Order ${orderId} moved from new to pending`);
+      } catch (updateError) {
+        console.error(
+          `[ORDERS] ❌ Failed to update order status:`,
+          updateError
+        );
+        setError(`Failed to update order status: ${updateError.message}`);
+        return; // Don't proceed with WhatsApp message if status update fails
+      } finally {
+        setUpdatingOrder(null);
+      }
+    }
 
     if (phoneNumber) {
       const cleanedNumber = "92" + phoneNumber?.slice(1);
@@ -224,15 +272,15 @@ const OrdersSection = () => {
           activeTab === "new"
             ? `Hello ${customerName}, 👋  
 
-We’ve received your order ${orderId} at ${storeName}.  
+We've received your order ${orderId} at ${storeName}.  
 
 🛒 Product: ${productName}  
 💰 Order Total: ${orderTotal}  
 
-Please reply with *YES* to confirm your order, or *NO* if you’d like to cancel/change it.  
+Please reply with *YES* to confirm your order, or *NO* if you'd like to cancel/change it.  
 
 Thank you for choosing us!  
-– ${storeName} Team`
+– ${storeName} Team`
             : `Hello ${customerName}, ⏰  
 
 Your order ${orderId} at ${storeName} is still awaiting confirmation.  
@@ -241,10 +289,10 @@ Your order ${orderId} at ${storeName} is still awaiting confirmation.
 💰 Order Total: ${orderTotal}  
 
 Please reply with *YES* to confirm or *NO* to cancel/change.  
-We’ll only process the order once we get your response.  
+We'll only process the order once we get your response.  
 
 Thank you!  
-– ${storeName} Team`;
+– ${storeName} Team`;
 
         chrome.runtime.sendMessage(
           {
@@ -296,7 +344,7 @@ Thank you!
             console.log("[ORDERS] Manual refresh triggered for both tabs");
             setError(null);
             try {
-              if (isAuthenticated()) {
+              if (getToken()) {
                 console.log(
                   "[ORDERS] Fetching fresh data for both new and pending orders..."
                 );
@@ -481,6 +529,7 @@ Thank you!
                     textAlign: "left",
                     borderBottom: "1px solid #e0e0e0",
                     fontWeight: "600",
+                    width: "200px",
                   }}
                 >
                   Name & Phone
@@ -508,6 +557,7 @@ Thank you!
                       padding: "12px 8px",
                       fontFamily: "monospace",
                       fontSize: "12px",
+                      alignContent: "center",
                     }}
                   >
                     {order.name}
@@ -518,11 +568,12 @@ Thank you!
                       padding: "12px 8px",
                       fontSize: "12px",
                       color: "#666",
+                      alignContent: "center",
                     }}
                   >
                     {formatDate(order.createdAt)}
                   </td>
-                  <td style={{ padding: "12px 8px" }}>
+                  <td style={{ padding: "12px 8px", alignContent: "center" }}>
                     <div>
                       <div style={{ fontWeight: "500" }}>
                         {order?.shipmentDetails?.addresses[0]?.name}
@@ -544,10 +595,19 @@ Thank you!
                     style={{
                       padding: "12px 8px",
                       textAlign: "center",
+                      display: "flex",
+                      gap: "10px",
+                      alignItems: "center",
+                      alignContent: "center",
+                      height: "100%",
                     }}
                   >
                     <button
                       onClick={() => handleWhatsAppRedirect(order)}
+                      disabled={
+                        updatingOrder ===
+                        (order?.name || order?._id || order?.id)
+                      }
                       style={{
                         padding: "6px 12px",
                         backgroundColor:
@@ -555,12 +615,62 @@ Thank you!
                         color: "white",
                         border: "none",
                         borderRadius: "4px",
-                        cursor: "pointer",
+                        cursor:
+                          updatingOrder ===
+                          (order?.name || order?._id || order?.id)
+                            ? "not-allowed"
+                            : "pointer",
+                        fontSize: "12px",
+                        fontWeight: "500",
+                        opacity:
+                          updatingOrder ===
+                          (order?.name || order?._id || order?.id)
+                            ? 0.6
+                            : 1,
+                      }}
+                    >
+                      {updatingOrder ===
+                      (order?.name || order?._id || order?.id)
+                        ? "Updating..."
+                        : activeTab === "new"
+                        ? "Confirm"
+                        : "Resend"}
+                    </button>
+                    <a
+                      href={`https://shopilam.com/orders/${order?._id}`}
+                      target="_blank"
+                    >
+                      <button
+                        style={{
+                          padding: "6px 12px",
+                          backgroundColor: "#FFA500",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          fontWeight: "500",
+                        }}
+                      >
+                        Detail
+                      </button>
+                    </a>
+                    <button
+                      onClick={() => handleWhatsAppRedirect(order)}
+                      disabled={
+                        updatingOrder ===
+                        (order?.name || order?._id || order?.id)
+                      }
+                      style={{
+                        padding: "6px 12px",
+                        backgroundColor: "#25D366",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
                         fontSize: "12px",
                         fontWeight: "500",
                       }}
                     >
-                      {activeTab === "new" ? "Confirm" : "Resend"}
+                      Tracking 
                     </button>
                   </td>
                 </tr>

@@ -115,7 +115,7 @@ export const ordersApi = {
    * @returns {Promise} - Promise that resolves with orders data
    */
   fetchOrders: (status, page = 1, limit = 50) => {
-    const url = `https://api1.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}`;
+    const url = `https://api.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}`;
     return apiGet(url);
   },
 
@@ -126,7 +126,7 @@ export const ordersApi = {
    * @returns {Promise} - Promise that resolves with update result
    */
   updateOrderStatus: (orderId, status) => {
-    const url = `https://api1.shopilam.com/api/v1/orders/${orderId}`;
+    const url = `https://api.shopilam.com/api/v1/orders/${orderId}`;
     return apiPut(url, { status });
   },
 
@@ -136,7 +136,7 @@ export const ordersApi = {
    * @returns {Promise} - Promise that resolves with created order
    */
   createOrder: (orderData) => {
-    const url = "https://api1.shopilam.com/api/v1/orders";
+    const url = "https://api.shopilam.com/api/v1/orders";
     return apiPost(url, orderData);
   },
 };
@@ -148,8 +148,7 @@ export const productsApi = {
    * @returns {Promise} - Promise that resolves with products data
    */
   fetchProducts: () => {
-    const url =
-      "https://api.shopilam.com/api/v1/products?limit=50&page=1&status=active";
+    const url = `https://api.shopilam.com/api/v1/products?limit=50&page=1&status=active`;
     return apiGet(url);
   },
 };

@@ -80,7 +80,6 @@ export async function getActiveChatDetails() {
       ? nameElement.textContent.trim()
       : "Unknown";
 
-    // Extract phone number (if available)
     const phoneElement = chatHeader.querySelector('[title*="+"]');
     const phoneNumber = phoneElement
       ? phoneElement.getAttribute("title")
@@ -312,4 +311,3 @@ export default {
   removeClass,
   toggleClass,
 };
-

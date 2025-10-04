@@ -18,7 +18,7 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       };
 
       const response = await fetch(
-        "https://api1.shopilam.com/api/v1/auth/signin",
+        `${import.meta.env.VITE_API_URL}/v1/auth/signin`,
         {
           method: "POST",
           headers: {
@@ -45,7 +45,6 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
           })
         );
 
-        // Call success callback
         if (onLoginSuccess) {
           onLoginSuccess();
         }

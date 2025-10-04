@@ -1,7 +1,7 @@
 function handleCreateOrder(request, sender, sendResponse) {
   console.log("[BG] Order request received:", request);
 
-  const orderApiUrl = "https://api1.shopilam.com/api/v1/orders";
+  const orderApiUrl = "https://api.shopilam.com/api/v1/orders";
 
   const headersToSend = {
     "Content-Type": "application/json",
@@ -181,14 +181,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
 
       const productsApiUrl =
-        "https://api1.shopilam.com/api/v1/products?limit=50&page=1&status=active";
+        "https://api.shopilam.com/api/v1/products?limit=50&page=1&status=active";
 
       const productsHeaders = {
         Authorization: `Bearer ${token}`,
       };
-
-      console.log("[BG] Making fetch request to:", productsApiUrl);
-      console.log("[BG] Request headers:", productsHeaders);
 
       fetch(productsApiUrl, {
         method: "GET",
@@ -232,13 +229,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const ordersToken = request.token;
       const { status, page = 1, limit = 50 } = request;
 
-      console.log("[BG] FETCH_ORDERS request received:", {
-        status,
-        page,
-        limit,
-        token: ordersToken ? ordersToken.substring(0, 20) + "..." : "undefined",
-      });
-
       if (!ordersToken) {
         console.error("[BG] No token provided in FETCH_ORDERS request");
         sendResponse({
@@ -248,15 +238,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return false;
       }
 
-      const ordersApiUrl = `https://api1.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}`;
+      const ordersApiUrl = `https://api.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}`;
 
       const ordersHeaders = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${ordersToken}`,
       };
-
-      console.log("[BG] Making fetch request to:", ordersApiUrl);
-      console.log("[BG] Request headers:", ordersHeaders);
 
       fetch(ordersApiUrl, {
         method: "GET",
@@ -296,6 +283,157 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: false, error: error.message });
         });
       return true;
+
+    case "UPDATE_ORDER_STATUS":
+      const updateToken = request.token;
+      const { orderId, newStatus } = request;
+
+      if (!updateToken) {
+        console.error("[BG] No token provided in UPDATE_ORDER_STATUS request");
+        sendResponse({
+          success: false,
+          error: "No authentication token provided",
+        });
+        return false;
+      }
+
+      if (!orderId || !newStatus) {
+        console.error(
+          "[BG] Missing orderId or newStatus in UPDATE_ORDER_STATUS request"
+        );
+        sendResponse({
+          success: false,
+          error: "Missing orderId or newStatus",
+        });
+        return false;
+      }
+
+      const updateApiUrl = `https://api.shopilam.com/api/v1/orders/${orderId}/status`;
+
+      const updateHeaders = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${updateToken}`,
+      };
+
+      const updatePayload = {
+        status: newStatus,
+      };
+
+      console.log("[BG] Making PUT request to:", updateApiUrl);
+      console.log("[BG] Request payload:", updatePayload);
+      console.log("[BG] Request headers:", updateHeaders);
+
+      fetch(updateApiUrl, {
+        method: "PUT",
+        headers: updateHeaders,
+        body: JSON.stringify(updatePayload),
+      })
+        .then((response) => {
+          console.log("[BG] Update API response status:", response.status);
+          console.log(
+            "[BG] Update API response headers:",
+            Object.fromEntries(response.headers.entries())
+          );
+
+          if (!response.ok) {
+            return response.text().then((text) => {
+              console.error("[BG] Update API error response:", text);
+              throw new Error(
+                `HTTP error! status: ${response.status}, message: ${text}`
+              );
+            });
+          }
+          return response.json();
+        })
+        .then((updateData) => {
+          console.log("[BG] Update API success response:", updateData);
+          sendResponse({ success: true, data: updateData });
+        })
+        .catch((error) => {
+          console.error("[BG] Update fetch error:", error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true;
+
+    case "SEARCH_PRODUCTS":
+      const searchToken = request.token;
+      const {
+        searchTerm,
+        page: searchPage = 1,
+        limit: searchLimit = 50,
+      } = request;
+
+      console.log("[BG] SEARCH_PRODUCTS request received:", {
+        searchTerm,
+        page: searchPage,
+        limit: searchLimit,
+        token: searchToken ? searchToken.substring(0, 20) + "..." : "undefined",
+      });
+
+      if (!searchToken) {
+        console.error("[BG] No token provided in SEARCH_PRODUCTS request");
+        sendResponse({
+          success: false,
+          error: "No authentication token provided",
+        });
+        return false;
+      }
+
+      // Allow empty search term for getting all products
+      const searchQuery =
+        searchTerm && searchTerm.trim() !== ""
+          ? `search=${encodeURIComponent(searchTerm.trim())}&`
+          : "";
+
+      const searchApiUrl = `https://api.shopilam.com/api/v1/products?${searchQuery}limit=${searchLimit}&page=${searchPage}&status=active`;
+
+      const searchHeaders = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${searchToken}`,
+      };
+
+      console.log("[BG] Making search request to:", searchApiUrl);
+      console.log("[BG] Request headers:", searchHeaders);
+
+      fetch(searchApiUrl, {
+        method: "GET",
+        headers: searchHeaders,
+      })
+        .then((response) => {
+          console.log("[BG] Search API response status:", response.status);
+          console.log(
+            "[BG] Search API response headers:",
+            Object.fromEntries(response.headers.entries())
+          );
+
+          if (!response.ok) {
+            return response.text().then((text) => {
+              console.error("[BG] Search API error response:", text);
+              throw new Error(
+                `HTTP error! status: ${response.status}, message: ${text}`
+              );
+            });
+          }
+          return response.json();
+        })
+        .then((searchData) => {
+          console.log("[BG] Search API success response:", searchData);
+          console.log(
+            "[BG] Search results count:",
+            Array.isArray(searchData?.data)
+              ? searchData?.data?.length
+              : Array.isArray(searchData)
+              ? searchData.length
+              : "Not an array"
+          );
+          sendResponse({ success: true, products: searchData });
+        })
+        .catch((error) => {
+          console.error("[BG] Search fetch error:", error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true;
+
     default:
       console.warn("Unknown message action:", request.action);
       return false;
