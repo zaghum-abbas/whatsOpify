@@ -194,16 +194,12 @@ window.toggleWhatsappSidebar = (open) => {
   }
 };
 
-// Inject Top Toolbar
 function injectTopToolbarIntoWhatsAppBody() {
-  // ... (Your existing TopToolbar injection code remains the same) ...
   if (document.getElementById("whatsapp-top-toolbar-root")) {
     console.log("⚠️ Top Toolbar already injected. Skipping injection.");
     return;
   }
-
-  const whatsappMainBodyContainerSelector = "div.x78zum5.xdt5ytf.x5yr21d"; // This is a good candidate for the main app layout
-
+  const whatsappMainBodyContainerSelector = "div.x78zum5.xdt5ytf.x5yr21d";
   waitForElement(
     whatsappMainBodyContainerSelector,
     (whatsappMainBodyContainer) => {
@@ -211,10 +207,8 @@ function injectTopToolbarIntoWhatsAppBody() {
       console.log(
         "Attempting to inject Top Toolbar into WhatsApp main body container..."
       );
-
       const toolbarContainer = document.createElement("div");
       toolbarContainer.id = "whatsapp-top-toolbar-root";
-
       Object.assign(toolbarContainer.style, {
         height: TOOLBAR_HEIGHT,
         marginRight: SIDEBAR_WIDTH,
@@ -224,21 +218,10 @@ function injectTopToolbarIntoWhatsAppBody() {
         boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
         borderBottom: "1px solid #e2e8f0",
       });
-
-      // Prepend toolbar and ensure mainAppContent is positioned for sidebar
       whatsappMainBodyContainer.prepend(toolbarContainer);
-
-      console.log(
-        "✅ Top Toolbar container created and prepended into WhatsApp main body container."
-      );
-
       const root = createRoot(toolbarContainer);
       root.render(<TopToolbar />);
       console.log("✅ TopToolbar mounted as part of WhatsApp Web's flow.");
-
-      console.log(
-        "ℹ️ No explicit padding adjustment needed for main content as toolbar is prepended internally."
-      );
     }
   );
 }

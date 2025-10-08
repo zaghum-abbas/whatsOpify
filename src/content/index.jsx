@@ -1004,68 +1004,132 @@ window.addEventListener("storage", (event) => {
   }
 });
 
-// Inject Top Toolbar
-function injectTopToolbarIntoWhatsAppBody() {
-  // The selector 'div.x78zum5.xdt5ytf.x5yr21d' is commonly the main layout container
-  // of WhatsApp Web, holding both the chat list and chat panel.
-  const whatsappMainBodyContainerSelector = "div.x78zum5.xdt5ytf.x5yr21d";
+// function injectTopToolbarIntoWhatsAppBody() {
+//   const appContainer = document.getElementById("app");
+//   console.log("🔍 App container found:", appContainer);
 
-  waitForElement(
-    whatsappMainBodyContainerSelector,
-    (whatsappMainBodyContainer) => {
-      // Store this reference globally for sidebar management
-      mainAppContent = whatsappMainBodyContainer;
-      console.log(
-        "Main WhatsApp content container identified:",
-        mainAppContent
-      );
+//   const whatsappMainBodyContainerSelector = "div.x78zum5.xdt5ytf.x5yr21d";
 
-      // Check if toolbar already exists to prevent re-injection
-      if (document.getElementById("whatsapp-top-toolbar-root")) {
-        console.log("⚠️ Top Toolbar already injected. Skipping injection.");
-        return;
-      }
+//   waitForElement(
+//     whatsappMainBodyContainerSelector,
+//     (whatsappMainBodyContainer) => {
+//       // Store this reference globally for sidebar management
+//       mainAppContent = whatsappMainBodyContainer;
+//       console.log(
+//         "Main WhatsApp content container identified:",
+//         mainAppContent
+//       );
 
-      console.log(
-        "Attempting to inject Top Toolbar as fixed element at top of viewport..."
-      );
+//       // Check if toolbar already exists to prevent re-injection
+//       if (document.getElementById("whatsapp-top-toolbar-root")) {
+//         console.log("⚠️ Top Toolbar already injected. Skipping injection.");
+//         return;
+//       }
 
-      const toolbarContainer = document.createElement("div");
-      toolbarContainer.id = "whatsapp-top-toolbar-root";
+//       console.log(
+//         "Attempting to inject Top Toolbar as fixed element at top of viewport..."
+//       );
 
-      Object.assign(toolbarContainer.style, {
-        position: "fixed",
-        top: "0",
-        left: "0",
-        right: "0",
-        height: TOOLBAR_HEIGHT,
-        width: "100%",
-        boxSizing: "border-box",
-        backgroundColor: "white",
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        borderBottom: "1px solid #e2e8f0",
-        zIndex: "10000", // High z-index to stay on top
-        display: "flex",
-        alignItems: "center",
-      });
+//       const toolbarContainer = document.createElement("div");
+//       toolbarContainer.id = "whatsapp-top-toolbar-root";
 
-      // Append toolbar to body instead of mainAppContent to avoid margin issues
-      document.body.appendChild(toolbarContainer);
+//       Object.assign(toolbarContainer.style, {
+//         position: "fixed",
+//         top: "0",
+//         left: "0",
+//         right: "0",
+//         height: TOOLBAR_HEIGHT,
+//         width: "100%",
+//         boxSizing: "border-box",
+//         backgroundColor: "white",
+//         boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+//         borderBottom: "1px solid #e2e8f0",
+//         zIndex: "10000", // High z-index to stay on top
+//         display: "flex",
+//         alignItems: "center",
+//       });
 
-      console.log("✅ Top Toolbar container created and appended to body.");
+//       // Append toolbar to body instead of mainAppContent to avoid margin issues
+//       document.body.appendChild(toolbarContainer);
 
-      const root = createRoot(toolbarContainer);
-      root.render(<TopToolbar />);
-      console.log("✅ TopToolbar mounted as fixed element at top of viewport.");
+//       console.log("✅ Top Toolbar container created and appended to body.");
 
-      // Add padding to main content to account for toolbar height
-      whatsappMainBodyContainer.style.paddingTop = TOOLBAR_HEIGHT;
+//       const root = createRoot(toolbarContainer);
+//       root.render(<TopToolbar />);
+//       console.log("✅ TopToolbar mounted as fixed element at top of viewport.");
 
-      // Initialize sidebar state to open by default
-      window.toggleWhatsappSidebar(true);
-    }
+//       // Add padding to main content to account for toolbar height
+//       whatsappMainBodyContainer.style.paddingTop = TOOLBAR_HEIGHT;
+
+//       // Initialize sidebar state to open by default
+//       window.toggleWhatsappSidebar(true);
+//     }
+//   );
+// }
+
+const injectTopToolbar = () => {
+  const appContainer = document.getElementById("app");
+  if (!appContainer) return;
+
+  const mainContainer = appContainer.querySelector(
+    "div.x78zum5.xdt5ytf.x5yr21d"
   );
-}
+  if (!mainContainer) return;
+
+  if (document.getElementById("whatsapp-top-toolbar-root")) return;
+
+  const toolbarContainer = document.createElement("div");
+  toolbarContainer.id = "whatsapp-top-toolbar-root";
+  Object.assign(toolbarContainer.style, {
+    height: `${TOOLBAR_HEIGHT}px`,
+    width: "100%",
+    position: "sticky",
+    top: "0",
+    zIndex: "10000",
+    background: "rgb(255,255,255)",
+    borderBottom: "1px solid rgba(0,0,0,0.1)",
+    flexShrink: "0",
+  });
+
+  // Insert toolbar before main UI
+  appContainer.prepend(toolbarContainer);
+
+  // Render React toolbar
+  const root = createRoot(toolbarContainer);
+  root.render(<TopToolbar />);
+
+  console.log("✅ Toolbar injected, applying padding...");
+
+  // ✅ Function to keep padding consistent
+  const applyPadding = () => {
+    if (
+      mainContainer &&
+      mainContainer.style.paddingTop !== `${TOOLBAR_HEIGHT}px`
+    ) {
+      mainContainer.style.paddingTop = `${TOOLBAR_HEIGHT}px`;
+    }
+  };
+
+  // Apply immediately
+  applyPadding();
+
+  // ✅ Watch for DOM resets and reapply
+  const observer = new MutationObserver(() => {
+    applyPadding();
+  });
+
+  observer.observe(appContainer, { childList: true, subtree: true });
+};
+
+window.addEventListener("load", () => {
+  const checkExist = setInterval(() => {
+    const appContainer = document.getElementById("app");
+    if (appContainer) {
+      clearInterval(checkExist);
+      injectTopToolbar();
+    }
+  }, 500);
+});
 
 // Inject Sidebar Buttons (into WhatsApp's left panel)
 function injectSidebarButtons() {
@@ -1161,7 +1225,7 @@ function injectChatListEnhancer() {
 }
 
 // Call all injection functions
-injectTopToolbarIntoWhatsAppBody();
+// injectTopToolbarIntoWhatsAppBody();
 injectSidebarButtons();
 injectChatHeaderHover();
 injectChatListEnhancer();
