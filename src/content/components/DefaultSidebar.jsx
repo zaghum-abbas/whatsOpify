@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import OrdersSection from "./OrdersSection";
-import ModalForm from "./ModalForm";
 import { formatPrice } from "../../core/utils/helperFunctions";
+import { useTheme } from "../../hooks/useTheme";
 
 const getTheme = () => {
   // Try to detect WhatsApp dark mode from body class or style
@@ -9,6 +9,8 @@ const getTheme = () => {
   const isDark =
     (body.classList.contains("web") && body.classList.contains("dark")) ||
     window.matchMedia("(prefers-color-scheme: dark)").matches;
+  console.log("isDark", isDark);
+
   return isDark
     ? {
         bg: "#18191a",
@@ -128,22 +130,25 @@ const DefaultSidebar = ({
   stores = [],
   notes = "",
   onNotesChange,
-  showOrderForm = false,
-  onOrderFormToggle,
 }) => {
   const theme = useMemo(getTheme, []);
+
+  const whatsappTheme = useTheme();
+  console.log("@@theme", whatsappTheme);
 
   return (
     <div
       style={{
         padding: "20px",
         fontFamily: "inherit",
-        background: theme.bg,
+        // background: theme.bg,
+        background: whatsappTheme === "dark" ? "#18191a" : "#f7f7f7",
+        color: whatsappTheme === "dark" ? "white" : "#222",
         minHeight: "100vh",
       }}
     >
       {/* User Info Section */}
-      {userInfo && (
+      {/* {userInfo && (
         <section style={{ marginBottom: "28px" }}>
           <h2
             style={{
@@ -216,32 +221,34 @@ const DefaultSidebar = ({
             )}
           </div>
         </section>
-      )}
-
+      )} */}
       {/* Orders Section - Always visible */}
       <section style={{ marginBottom: "28px" }}>
         <h2
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
-            color: theme.text,
+            // color: theme.text,
+            color: whatsappTheme === "dark" ? "white" : "#222",
           }}
         >
           Orders
         </h2>
         <div
           style={{
-            background: theme.card,
+            // background: theme.card,
+            background: whatsappTheme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-            border: `1px solid ${theme.border}`,
+            border: `1px solid ${
+              whatsappTheme === "dark" ? "#333" : "#e2e8f0"
+            }`,
           }}
         >
-          <OrdersSection />
+          <OrdersSection whatsappTheme={whatsappTheme} />
         </div>
       </section>
-
-      {/* My Stores Section */}
+      {/* My Stores Section
       <section style={{ marginBottom: "28px" }}>
         <h2
           style={{
@@ -269,62 +276,8 @@ const DefaultSidebar = ({
         </div>
       </section>
 
-      {/* Order Form Section - Only shown when triggered from top toolbar */}
-      {showOrderForm && (
-        <section style={{ marginBottom: "28px" }}>
-          <h2
-            style={{
-              marginBottom: "12px",
-              fontSize: "1.1rem",
-              color: theme.text,
-            }}
-          >
-            Create New Order
-          </h2>
-          <div
-            style={{
-              background: theme.card,
-              borderRadius: "10px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-              padding: "16px",
-              border: `1px solid ${theme.border}`,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                alignItems: "center",
-                marginBottom: "16px",
-              }}
-            >
-              <button
-                onClick={() => onOrderFormToggle && onOrderFormToggle(false)}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: theme.subText,
-                  cursor: "pointer",
-                  fontSize: "1.2rem",
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <ModalForm
-              onClose={() => onOrderFormToggle && onOrderFormToggle(false)}
-              initialData={{
-                name: "",
-                phone: "",
-              }}
-            />
-          </div>
-        </section>
-      )}
-
       {/* Notes Section */}
-      <section style={{ marginBottom: "28px" }}>
+      {/* <section style={{ marginBottom: "28px" }}>
         <h2
           style={{
             marginBottom: "12px",
@@ -361,7 +314,7 @@ const DefaultSidebar = ({
             onChange={(e) => onNotesChange && onNotesChange(e.target.value)}
           />
         </div>
-      </section>
+      </section>{" "} */}
     </div>
   );
 };

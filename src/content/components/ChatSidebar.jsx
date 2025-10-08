@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import CustomerSupportMessages from "./CustomerSupportMessages";
+import ModalForm from "./ModalForm";
 import { formatPrice } from "../../core/utils/helperFunctions";
 import { useDebounce } from "../../hooks/useDebounce";
 
@@ -373,6 +374,36 @@ const ChatSidebar = ({
           </div>
         </section>
       )}
+
+      {/* Create Order Form Section */}
+      <section style={{ marginBottom: "28px" }}>
+        <h2
+          style={{
+            marginBottom: "12px",
+            fontSize: "1.1rem",
+            color: theme.text,
+          }}
+        >
+          Create New Order
+        </h2>
+        <div
+          style={{
+            background: theme.card,
+            borderRadius: "10px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+            padding: "16px",
+            border: `1px solid ${theme.border}`,
+          }}
+        >
+          <ModalForm
+            onClose={() => {}}
+            initialData={{
+              name: contact?.name || "",
+              phone: contact?.phone || "",
+            }}
+          />
+        </div>
+      </section>
 
       {/* Catalog Section */}
       <section style={{ marginBottom: "28px" }}>

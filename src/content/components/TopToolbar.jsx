@@ -10,6 +10,7 @@ import {
   handleAuthMessage,
   handleAuthStorage,
 } from "./authMiddleware.jsx";
+import { useTheme } from "../../hooks/useTheme.js";
 
 const SELECTORS = {
   Inbox: 'button#all-filter[role="tab"]',
@@ -19,6 +20,8 @@ const SELECTORS = {
 };
 
 const TopToolbar = (props) => {
+  const theme = useTheme();
+  console.log("@@theme", theme);
   const [showModal, setShowModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [customTabs, setCustomTabs] = useState([]);
@@ -33,10 +36,6 @@ const TopToolbar = (props) => {
       props.onRequireLogin(() => setShowLoginModal(true));
     }
   }, [props]);
-
-  useEffect(() => {
-    console.log("📌 TopToolbar mounted on WhatsApp Web");
-  }, []);
 
   const clickWhatsAppFilterButton = useCallback(async (label) => {
     const selector = SELECTORS[label];
@@ -248,12 +247,12 @@ const TopToolbar = (props) => {
         paddingLeft: "1rem",
         paddingRight: "1rem",
         boxSizing: "border-box",
-        backgroundColor: "white",
+        backgroundColor: theme === "dark" ? "black" : "white",
+        color: theme === "dark" ? "white" : "black",
         zIndex: 10000,
         position: "relative",
       }}
     >
-      {/* Left side: Buttons */}
       <div
         style={{
           display: "flex",

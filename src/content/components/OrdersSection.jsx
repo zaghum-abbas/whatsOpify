@@ -6,7 +6,7 @@ import {
   getToken,
 } from "../../core/utils/helperFunctions";
 
-const OrdersSection = () => {
+const OrdersSection = ({ whatsappTheme }) => {
   const [activeTab, setActiveTab] = useState("new");
   const [orders, setOrders] = useState({
     new: [],
@@ -333,7 +333,7 @@ Thank you!
           style={{
             fontSize: "18px",
             fontWeight: "bold",
-            color: "#333",
+            color: whatsappTheme === "dark" ? "white" : "#333",
             margin: 0,
           }}
         >

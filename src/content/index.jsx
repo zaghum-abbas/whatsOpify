@@ -102,18 +102,30 @@ let lastActiveChatId = null;
 
 // Function to switch sidebar mode
 const switchSidebarMode = (mode) => {
+  console.log("🚀 switchSidebarMode called with:", mode);
+  console.log("🔍 Before switch - sidebarMode:", sidebarMode);
+  console.log("🔍 sidebarRoot exists:", !!sidebarRoot);
+  console.log("🔍 isSidebarOpen:", isSidebarOpen);
+
   sidebarMode = mode;
   console.log(`🔄 Sidebar mode switched to: ${mode}`);
 
   if (sidebarRoot && isSidebarOpen) {
+    console.log("✅ Calling renderSidebar()...");
     renderSidebar();
+  } else {
+    console.warn(
+      "⚠️ NOT rendering sidebar. sidebarRoot:",
+      !!sidebarRoot,
+      "isSidebarOpen:",
+      isSidebarOpen
+    );
   }
 };
 
 // Function to render the appropriate sidebar based on mode
 const renderSidebar = () => {
   if (!sidebarRoot) return;
-
   if (sidebarMode === "default") {
     console.log("🎨 Rendering Default Sidebar");
     sidebarRoot.render(<DefaultSidebar {...sidebarProps} />);
@@ -753,18 +765,25 @@ function observeActiveChat() {
     console.log("✅ Found chat list container, setting up click listener");
 
     chatListContainer.addEventListener("click", async (event) => {
+      console.log("🖱️ Click detected on chat list container");
+
       // Check if the click was on a chat item
       const chatItem = event.target.closest(
         '[data-testid="cell-frame-container"], div[role="listitem"], div[tabindex="0"]'
       );
+
+      console.log("🎯 Chat item found:", !!chatItem);
+
       if (chatItem) {
-        console.log(" ️ Chat item clicked, waiting for chat to load...");
+        console.log("✅ Chat item clicked, waiting for chat to load...");
 
         // Wait a bit for the chat to load, then extract contact info
         setTimeout(async () => {
           console.log("🔄 Extracting contact details for selected chat...");
           const contact = await getActiveChatDetails();
           console.log("📋 Contact extraction result:", contact);
+          console.log("📋 Contact has name:", !!contact?.name);
+          console.log("📋 Contact has phone:", !!contact?.phone);
 
           // Check if we have a valid contact (not null and has some data)
           if (contact && (contact.name || contact.phone || contact.about)) {
@@ -1743,6 +1762,23 @@ window.switchToChatSidebar = (contact) => {
 
 window.getCurrentSidebarMode = () => {
   return sidebarMode;
+};
+
+// Debug function to check sidebar state
+window.debugSidebarState = () => {
+  console.log("🔍 ===== SIDEBAR DEBUG STATE =====");
+  console.log("📊 Current sidebarMode:", sidebarMode);
+  console.log("📊 isSidebarOpen:", isSidebarOpen);
+  console.log("📊 sidebarRoot exists:", !!sidebarRoot);
+  console.log("📊 mainAppContent exists:", !!mainAppContent);
+  console.log("📊 lastActiveChatId:", lastActiveChatId);
+  console.log("📊 sidebarProps.contact:", sidebarProps.contact);
+  console.log("📊 #pane-side exists:", !!document.querySelector("#pane-side"));
+  console.log(
+    "📊 Sidebar container exists:",
+    !!document.getElementById("whatsapp-sidebar-root")
+  );
+  console.log("🔍 ================================");
 };
 
 // --- Global API Exposure ---
