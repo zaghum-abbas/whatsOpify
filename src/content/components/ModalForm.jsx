@@ -4,7 +4,7 @@ import { useDebounce } from "../../hooks/useDebounce";
 import { formatPrice, getToken } from "../../core/utils/helperFunctions";
 import { IoMdTrash } from "react-icons/io";
 
-const ModalForm = ({ onClose }) => {
+const ModalForm = ({ onClose, theme }) => {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -668,7 +668,7 @@ const ModalForm = ({ onClose }) => {
                       onClick={() => setShowProductModal(true)}
                       style={{
                         padding: "10px 20px",
-                        backgroundColor: "#8B5CF6",
+                        backgroundColor: theme === "dark" ? "#25D366" : "#ccc",
                         color: "white",
                         border: "none",
                         borderRadius: "6px",
@@ -777,7 +777,15 @@ const ModalForm = ({ onClose }) => {
 
             {/* Payment Method Section */}
             <div style={sectionStyle}>
-              <h3 style={sectionHeaderStyle}>Payment Method*</h3>
+              <h3
+                style={{
+                  ...sectionHeaderStyle,
+                  color: theme === "dark" ? "white" : "#222",
+                }}
+              >
+                Payment Method*
+              </h3>
+
               <div style={radioGroupStyle}>
                 {paymentMethods.map((method) => (
                   <label key={method.value} style={radioLabelStyle}>
@@ -798,7 +806,14 @@ const ModalForm = ({ onClose }) => {
 
             {/* Shipping Information Section */}
             <div style={sectionStyle}>
-              <h3 style={sectionHeaderStyle}>Shipping Information</h3>
+              <h3
+                style={{
+                  ...sectionHeaderStyle,
+                  color: theme === "dark" ? "white" : "#222",
+                }}
+              >
+                Shipping Information
+              </h3>
               <div style={fieldGroupStyle}>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>Name*</label>
@@ -1324,7 +1339,6 @@ const sectionStyle = {};
 const sectionHeaderStyle = {
   margin: "0 0 12px 0",
   fontSize: "1.1rem",
-  color: "#555",
 };
 
 const fieldGroupStyle = {

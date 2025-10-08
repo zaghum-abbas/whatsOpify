@@ -131,8 +131,6 @@ const DefaultSidebar = ({
   notes = "",
   onNotesChange,
 }) => {
-  const theme = useMemo(getTheme, []);
-
   const whatsappTheme = useTheme();
   console.log("@@theme", whatsappTheme);
 

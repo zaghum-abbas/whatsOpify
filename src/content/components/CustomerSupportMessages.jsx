@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useTheme } from "../../hooks/useTheme";
 
 const CustomerSupportMessages = () => {
-  const theme = {
-    bg: "#f0f2f5",
-    card: "#fff",
-    text: "#111b21",
-    subText: "#667781",
-    accent: "#00a884",
-    border: "#e9edef",
-  };
+  const theme = useTheme();
 
   const [contactName, setContactName] = useState("");
   const [isLoadingContact, setIsLoadingContact] = useState(true);
@@ -186,10 +180,10 @@ const CustomerSupportMessages = () => {
     <section style={{ marginBottom: "28px" }}>
       <h2
         style={{
-          color: theme.text,
+          color: theme === "dark" ? "white" : "black",
           fontSize: "1.2rem",
           marginBottom: "16px",
-          borderBottom: `1px solid ${theme.border}`,
+          borderBottom: `1px solid ${theme === "dark" ? "#333" : "#e9edef"}`,
           paddingBottom: "8px",
         }}
       >
@@ -199,7 +193,7 @@ const CustomerSupportMessages = () => {
       <div
         style={{
           padding: "16px",
-          background: theme.bg,
+          background: theme === "dark" ? "#23272a" : "#fff",
           height: "100%",
           overflowY: "auto",
         }}
@@ -208,7 +202,7 @@ const CustomerSupportMessages = () => {
           <div
             key={index}
             style={{
-              background: theme.card,
+              background: theme === "dark" ? "#23272a" : "#fff",
               borderRadius: "8px",
               padding: "12px",
               marginBottom: "12px",
@@ -217,7 +211,7 @@ const CustomerSupportMessages = () => {
           >
             <h3
               style={{
-                color: theme.accent,
+                color: theme === "dark" ? "white" : "black",
                 fontSize: "0.95rem",
                 marginBottom: "8px",
               }}
@@ -234,22 +228,30 @@ const CustomerSupportMessages = () => {
                   disabled={isLoadingContact}
                   style={{
                     background: "transparent",
-                    border: `1px solid ${theme.border}`,
+                    border: `1px solid ${
+                      theme === "dark" ? "#333" : "#e9edef"
+                    }`,
                     borderRadius: "6px",
                     padding: "8px 12px",
                     textAlign: "left",
                     cursor: "pointer",
-                    color: theme.text,
+                    color: theme === "dark" ? "white" : "black",
                     fontSize: "0.9rem",
                     transition: "all 0.2s",
                     opacity: isLoadingContact ? 0.7 : 1,
                     ":hover": {
                       background: isLoadingContact
                         ? "transparent"
-                        : theme.accent + "15",
+                        : theme === "dark"
+                        ? "#00a884"
+                        : "#00a884",
                       borderColor: isLoadingContact
-                        ? theme.border
-                        : theme.accent,
+                        ? theme === "dark"
+                          ? "#333"
+                          : "#e9edef"
+                        : theme === "dark"
+                        ? "#00a884"
+                        : "#00a884",
                     },
                   }}
                 >

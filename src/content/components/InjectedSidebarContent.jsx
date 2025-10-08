@@ -4,34 +4,9 @@ import CustomerSupportMessages from "./CustomerSupportMessages";
 import OrdersSection from "./OrdersSection";
 import { formatPrice, getToken } from "../../core/utils/helperFunctions";
 import { useDebounce } from "../../hooks/useDebounce";
-const getTheme = () => {
-  // Try to detect WhatsApp dark mode from body class or style
-  const body = document.body;
-  const isDark =
-    (body.classList.contains("web") && body.classList.contains("dark")) ||
-    window.matchMedia("(prefers-color-scheme: dark)").matches;
-  return isDark
-    ? {
-        bg: "#18191a",
-        card: "#23272a",
-        text: "#e4e6eb",
-        subText: "#b0b3b8",
-        accent: "#00bfae",
-        border: "#333",
-      }
-    : {
-        bg: "#f7f7f7",
-        card: "#fff",
-        text: "#222",
-        subText: "#555",
-        accent: "#00bfae",
-        border: "#e2e8f0",
-      };
-};
+import { useTheme } from "../../hooks/useTheme";
 
-const StoreItem = ({ store }) => {
-  const theme = getTheme();
-
+const StoreItem = ({ store, theme }) => {
   // Default to active status unless explicitly marked as inactive
   const isActive =
     // Only mark as inactive if explicitly set to inactive values
@@ -58,12 +33,12 @@ const StoreItem = ({ store }) => {
       style={{
         display: "flex",
         flexDirection: "column",
-        background: theme.card,
+        background: theme === "dark" ? "#23272a" : "#fff",
         borderRadius: "8px",
         boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         padding: "12px 16px",
         marginBottom: "12px",
-        border: `1px solid ${theme.border}`,
+        border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
       }}
     >
       {/* Store Header */}
@@ -76,8 +51,21 @@ const StoreItem = ({ store }) => {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "1.2em", color: theme.accent }}>🏪</span>
-          <div style={{ color: theme.text, fontWeight: 600, fontSize: "1rem" }}>
+          <span
+            style={{
+              fontSize: "1.2em",
+              color: theme === "dark" ? "white" : "#222",
+            }}
+          >
+            🏪
+          </span>
+          <div
+            style={{
+              color: theme === "dark" ? "white" : "#222",
+              fontWeight: 600,
+              fontSize: "1rem",
+            }}
+          >
             {store.name || store.store_name || "Unnamed Store"}
           </div>
         </div>
@@ -99,7 +87,11 @@ const StoreItem = ({ store }) => {
 
       {/* Store Details */}
       <div
-        style={{ fontSize: "0.85em", color: theme.subText, lineHeight: "1.4" }}
+        style={{
+          fontSize: "0.85em",
+          color: theme === "dark" ? "white" : "#222",
+          lineHeight: "1.4",
+        }}
       >
         {store.description && (
           <div style={{ marginBottom: "4px" }}>
@@ -132,9 +124,7 @@ const StoreItem = ({ store }) => {
   );
 };
 
-const CatalogItem = ({ item, handleProductClick }) => {
-  const theme = getTheme();
-
+const CatalogItem = ({ item, handleProductClick, theme }) => {
   return (
     <div
       onClick={() => handleProductClick(item)}
@@ -142,12 +132,12 @@ const CatalogItem = ({ item, handleProductClick }) => {
         display: "flex",
         alignItems: "center",
         gap: "12px",
-        background: theme.card,
+        background: theme === "dark" ? "#23272a" : "#fff",
         borderRadius: "8px",
         // boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
         padding: "12px",
         marginBottom: "12px",
-        border: `1px solid ${theme.border}`,
+        border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
         cursor: "pointer",
         transition: "all 0.2s ease",
       }}
@@ -167,7 +157,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
           borderRadius: "6px",
           overflow: "hidden",
           // backgroundColor: theme.bg,
-          border: `1px solid ${theme.border}`,
+          border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
@@ -197,7 +187,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
               width: "100%",
               height: "100%",
               fontSize: "1.2em",
-              color: theme.accent,
+              color: theme === "dark" ? "white" : "#222",
             }}
           >
             🛒
@@ -208,7 +198,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            color: theme.text,
+            color: theme === "dark" ? "white" : "#222",
             fontWeight: 600,
             fontSize: "0.95rem",
             marginBottom: "4px",
@@ -222,7 +212,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
         {/* {item.description && (
           <div
             style={{
-              color: theme.subText,
+                  color: theme === "dark" ? "white" : "#222",
               fontSize: "0.8em",
               marginBottom: "4px",
               overflow: "hidden",
@@ -242,10 +232,14 @@ const CatalogItem = ({ item, handleProductClick }) => {
           }}
         >
           {item.vendor && (
-            <span style={{ color: theme.subText }}>👤 {item.vendor}</span>
+            <span style={{ color: theme === "dark" ? "white" : "#222" }}>
+              👤 {item.vendor}
+            </span>
           )}
           {item.category && (
-            <span style={{ color: theme.subText }}>🏷️ {item.category}</span>
+            <span style={{ color: theme === "dark" ? "white" : "#222" }}>
+              🏷️ {item.category}
+            </span>
           )}
         </div>
       </div>
@@ -261,7 +255,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
       >
         <div
           style={{
-            color: theme.accent,
+            color: theme === "dark" ? "white" : "#222",
             fontWeight: 700,
             fontSize: "1rem",
             marginBottom: "4px",
@@ -272,7 +266,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
         <div
           style={{
             fontSize: "0.7em",
-            color: theme.subText,
+            color: theme === "dark" ? "white" : "#222",
             fontStyle: "italic",
           }}
         >
@@ -292,7 +286,7 @@ const InjectedSidebarContent = ({
   showOrderForm = false,
   onOrderFormToggle,
 }) => {
-  const theme = useMemo(getTheme, []);
+  const theme = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [contact, setContact] = useState(null);
   const [showOrders, setShowOrders] = useState(false);
@@ -610,19 +604,19 @@ const InjectedSidebarContent = ({
             style={{
               marginBottom: "12px",
               fontSize: "1.1rem",
-              color: theme.text,
+              color: theme === "dark" ? "white" : "#222",
             }}
           >
             User Account
           </h2>
           <div
             style={{
-              background: theme.card,
+              background: theme === "dark" ? "#23272a" : "#fff",
               borderRadius: "10px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
               padding: "16px",
               fontSize: "0.98rem",
-              color: theme.text,
+              color: theme === "dark" ? "white" : "#222",
               border: `1px solid ${theme.border}`,
             }}
           >
@@ -637,7 +631,15 @@ const InjectedSidebarContent = ({
               <span style={{ fontSize: "1.1em" }}>👤</span>
               <strong>Name:</strong>
               <span
-                style={{ color: userInfo?.name ? theme.text : theme.subText }}
+                style={{
+                  color: userInfo?.name
+                    ? theme === "dark"
+                      ? "white"
+                      : "#222"
+                    : theme === "dark"
+                    ? "white"
+                    : "#222",
+                }}
               >
                 {userInfo?.name || userInfo?.username || "Not available"}
               </span>
@@ -653,7 +655,15 @@ const InjectedSidebarContent = ({
               <span style={{ fontSize: "1.1em" }}>📧</span>
               <strong>Email:</strong>
               <span
-                style={{ color: userInfo?.email ? theme.text : theme.subText }}
+                style={{
+                  color: userInfo?.email
+                    ? theme === "dark"
+                      ? "white"
+                      : "#222"
+                    : theme === "dark"
+                    ? "white"
+                    : "#222",
+                }}
               >
                 {userInfo?.email || "Not available"}
               </span>
@@ -666,7 +676,7 @@ const InjectedSidebarContent = ({
                 <strong>Role:</strong>
                 <span
                   style={{
-                    color: theme.accent,
+                    color: theme === "dark" ? "white" : "#222",
                     textTransform: "capitalize",
                     fontWeight: 500,
                   }}
@@ -684,14 +694,14 @@ const InjectedSidebarContent = ({
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
-            color: theme.text,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           User Info
         </h2>
         <div
           style={{
-            background: theme.card,
+            background: theme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
             padding: "16px",
@@ -744,7 +754,7 @@ const InjectedSidebarContent = ({
             background: theme.card,
             borderRadius: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-            border: `1px solid ${theme.border}`,
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
           }}
         >
           <OrdersSection />
@@ -756,24 +766,28 @@ const InjectedSidebarContent = ({
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
-            color: theme.text,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           My Stores
         </h2>
         <div
           style={{
-            background: theme.card,
+            background: theme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
             padding: "16px",
-            border: `1px solid ${theme.border}`,
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
           }}
         >
           {stores && stores.length > 0 ? (
-            stores.map((store, idx) => <StoreItem store={store} key={idx} />)
+            stores.map((store, idx) => (
+              <StoreItem store={store} key={idx} theme={theme} />
+            ))
           ) : (
-            <div style={{ color: theme.subText }}>No stores available.</div>
+            <div style={{ color: theme === "dark" ? "white" : "#222" }}>
+              No stores available.
+            </div>
           )}
         </div>
       </section>
@@ -783,18 +797,18 @@ const InjectedSidebarContent = ({
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
-            color: theme.text,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           Catalog
         </h2>
         <div
           style={{
-            background: theme.card,
+            background: theme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             // boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
             padding: "16px",
-            border: `1px solid ${theme.border}`,
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
           }}
         >
           <div style={{ position: "relative", marginBottom: "16px" }}>
@@ -809,11 +823,11 @@ const InjectedSidebarContent = ({
                 padding: "10px 12px",
                 paddingRight: isSearching ? "40px" : "12px",
                 borderRadius: "6px",
-                border: `1px solid ${theme.border}`,
+                border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
                 fontSize: "0.95rem",
                 boxSizing: "border-box",
-                backgroundColor: theme.bg,
-                color: theme.text,
+                backgroundColor: theme === "dark" ? "#23272a" : "#fff",
+                color: theme === "dark" ? "white" : "#222",
               }}
             />
             {isSearching && (
@@ -823,7 +837,7 @@ const InjectedSidebarContent = ({
                   right: "12px",
                   top: "50%",
                   transform: "translateY(-50%)",
-                  color: theme.accent,
+                  color: theme === "dark" ? "white" : "#222",
                   fontSize: "14px",
                 }}
               >
@@ -834,7 +848,7 @@ const InjectedSidebarContent = ({
           {isSearching ? (
             <div
               style={{
-                color: theme.subText,
+                color: theme === "dark" ? "white" : "#222",
                 textAlign: "center",
                 padding: "20px",
                 fontSize: "14px",
@@ -848,12 +862,13 @@ const InjectedSidebarContent = ({
                 item={item}
                 key={idx}
                 handleProductClick={handleProductClick}
+                theme={theme}
               />
             ))
           ) : search.trim() ? (
             <div
               style={{
-                color: theme.subText,
+                color: theme === "dark" ? "white" : "#222",
                 textAlign: "center",
                 padding: "20px",
                 fontSize: "14px",
@@ -862,7 +877,9 @@ const InjectedSidebarContent = ({
               No products found for "{search}"
             </div>
           ) : (
-            <div style={{ color: theme.subText }}>No products available.</div>
+            <div style={{ color: theme === "dark" ? "white" : "#222" }}>
+              No products available.
+            </div>
           )}
         </div>
       </section>
@@ -874,18 +891,18 @@ const InjectedSidebarContent = ({
             style={{
               marginBottom: "12px",
               fontSize: "1.1rem",
-              color: theme.text,
+              color: theme === "dark" ? "white" : "#222",
             }}
           >
             Create New Order
           </h2>
           <div
             style={{
-              background: theme.card,
+              background: theme === "dark" ? "#23272a" : "#fff",
               borderRadius: "10px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
               padding: "16px",
-              border: `1px solid ${theme.border}`,
+              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
             }}
           >
             <div
@@ -901,7 +918,7 @@ const InjectedSidebarContent = ({
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: theme.subText,
+                  color: theme === "dark" ? "white" : "#222",
                   cursor: "pointer",
                   fontSize: "1.2rem",
                   // padding: "4px",
@@ -917,6 +934,7 @@ const InjectedSidebarContent = ({
                 name: contact?.name || "",
                 phone: contact?.phone || "",
               }}
+              theme={theme}
             />
           </div>
         </section>
@@ -927,18 +945,18 @@ const InjectedSidebarContent = ({
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
-            color: theme.text,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           Notes
         </h2>
         <div
           style={{
-            background: theme.card,
+            background: theme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
             padding: "16px",
-            border: `1px solid ${theme.border}`,
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
           }}
         >
           <textarea
@@ -946,12 +964,12 @@ const InjectedSidebarContent = ({
               width: "100%",
               minHeight: "80px",
               borderRadius: "6px",
-              border: `1px solid ${theme.border}`,
+              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
               padding: "10px",
               resize: "vertical",
               fontSize: "1rem",
-              color: theme.text,
-              background: theme.bg,
+              color: theme === "dark" ? "white" : "#222",
+              background: theme === "dark" ? "#23272a" : "#fff",
               boxSizing: "border-box",
             }}
             placeholder="Type your notes here..."

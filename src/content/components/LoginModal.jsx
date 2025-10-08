@@ -33,11 +33,7 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
       if (response.ok) {
         const responseData = await response.json();
-
-        // Save the entire response data structure
         localStorage.setItem("whatsopify_token", JSON.stringify(responseData));
-
-        // Force storage event for all listeners (including same tab)
         window.dispatchEvent(
           new StorageEvent("storage", {
             key: "whatsopify_token",
@@ -49,7 +45,6 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
           onLoginSuccess();
         }
 
-        // Close modal
         onClose();
       } else {
         const errorData = await response.json().catch(() => ({}));

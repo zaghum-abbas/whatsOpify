@@ -247,8 +247,8 @@ const TopToolbar = (props) => {
         paddingLeft: "1rem",
         paddingRight: "1rem",
         boxSizing: "border-box",
-        backgroundColor: theme === "dark" ? "black" : "white",
-        color: theme === "dark" ? "white" : "black",
+        backgroundColor: theme === "dark" ? "#18191a" : "white",
+        color: theme === "dark" ? "white" : "#18191a",
         zIndex: 10000,
         position: "relative",
       }}

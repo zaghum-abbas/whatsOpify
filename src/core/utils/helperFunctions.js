@@ -28,3 +28,9 @@ export const getToken = () => {
     return false;
   }
 };
+
+export const sanitizePhone = (phone) => {
+  if (phone?.startsWith("+92")) return "0" + phone?.slice(3);
+  if (phone?.startsWith("92")) return "0" + phone?.slice(2);
+  return phone;
+};

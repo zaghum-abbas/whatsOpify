@@ -4,6 +4,7 @@ import {
   formatDate,
   formatPrice,
   getToken,
+  sanitizePhone,
 } from "../../core/utils/helperFunctions";
 
 const OrdersSection = ({ whatsappTheme }) => {
@@ -248,7 +249,7 @@ const OrdersSection = ({ whatsappTheme }) => {
         await updateOrderStatus(order?._id, "pending");
         setOrders((prev) => ({
           ...prev,
-          new: prev.new.filter((o) => (o.name || o._id || o.id) !== orderId),
+          new: prev.new.filter((o) => o._id !== order._id),
           pending: [...prev.pending, { ...order, status: "pending" }],
         }));
 
@@ -266,33 +267,37 @@ const OrdersSection = ({ whatsappTheme }) => {
     }
 
     if (phoneNumber) {
-      const cleanedNumber = "92" + phoneNumber?.slice(1);
+      // const cleanedNumber = "92" + phoneNumber?.slice(1);
+      const cleanedNumber = phoneNumber
+        .replace(/^\+92/, "92")
+        .replace(/^0/, "92");
+
       if (cleanedNumber) {
         const message =
           activeTab === "new"
-            ? `Hello ${customerName}, 👋  
+            ? `Hello ${customerName}, 👋
 
-We've received your order ${orderId} at ${storeName}.  
+    We've received your order ${orderId} at ${storeName}.
 
-🛒 Product: ${productName}  
-💰 Order Total: ${orderTotal}  
+    🛒 Product: ${productName}
+    💰 Order Total: ${orderTotal}
 
-Please reply with *YES* to confirm your order, or *NO* if you'd like to cancel/change it.  
+    Please reply with *YES* to confirm your order, or *NO* if you'd like to cancel/change it.
 
-Thank you for choosing us!  
-– ${storeName} Team`
-            : `Hello ${customerName}, ⏰  
+    Thank you for choosing us!
+    – ${storeName} Team`
+            : `Hello ${customerName}, ⏰
 
-Your order ${orderId} at ${storeName} is still awaiting confirmation.  
+    Your order ${orderId} at ${storeName} is still awaiting confirmation.
 
-🛒 Product: ${productName}  
-💰 Order Total: ${orderTotal}  
+    🛒 Product: ${productName}
+    💰 Order Total: ${orderTotal}
 
-Please reply with *YES* to confirm or *NO* to cancel/change.  
-We'll only process the order once we get your response.  
+    Please reply with *YES* to confirm or *NO* to cancel/change.
+    We'll only process the order once we get your response.
 
-Thank you!  
-– ${storeName} Team`;
+    Thank you!
+    – ${storeName} Team`;
 
         chrome.runtime.sendMessage(
           {
@@ -318,6 +323,8 @@ Thank you!
   };
 
   const currentOrders = orders[activeTab];
+
+  console.log("orders", orders);
 
   return (
     <div className="orders-section" style={{ padding: "16px" }}>
@@ -492,7 +499,12 @@ Thank you!
             }}
           >
             <thead>
-              <tr style={{ backgroundColor: "#f5f5f5" }}>
+              <tr
+                style={{
+                  backgroundColor:
+                    whatsappTheme === "dark" ? "#23272a" : "#f5f5f5",
+                }}
+              >
                 <th
                   style={{
                     padding: "12px 8px",
@@ -567,7 +579,6 @@ Thank you!
                     style={{
                       padding: "12px 8px",
                       fontSize: "12px",
-                      color: "#666",
                       alignContent: "center",
                     }}
                   >
@@ -587,7 +598,9 @@ Thank you!
                         }}
                         title="Click to open WhatsApp"
                       >
-                        {order?.shipmentDetails?.addresses[0]?.phone}
+                        {sanitizePhone(
+                          order?.shipmentDetails?.addresses[0]?.phone
+                        )}
                       </div>
                     </div>
                   </td>
@@ -654,24 +667,6 @@ Thank you!
                         Detail
                       </button>
                     </a>
-                    <button
-                      onClick={() => handleWhatsAppRedirect(order)}
-                      disabled={
-                        updatingOrder ===
-                        (order?.name || order?._id || order?.id)
-                      }
-                      style={{
-                        padding: "6px 12px",
-                        backgroundColor: "#25D366",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        fontSize: "12px",
-                        fontWeight: "500",
-                      }}
-                    >
-                      Tracking 
-                    </button>
                   </td>
                 </tr>
               ))}

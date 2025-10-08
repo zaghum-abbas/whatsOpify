@@ -3,34 +3,10 @@ import CustomerSupportMessages from "./CustomerSupportMessages";
 import ModalForm from "./ModalForm";
 import { formatPrice } from "../../core/utils/helperFunctions";
 import { useDebounce } from "../../hooks/useDebounce";
+import { useTheme, getThemeColors } from "../../hooks/useTheme";
 
-const getTheme = () => {
-  // Try to detect WhatsApp dark mode from body class or style
-  const body = document.body;
-  const isDark =
-    (body.classList.contains("web") && body.classList.contains("dark")) ||
-    window.matchMedia("(prefers-color-scheme: dark)").matches;
-  return isDark
-    ? {
-        bg: "#18191a",
-        card: "#23272a",
-        text: "#e4e6eb",
-        subText: "#b0b3b8",
-        accent: "#00bfae",
-        border: "#333",
-      }
-    : {
-        bg: "#f7f7f7",
-        card: "#fff",
-        text: "#222",
-        subText: "#555",
-        accent: "#00bfae",
-        border: "#e2e8f0",
-      };
-};
-
-const CatalogItem = ({ item, handleProductClick }) => {
-  const theme = getTheme();
+const CatalogItem = ({ item, handleProductClick, theme }) => {
+  const colors = getThemeColors(theme);
 
   return (
     <div
@@ -39,11 +15,11 @@ const CatalogItem = ({ item, handleProductClick }) => {
         display: "flex",
         alignItems: "center",
         gap: "12px",
-        background: theme.card,
+        background: colors.card,
         borderRadius: "8px",
         padding: "12px",
         marginBottom: "12px",
-        border: `1px solid ${theme.border}`,
+        border: `1px solid ${colors.border}`,
         cursor: "pointer",
         transition: "all 0.2s ease",
       }}
@@ -62,7 +38,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
           height: "50px",
           borderRadius: "6px",
           overflow: "hidden",
-          border: `1px solid ${theme.border}`,
+          border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
@@ -92,7 +68,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
               width: "100%",
               height: "100%",
               fontSize: "1.2em",
-              color: theme.accent,
+              color: theme === "dark" ? "white" : "#222",
             }}
           >
             🛒
@@ -103,7 +79,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            color: theme.text,
+            color: theme === "dark" ? "white" : "#222",
             fontWeight: 600,
             fontSize: "0.95rem",
             marginBottom: "4px",
@@ -123,10 +99,14 @@ const CatalogItem = ({ item, handleProductClick }) => {
           }}
         >
           {item.vendor && (
-            <span style={{ color: theme.subText }}>👤 {item.vendor}</span>
+            <span style={{ color: theme === "dark" ? "white" : "#222" }}>
+              👤 {item.vendor}
+            </span>
           )}
           {item.category && (
-            <span style={{ color: theme.subText }}>🏷️ {item.category}</span>
+            <span style={{ color: theme === "dark" ? "white" : "#222" }}>
+              🏷️ {item.category}
+            </span>
           )}
         </div>
       </div>
@@ -142,7 +122,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
       >
         <div
           style={{
-            color: theme.accent,
+            color: theme === "dark" ? "white" : "#222",
             fontWeight: 700,
             fontSize: "1rem",
             marginBottom: "4px",
@@ -153,7 +133,7 @@ const CatalogItem = ({ item, handleProductClick }) => {
         <div
           style={{
             fontSize: "0.7em",
-            color: theme.subText,
+            color: theme === "dark" ? "white" : "#222",
             fontStyle: "italic",
           }}
         >
@@ -170,8 +150,8 @@ const ChatSidebar = ({
   notes = "",
   onNotesChange,
 }) => {
-  console.log(contact, "@@contact");
-  const theme = useMemo(getTheme, []);
+  const theme = useTheme();
+
   const [search, setSearch] = useState("");
   const [filteredCatalog, setFilteredCatalog] = useState(catalog);
   const [isSearching, setIsSearching] = useState(false);
@@ -295,7 +275,8 @@ const ChatSidebar = ({
       style={{
         padding: "20px",
         fontFamily: "inherit",
-        background: theme.bg,
+        // background: theme.bg,
+        background: theme === "dark" ? "#18191a" : "#fff",
         minHeight: "100vh",
       }}
     >
@@ -306,20 +287,20 @@ const ChatSidebar = ({
             style={{
               marginBottom: "12px",
               fontSize: "1.1rem",
-              color: theme.text,
+              color: theme === "dark" ? "white" : "#222",
             }}
           >
             Contact Info
           </h2>
           <div
             style={{
-              background: theme.card,
+              background: theme === "dark" ? "#23272a" : "#fff",
               borderRadius: "10px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
               padding: "16px",
               fontSize: "0.98rem",
-              color: theme.text,
-              border: `1px solid ${theme.border}`,
+              color: theme === "dark" ? "white" : "#222",
+              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
             }}
           >
             <div>
@@ -333,7 +314,9 @@ const ChatSidebar = ({
               >
                 <strong>Name:</strong>
                 <p
-                  style={{ color: contact?.name ? theme.text : theme.subText }}
+                  style={{
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
                 >
                   {contact?.name || "Not available"}
                 </p>
@@ -348,7 +331,9 @@ const ChatSidebar = ({
               >
                 <strong>Phone:</strong>
                 <p
-                  style={{ color: contact?.name ? theme.text : theme.subText }}
+                  style={{
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
                 >
                   {contact?.phone ? `${contact.phone}` : ""}
                 </p>
@@ -365,7 +350,15 @@ const ChatSidebar = ({
                 <span style={{ fontSize: "1.1em" }}>💬</span>
                 <strong>About:</strong>
                 <span
-                  style={{ color: contact?.about ? theme.text : theme.subText }}
+                  style={{
+                    color: contact?.about
+                      ? theme === "dark"
+                        ? "white"
+                        : "#222"
+                      : theme === "dark"
+                      ? "white"
+                      : "#222",
+                  }}
                 >
                   {contact?.about || "Not available"}
                 </span>
@@ -381,18 +374,19 @@ const ChatSidebar = ({
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
-            color: theme.text,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           Create New Order
         </h2>
         <div
           style={{
-            background: theme.card,
+            background: theme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
             padding: "16px",
-            border: `1px solid ${theme.border}`,
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           <ModalForm
@@ -401,6 +395,7 @@ const ChatSidebar = ({
               name: contact?.name || "",
               phone: contact?.phone || "",
             }}
+            theme={theme}
           />
         </div>
       </section>
@@ -411,17 +406,18 @@ const ChatSidebar = ({
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
-            color: theme.text,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           Product Catalog
         </h2>
         <div
           style={{
-            background: theme.card,
+            background: theme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             padding: "16px",
-            border: `1px solid ${theme.border}`,
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           <div style={{ position: "relative", marginBottom: "16px" }}>
@@ -436,11 +432,11 @@ const ChatSidebar = ({
                 padding: "10px 12px",
                 paddingRight: isSearching ? "40px" : "12px",
                 borderRadius: "6px",
-                border: `1px solid ${theme.border}`,
+                border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
                 fontSize: "0.95rem",
                 boxSizing: "border-box",
-                backgroundColor: theme.bg,
-                color: theme.text,
+                backgroundColor: theme === "dark" ? "#23272a" : "#fff",
+                color: theme === "dark" ? "white" : "#222",
               }}
             />
             {isSearching && (
@@ -450,7 +446,7 @@ const ChatSidebar = ({
                   right: "12px",
                   top: "50%",
                   transform: "translateY(-50%)",
-                  color: theme.accent,
+                  color: theme === "dark" ? "white" : "#222",
                   fontSize: "14px",
                 }}
               >
@@ -461,7 +457,7 @@ const ChatSidebar = ({
           {isSearching ? (
             <div
               style={{
-                color: theme.subText,
+                color: theme === "dark" ? "white" : "#222",
                 textAlign: "center",
                 padding: "20px",
                 fontSize: "14px",
@@ -475,12 +471,13 @@ const ChatSidebar = ({
                 item={item}
                 key={idx}
                 handleProductClick={handleProductClick}
+                theme={theme}
               />
             ))
           ) : search.trim() ? (
             <div
               style={{
-                color: theme.subText,
+                color: theme === "dark" ? "white" : "#222",
                 textAlign: "center",
                 padding: "20px",
                 fontSize: "14px",
@@ -489,7 +486,9 @@ const ChatSidebar = ({
               No products found for "{search}"
             </div>
           ) : (
-            <div style={{ color: theme.subText }}>No products available.</div>
+            <div style={{ color: theme === "dark" ? "white" : "#222" }}>
+              No products available.
+            </div>
           )}
         </div>
       </section>
@@ -500,18 +499,19 @@ const ChatSidebar = ({
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
-            color: theme.text,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           Notes
         </h2>
         <div
           style={{
-            background: theme.card,
+            background: theme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
             padding: "16px",
-            border: `1px solid ${theme.border}`,
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            color: theme === "dark" ? "white" : "#222",
           }}
         >
           <textarea
@@ -519,12 +519,12 @@ const ChatSidebar = ({
               width: "100%",
               minHeight: "80px",
               borderRadius: "6px",
-              border: `1px solid ${theme.border}`,
+              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
               padding: "10px",
               resize: "vertical",
               fontSize: "1rem",
-              color: theme.text,
-              background: theme.bg,
+              color: theme === "dark" ? "white" : "#222",
+              background: theme === "dark" ? "#23272a" : "#fff",
               boxSizing: "border-box",
             }}
             placeholder="Type your notes here..."

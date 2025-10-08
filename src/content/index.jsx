@@ -83,6 +83,28 @@ function waitForElement(selector, callback) {
 const TOOLBAR_HEIGHT = "48px"; // Assuming your TopToolbar has this height
 const SIDEBAR_WIDTH = "400px"; // Define sidebar width once
 
+// Import theme colors helper from your existing hook
+import { getThemeColors } from "../hooks/useTheme";
+
+function getWhatsAppTheme() {
+  const isDark =
+    document.body.classList.contains("dark") ||
+    document.querySelector('html[data-theme="dark"]') ||
+    (localStorage.getItem("theme") &&
+      JSON.parse(localStorage.getItem("theme")) === "dark") ||
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+  const theme = isDark ? "dark" : "light";
+  const colors = getThemeColors(theme);
+
+  return {
+    isDark,
+    theme,
+    sidebarBg: colors.sidebar,
+    sidebarShadow: colors.sidebarShadow,
+  };
+}
+
 // --- Sidebar Control State (GLOBAL to this content script) ---
 let isSidebarOpen = true;
 let sidebarRoot = null; // Store the React root for the sidebar
@@ -123,7 +145,6 @@ const switchSidebarMode = (mode) => {
   }
 };
 
-// Function to render the appropriate sidebar based on mode
 const renderSidebar = () => {
   if (!sidebarRoot) return;
   if (sidebarMode === "default") {
@@ -154,7 +175,9 @@ const getActiveChatDetails = async () => {
       name = element.textContent.trim();
       console.log("📝 Found name:", name);
 
-      element.click(); // open contact info
+      // Don't click to open contact info - just use the name
+      // This prevents WhatsApp internal errors
+      // element.click(); // Commented out to avoid WhatsApp comms errors
       break;
     }
   }
@@ -164,39 +187,16 @@ const getActiveChatDetails = async () => {
     return { name: "", phone: "" };
   }
 
-  // 🕐 Step 2 — Wait for the contact panel to load
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  const elementsToHide = document.querySelectorAll(
-    "div._aig-._as6h.x9f619.x1n2onr6.x5yr21d.x6ikm8r.x10wlt62.x17dzmu4.x1i1dayz.x2ipvbc.x1w8yi2h.xpilrb4.x1t7ytsu.x1m2ixmg.x1c4vz4f.x2lah0s.x1oy9qf3.xwfak60.x5hsz1j.x17dq4o0.x10e4vud"
-  );
-
-  if (elementsToHide.length > 0) {
-    elementsToHide.forEach((el) => {
-      el.style.display = "none";
-    });
-    console.log(
-      `🙈 Hidden ${elementsToHide.length} element(s) with given classes`
-    );
+  // Try to extract phone from URL (more reliable and doesn't trigger WhatsApp UI)
+  const urlMatch = window.location.href.match(/\/(\d+)@/);
+  if (urlMatch) {
+    phone = "+" + urlMatch[1];
+    console.log("📞 Found phone from URL:", phone);
   } else {
-    console.warn("⚠️ No matching element found to hide");
+    console.log("⚠️ No phone found in URL, using name only");
   }
 
-  const phoneElement = Array.from(
-    document.querySelectorAll("[dir='auto'].copyable-text")
-  ).find((el) => {
-    const text = el.innerText.trim().replace(/\s+/g, "");
-    return /^\+?\d{7,}$/.test(text);
-  });
-
-  if (phoneElement) {
-    phone = phoneElement.innerText.trim().replace(/\s+/g, "");
-    console.log("📞 Found phone:", phone);
-  } else {
-    console.warn("⚠️ Phone number not found!");
-  }
-
-  // 📋 Step 6 — Return final result
+  // 📋 Return result without opening contact info panel
   const result = { name, phone };
   console.log("✅ Final extracted contact details:", result);
   return result;
@@ -759,11 +759,64 @@ window.whatsappNotesUtils = {
 function observeActiveChat() {
   console.log("🔍 Setting up chat selection observer...");
 
-  // Watch for clicks on chat list items
-  const chatListContainer = document.querySelector("#pane-side");
-  if (chatListContainer) {
-    console.log("✅ Found chat list container, setting up click listener");
+  // Wait for both #pane-side AND the actual chat list to be ready
+  const waitForChatList = () => {
+    const paneSide = document.querySelector("#pane-side");
+    const chatList = document.querySelector('[aria-label="Chat list"]');
 
+    console.log("🔍 pane-side exists:", !!paneSide);
+    console.log("🔍 Chat list exists:", !!chatList);
+
+    if (paneSide && chatList) {
+      console.log(
+        "✅ Found both chat container and chat list, setting up click listener"
+      );
+      return { paneSide, chatList };
+    }
+    return null;
+  };
+
+  const containers = waitForChatList();
+  if (containers) {
+    const { paneSide: chatListContainer } = containers;
+    setupClickListener(chatListContainer);
+  } else {
+    console.warn("⚠️ Chat list container not found, waiting for it to load...");
+
+    // Wait for chat list to load with retry mechanism
+    let retryCount = 0;
+    const maxRetries = 10;
+
+    const retrySetup = () => {
+      if (retryCount >= maxRetries) {
+        console.error(
+          "❌ Max retries reached, falling back to mutation observer"
+        );
+        setupMutationObserver();
+        return;
+      }
+
+      retryCount++;
+      console.log(
+        `🔄 Retry ${retryCount}/${maxRetries} - waiting for chat list...`
+      );
+
+      setTimeout(() => {
+        const containers = waitForChatList();
+        if (containers) {
+          console.log("✅ Chat list found on retry, setting up click listener");
+          const { paneSide: chatListContainer } = containers;
+          setupClickListener(chatListContainer);
+        } else {
+          retrySetup();
+        }
+      }, 1000); // Wait 1 second between retries
+    };
+
+    retrySetup();
+  }
+
+  function setupClickListener(chatListContainer) {
     chatListContainer.addEventListener("click", async (event) => {
       console.log("🖱️ Click detected on chat list container");
 
@@ -843,10 +896,10 @@ function observeActiveChat() {
         }, 200); // Wait 200ms for chat to load (reduced from 500ms)
       }
     });
-  } else {
-    console.warn(
-      "⚠️ Chat list container not found, falling back to mutation observer"
-    );
+  }
+
+  function setupMutationObserver() {
+    console.log("🔄 Setting up mutation observer as fallback...");
 
     // Fallback: watch for changes in the main chat panel
     const chatPanel = document.querySelector('div[role="main"]');
@@ -911,9 +964,18 @@ window.toggleWhatsappSidebar = async (open) => {
   if (isSidebarOpen) {
     // Open sidebar
     const renderSidebarWithData = async () => {
-      // Initialize with default mode and empty contact data
-      sidebarMode = "default";
-      sidebarProps.contact = { name: "", phone: "", about: "" };
+      // Only initialize to default mode if sidebar is being opened for the first time
+      // Don't reset mode if it's already set (e.g., to "chat")
+      if (!sidebarRoot) {
+        console.log("🆕 First time opening sidebar - setting to default mode");
+        sidebarMode = "default";
+        sidebarProps.contact = { name: "", phone: "", about: "" };
+      } else {
+        console.log(
+          "♻️ Sidebar already initialized - keeping current mode:",
+          sidebarMode
+        );
+      }
 
       // Fetch user info, stores, and products for initial render
       getUserInfo((userInfo) => {
@@ -940,14 +1002,17 @@ window.toggleWhatsappSidebar = async (open) => {
       // Create and append sidebar container if it doesn't exist
       sidebarContainer = document.createElement("div");
       sidebarContainer.id = "whatsapp-sidebar-root";
+
+      const theme = getWhatsAppTheme();
+
       Object.assign(sidebarContainer.style, {
         position: "fixed",
         right: "0",
         top: TOOLBAR_HEIGHT, // Start below the toolbar
         height: `calc(100% - ${TOOLBAR_HEIGHT})`, // Full height minus toolbar height
         width: SIDEBAR_WIDTH,
-        backgroundColor: "#f7f7f7",
-        boxShadow: "-2px 0 5px rgba(0,0,0,0.1)",
+        backgroundColor: theme.sidebarBg,
+        boxShadow: theme.sidebarShadow,
         zIndex: "9999", // Lower than toolbar but above content
         overflowY: "auto",
         display: "flex",
@@ -961,8 +1026,9 @@ window.toggleWhatsappSidebar = async (open) => {
       console.log("✅ Sidebar rendered in container.");
     } else {
       sidebarContainer.style.display = "flex";
-      await renderSidebarWithData();
-      console.log("✅ Sidebar container shown and updated.");
+      console.log(
+        "✅ Sidebar container shown (not re-rendering to preserve mode)."
+      );
     }
 
     mainAppContent.style.marginRight = SIDEBAR_WIDTH;
@@ -1002,6 +1068,39 @@ window.addEventListener("storage", (event) => {
       }
     }
   }
+});
+
+// --- Listen for theme changes and update sidebar ---
+const themeObserver = new MutationObserver(() => {
+  const sidebarContainer = document.getElementById("whatsapp-sidebar-root");
+  if (sidebarContainer) {
+    const theme = getWhatsAppTheme();
+    sidebarContainer.style.backgroundColor = theme.sidebarBg;
+    sidebarContainer.style.boxShadow = theme.sidebarShadow;
+    console.log("🎨 Sidebar theme updated:", theme.isDark ? "Dark" : "Light");
+  }
+});
+
+// Observe changes to body class (WhatsApp theme changes)
+themeObserver.observe(document.body, {
+  attributes: true,
+  attributeFilter: ["class"],
+});
+
+// Also observe HTML element for data-theme attribute
+const htmlThemeObserver = new MutationObserver(() => {
+  const sidebarContainer = document.getElementById("whatsapp-sidebar-root");
+  if (sidebarContainer) {
+    const theme = getWhatsAppTheme();
+    sidebarContainer.style.backgroundColor = theme.sidebarBg;
+    sidebarContainer.style.boxShadow = theme.sidebarShadow;
+    console.log("🎨 Sidebar theme updated:", theme.isDark ? "Dark" : "Light");
+  }
+});
+
+htmlThemeObserver.observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ["data-theme", "class"],
 });
 
 // Inject Top Toolbar
@@ -1167,7 +1266,8 @@ injectChatHeaderHover();
 injectChatListEnhancer();
 
 // Always observe chat changes to update sidebar contact info
-waitForElement('div[role="main"]', () => {
+waitForElement("#pane-side", () => {
+  console.log("🎯 #pane-side found, setting up chat observer...");
   observeActiveChat();
 });
 
@@ -1778,7 +1878,27 @@ window.debugSidebarState = () => {
     "📊 Sidebar container exists:",
     !!document.getElementById("whatsapp-sidebar-root")
   );
+  const theme = getWhatsAppTheme();
+  console.log("📊 Current theme:", theme.isDark ? "Dark 🌙" : "Light ☀️");
   console.log("🔍 ================================");
+};
+
+// Function to manually update sidebar theme
+window.updateSidebarTheme = () => {
+  const sidebarContainer = document.getElementById("whatsapp-sidebar-root");
+  if (sidebarContainer) {
+    const theme = getWhatsAppTheme();
+    sidebarContainer.style.backgroundColor = theme.sidebarBg;
+    sidebarContainer.style.boxShadow = theme.sidebarShadow;
+    console.log(
+      "✅ Sidebar theme manually updated:",
+      theme.isDark ? "Dark 🌙" : "Light ☀️"
+    );
+    return theme;
+  } else {
+    console.warn("⚠️ Sidebar container not found");
+    return null;
+  }
 };
 
 // --- Global API Exposure ---
