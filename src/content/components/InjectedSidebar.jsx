@@ -150,35 +150,33 @@ window.toggleWhatsappSidebar = (open) => {
     ); // This is a common pattern for the main chat area
     // Or inspect the element in the screenshot: the div containing the chat list and the chat panel.
 
-    if (mainChatArea) {
-      // From common WhatsApp Web DOM structures, this is often the `div` that is a direct child of `#app` and has a `flex` display.
-      const appLayoutContainer = document.querySelector(
-        "div#app > div.x78zum5.xdt5ytf.x5yr21d"
-      ); // This was your old whatsappMainBodyContainerSelector, it often wraps both panels.
-
-      if (appLayoutContainer) {
-        // Option 1: Adjust flex-basis of existing panels
-        // This is harder because WhatsApp's internal flex properties might conflict.
-
-        // Option 2: Wrap the existing content and apply a new flex container.
-        // This is what we'll attempt. Find the element that is the direct parent of the chat list and chat content.
-        const whatsappMainContentWrapper = document.querySelector(
-          "div.x78zum5.xdt5ytf.x5yr21d"
-        ); // The container holding left and right panels
-
-        // No need to adjust marginRight; sidebar is fixed and overlays content
-        // This prevents the top toolbar from shrinking
-        console.log(
-          "✅ Sidebar opened (no main content margin adjustment needed)."
-        );
-      } else {
-        console.warn(
-          "Could not find the main app layout container to adjust for sidebar."
-        );
-      }
+    // Apply margin-right to the main WhatsApp container
+    if (mainAppContent) {
+      mainAppContent.style.marginRight = SIDEBAR_WIDTH;
+      console.log(
+        `✅ Applied margin-right: ${SIDEBAR_WIDTH} to main WhatsApp container`
+      );
     } else {
-      console.warn("Could not find the WhatsApp main chat area to adjust.");
+      console.warn("⚠️ mainAppContent not found, cannot apply margin-right");
     }
+
+    // Also try to apply margin to other possible containers
+    const possibleContainers = [
+      "div.x78zum5.xdt5ytf.x5yr21d",
+      "div#app > div.x78zum5.xdt5ytf.x5yr21d",
+      "div.app-wrapper-web",
+      "div.app-wrapper-web-container",
+    ];
+
+    possibleContainers.forEach((selector) => {
+      const container = document.querySelector(selector);
+      console.log("@container", container);
+
+      if (container && container !== mainAppContent) {
+        container.style.marginRight = SIDEBAR_WIDTH;
+        console.log(`✅ Applied margin-right to: ${selector}`);
+      }
+    });
   } else {
     // Close sidebar
     if (sidebarContainer) {
@@ -186,11 +184,29 @@ window.toggleWhatsappSidebar = (open) => {
       console.log("✅ Sidebar hidden.");
     }
 
-    // Restore main content width
-    // No need to restore marginRight; sidebar is fixed
-    console.log(
-      "✅ Main WhatsApp content remains full width (no margin adjustment needed)."
-    );
+    // Remove margin-right from all containers
+    if (mainAppContent) {
+      mainAppContent.style.marginRight = "0px";
+      console.log("✅ Removed margin-right from main WhatsApp container");
+    }
+
+    // Also remove margin from other possible containers
+    const possibleContainers = [
+      "div.x78zum5.xdt5ytf.x5yr21d",
+      "div#app > div.x78zum5.xdt5ytf.x5yr21d",
+      "div.app-wrapper-web",
+      "div.app-wrapper-web-container",
+    ];
+
+    possibleContainers.forEach((selector) => {
+      const container = document.querySelector(selector);
+      if (container) {
+        container.style.marginRight = "0px";
+        console.log(`✅ Removed margin-right from: ${selector}`);
+      }
+    });
+
+    console.log("✅ Main WhatsApp content restored to full width.");
   }
 };
 
@@ -349,3 +365,36 @@ waitForElement("div.x78zum5.xdt5ytf.x5yr21d", (appContainer) => {
     "✅ Sidebar layout observer started to monitor WhatsApp main content."
   );
 });
+
+// Debug function to test margin application
+window.debugMarginApplication = () => {
+  console.log("🧪 Testing margin application...");
+  console.log("🧪 mainAppContent:", !!mainAppContent);
+  console.log("🧪 isSidebarOpen:", isSidebarOpen);
+
+  const possibleContainers = [
+    "div.x78zum5.xdt5ytf.x5yr21d",
+    "div#app > div.x78zum5.xdt5ytf.x5yr21d",
+    "div.app-wrapper-web",
+    "div.app-wrapper-web-container",
+  ];
+
+  possibleContainers.forEach((selector) => {
+    const container = document.querySelector(selector);
+    if (container) {
+      const marginRight = window.getComputedStyle(container).marginRight;
+      console.log(`🧪 ${selector}: margin-right = ${marginRight}`);
+    } else {
+      console.log(`🧪 ${selector}: NOT FOUND`);
+    }
+  });
+
+  // Test applying margin manually
+  const testContainer = document.querySelector("div.x78zum5.xdt5ytf.x5yr21d");
+  if (testContainer) {
+    testContainer.style.marginRight = SIDEBAR_WIDTH;
+    console.log(
+      `🧪 Manually applied ${SIDEBAR_WIDTH} margin to main container`
+    );
+  }
+};

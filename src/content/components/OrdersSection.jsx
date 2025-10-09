@@ -235,43 +235,44 @@ const OrdersSection = ({ whatsappTheme }) => {
     }
   };
 
-  const handleWhatsAppRedirect = async (order) => {
+  const handleWhatsAppRedirect = async (order, status) => {
+    console.log("status", status);
+    const data = localStorage.getItem("whatsopify_token");
+    const store = JSON.parse(data)?.data?.stores;
+
     const phoneNumber = order?.shipmentDetails?.addresses[0]?.phone;
     const customerName = order?.shipmentDetails?.addresses[0]?.name;
     const orderId = order?.name;
-    const storeName = order?.lineItems[0]?.vendor;
+    const storeName = store?.find((s) => s._id === order?.storeId)?.name;
     const productName = order?.lineItems?.[0]?.name;
     const orderTotal = formatPrice(order?.pricing?.currentTotalPrice);
+    console.log("store", storeName, store);
 
-    if (activeTab === "new") {
-      try {
-        setUpdatingOrder(order?._id);
-        await updateOrderStatus(order?._id, "pending");
+    try {
+      setUpdatingOrder(order?._id);
+      if (status !== "") {
+        await updateOrderStatus(order?._id, status);
+      }
+      if (activeTab === "new") {
         setOrders((prev) => ({
           ...prev,
           new: prev.new.filter((o) => o._id !== order._id),
           pending: [...prev.pending, { ...order, status: "pending" }],
         }));
 
-        console.log(`[ORDERS] ✅ Order ${orderId} moved from new to pending`);
-      } catch (updateError) {
-        console.error(
-          `[ORDERS] ❌ Failed to update order status:`,
-          updateError
-        );
-        setError(`Failed to update order status: ${updateError.message}`);
-        return; // Don't proceed with WhatsApp message if status update fails
-      } finally {
-        setUpdatingOrder(null);
+        console.log(`[ORDERS] ✅ Order ${order._id} moved from new to pending`);
       }
+    } catch (updateError) {
+      setError(`Failed to update order status: ${updateError.message}`);
+      return;
+    } finally {
+      setUpdatingOrder(null);
     }
 
     if (phoneNumber) {
-      // const cleanedNumber = "92" + phoneNumber?.slice(1);
       const cleanedNumber = phoneNumber
         .replace(/^\+92/, "92")
         .replace(/^0/, "92");
-
       if (cleanedNumber) {
         const message =
           activeTab === "new"
@@ -285,7 +286,7 @@ const OrdersSection = ({ whatsappTheme }) => {
     Please reply with *YES* to confirm your order, or *NO* if you'd like to cancel/change it.
 
     Thank you for choosing us!
-    – ${storeName} Team`
+    – ${storeName ?? ""} Team`
             : `Hello ${customerName}, ⏰
 
     Your order ${orderId} at ${storeName} is still awaiting confirmation.
@@ -297,8 +298,7 @@ const OrdersSection = ({ whatsappTheme }) => {
     We'll only process the order once we get your response.
 
     Thank you!
-    – ${storeName} Team`;
-
+    – ${storeName ?? ""} Team`;
         chrome.runtime.sendMessage(
           {
             action: "SEND_WHATSAPP_MESSAGE",
@@ -323,8 +323,6 @@ const OrdersSection = ({ whatsappTheme }) => {
   };
 
   const currentOrders = orders[activeTab];
-
-  console.log("orders", orders);
 
   return (
     <div className="orders-section" style={{ padding: "16px" }}>
@@ -616,40 +614,81 @@ const OrdersSection = ({ whatsappTheme }) => {
                     }}
                   >
                     <button
-                      onClick={() => handleWhatsAppRedirect(order)}
-                      disabled={
-                        updatingOrder ===
-                        (order?.name || order?._id || order?.id)
+                      onClick={() =>
+                        handleWhatsAppRedirect(
+                          order,
+                          activeTab === "new" ? "pending" : "confirm"
+                        )
                       }
+                      disabled={updatingOrder === order?._id}
                       style={{
                         padding: "6px 12px",
-                        backgroundColor:
-                          activeTab === "new" ? "#25D366" : "#FFA500",
+                        backgroundColor: "#25D366",
                         color: "white",
                         border: "none",
                         borderRadius: "4px",
                         cursor:
-                          updatingOrder ===
-                          (order?.name || order?._id || order?.id)
+                          updatingOrder === order?._id
                             ? "not-allowed"
                             : "pointer",
                         fontSize: "12px",
                         fontWeight: "500",
-                        opacity:
-                          updatingOrder ===
-                          (order?.name || order?._id || order?.id)
-                            ? 0.6
-                            : 1,
+                        opacity: updatingOrder === order?._id ? 0.6 : 1,
                       }}
                     >
-                      {updatingOrder ===
-                      (order?.name || order?._id || order?.id)
-                        ? "Updating..."
-                        : activeTab === "new"
-                        ? "Confirm"
-                        : "Resend"}
+                      {updatingOrder === order?._id ? "Updating..." : "Confirm"}
                     </button>
-                    <a
+                    {activeTab === "pending" && (
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        <button
+                          onClick={() => handleWhatsAppRedirect(order, "")}
+                          disabled={updatingOrder === order?._id}
+                          style={{
+                            padding: "6px 12px",
+                            backgroundColor: "#FFA500",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor:
+                              updatingOrder === order?._id
+                                ? "not-allowed"
+                                : "pointer",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            opacity: updatingOrder === order?._id ? 0.6 : 1,
+                          }}
+                        >
+                          {updatingOrder === order?._id
+                            ? "Updating..."
+                            : "Resend"}
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleWhatsAppRedirect(order, "cancel")
+                          }
+                          disabled={updatingOrder === order?._id}
+                          style={{
+                            padding: "6px 12px",
+                            backgroundColor: "#DC2626",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor:
+                              updatingOrder === order?._id
+                                ? "not-allowed"
+                                : "pointer",
+                            fontSize: "12px",
+                            fontWeight: "500",
+                            opacity: updatingOrder === order?._id ? 0.6 : 1,
+                          }}
+                        >
+                          {updatingOrder === order?._id
+                            ? "Updating..."
+                            : "Cancel"}
+                        </button>
+                      </div>
+                    )}
+                    {/* <a
                       href={`https://shopilam.com/orders/${order?._id}`}
                       target="_blank"
                     >
@@ -666,7 +705,7 @@ const OrdersSection = ({ whatsappTheme }) => {
                       >
                         Detail
                       </button>
-                    </a>
+                    </a> */}
                   </td>
                 </tr>
               ))}

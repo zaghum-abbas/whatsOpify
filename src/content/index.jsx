@@ -174,10 +174,7 @@ const getActiveChatDetails = async () => {
     if (element && element.textContent.trim().length > 0) {
       name = element.textContent.trim();
       console.log("📝 Found name:", name);
-
-      // Don't click to open contact info - just use the name
-      // This prevents WhatsApp internal errors
-      // element.click(); // Commented out to avoid WhatsApp comms errors
+      element.click();
       break;
     }
   }
