@@ -460,6 +460,167 @@ function getProducts(callback) {
   fetchProductsFromAPI();
 }
 
+// async function fetchProductsFromAPI() {
+//   if (productsLoading) return;
+
+//   productsLoading = true;
+//   productsError = null;
+
+//   try {
+//     console.log(
+//       "[PRODUCTS] Fetching user-specific products from API using session-based auth..."
+//     );
+
+//     // Ensure stores are loaded before attempting to filter products by storeId
+//     if (storesCache === null && !storesLoading) {
+//       console.log(
+//         "[PRODUCTS] Stores cache is null and not loading, fetching stores first..."
+//       );
+//       await new Promise((resolve) => {
+//         getStoresForUser(() => resolve());
+//       });
+//     } else if (storesLoading) {
+//       console.log(
+//         "[PRODUCTS] Stores are currently loading, waiting for them..."
+//       );
+//       await new Promise((resolve) => {
+//         storesListeners.push(() => resolve());
+//       });
+//     }
+
+//     let allUserProducts = [];
+
+//     try {
+//       const response = await chrome.runtime.sendMessage({
+//         action: "FETCH_PRODUCTS",
+//         token: getToken(),
+//       });
+
+//       console.log("[PRODUCTS] Response:", response);
+
+//       if (response.success) {
+//         console.log(
+//           "[PRODUCTS] ✅ Products fetched successfully via background script"
+//         );
+//         console.log(
+//           "[PRODUCTS] 🔍 Full API response structure:",
+//           response.products
+//         );
+//         console.log(
+//           "[PRODUCTS] 🔍 Response.products type:",
+//           typeof response.products
+//         );
+//         console.log(
+//           "[PRODUCTS] 🔍 Response.products keys:",
+//           Object.keys(response.products || {})
+//         );
+
+//         let productsFromApiResponse = [];
+
+//         // Handle different possible response structures
+//         if (Array.isArray(response.products)) {
+//           console.log(
+//             "[PRODUCTS] 📋 Response.products is array, length:",
+//             response.products.length
+//           );
+//           productsFromApiResponse = response.products;
+//         } else if (
+//           response.products &&
+//           response.products.products &&
+//           Array.isArray(response.products.products)
+//         ) {
+//           console.log(
+//             "[PRODUCTS] 📋 Found response.products.products array, length:",
+//             response.products.products.length
+//           );
+//           productsFromApiResponse = response.products.products;
+//         } else if (
+//           response.products &&
+//           response.products.data &&
+//           Array.isArray(response.products.data)
+//         ) {
+//           console.log(
+//             "[PRODUCTS] 📋 Found response.products.data array, length:",
+//             response.products.data.length
+//           );
+//           console.log(
+//             "[PRODUCTS] 📋 First item in data array:",
+//             response.products.data[0]
+//           );
+//           productsFromApiResponse = response.products.data;
+//         } else if (
+//           response.products &&
+//           response.products.result &&
+//           Array.isArray(response.products.result)
+//         ) {
+//           console.log(
+//             "[PRODUCTS] 📋 Found response.products.result array, length:",
+//             response.products.result.length
+//           );
+//           productsFromApiResponse = response.products.result;
+//         } else {
+//           console.warn(
+//             "[PRODUCTS] ⚠️ Unexpected products response structure:",
+//             response.products
+//           );
+
+//           productsFromApiResponse = [];
+//         }
+
+//         console.log("@productsFromApiResponse", productsFromApiResponse);
+
+//         if (productsFromApiResponse.length > 0) {
+//           // if (userStoreIds.length > 0) {
+//           //   allUserProducts = productsFromApiResponse.filter((p) => {
+//           //     const productStoreId = p.storeId || p.store_id || p._storeId;
+//           //     return userStoreIds.includes(productStoreId);
+//           //   });
+//           //   console.log(
+//           //     `[PRODUCTS] 🔍 Filtered ${allUserProducts.length} products for user's stores`
+//           //   );
+//           // } else {
+//           //   allUserProducts = productsFromApiResponse;
+//           //   console.log(
+//           //     `[PRODUCTS] 📦 Using all ${allUserProducts.length} products (no store filtering)`
+//           //   );
+//           // }
+//         } else {
+//           allUserProducts = [];
+//           console.log("[PRODUCTS] ⚠️ No products found in API response");
+//         }
+//       } else {
+//         console.error(
+//           `[PRODUCTS] ❌ Background script fetch failed:`,
+//           response.error
+//         );
+//         allUserProducts = [];
+//       }
+//     } catch (err) {
+//       console.error(`[PRODUCTS] ❌ Error calling background script:`, err);
+//       allUserProducts = [];
+//     }
+
+//     productsCache = productsFromApiResponse;
+
+//     console.log(
+//       `[PRODUCTS] 📊 Final result: ${productsCache.length} products processed`
+//     );
+
+//     productsLoading = false;
+//     // Notify all waiting listeners with the newly populated productsCache
+//     productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
+//     productsListeners = []; // Clear listeners after notifying
+//   } catch (e) {
+//     // Catch any errors during the entire fetch process
+//     console.error("[PRODUCTS] ❌ Error fetching products:", e);
+//     productsError = e;
+//     productsLoading = false;
+//     productsCache = [];
+//     productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
+//     productsListeners = [];
+//   }
+// }
+
 async function fetchProductsFromAPI() {
   if (productsLoading) return;
 
@@ -467,131 +628,124 @@ async function fetchProductsFromAPI() {
   productsError = null;
 
   try {
-    console.log(
-      "[PRODUCTS] Fetching user-specific products from API using session-based auth..."
-    );
+    console.log("[PRODUCTS] Fetching products from API...");
 
-    // Ensure stores are loaded before attempting to filter products by storeId
-    if (storesCache === null && !storesLoading) {
-      console.log(
-        "[PRODUCTS] Stores cache is null and not loading, fetching stores first..."
-      );
-      await new Promise((resolve) => {
-        getStoresForUser(() => resolve());
-      });
-    } else if (storesLoading) {
-      console.log(
-        "[PRODUCTS] Stores are currently loading, waiting for them..."
-      );
-      await new Promise((resolve) => {
-        storesListeners.push(() => resolve());
-      });
+    const response = await chrome.runtime.sendMessage({
+      action: "FETCH_PRODUCTS",
+      token: getToken(),
+    });
+
+    console.log("[PRODUCTS] 🔍 Full API response:", response);
+
+    if (!response?.success) {
+      console.error("[PRODUCTS] ❌ API fetch failed:", response?.error);
+      productsCache = [];
+      productsLoading = false;
+      productsListeners.forEach((fn) => fn(productsCache));
+      productsListeners = [];
+      return;
     }
 
-    const userStoreIds = storesCache
-      ? storesCache
-          .map(
-            (store) => store._id || store.id || store.storeId || store.store_id
-          )
-          .filter(Boolean)
-      : [];
+    let products = [];
 
-    let allUserProducts = [];
+    // Handle different response structures
+    if (Array.isArray(response.products)) {
+      products = response.products;
+      console.log(
+        "[PRODUCTS] 📋 Response.products is array, length:",
+        products.length
+      );
+    } else if (
+      response.products?.products &&
+      Array.isArray(response.products.products)
+    ) {
+      products = response.products.products;
+      console.log(
+        "[PRODUCTS] 📋 Found response.products.products array, length:",
+        products.length
+      );
+    } else if (
+      response.products?.data &&
+      Array.isArray(response.products.data)
+    ) {
+      products = response.products.data;
+      console.log(
+        "[PRODUCTS] 📋 Found response.products.data array, length:",
+        products.length
+      );
+      console.log("[PRODUCTS] 📋 First item in data array:", products[0]);
+    } else if (
+      response.products?.result &&
+      Array.isArray(response.products.result)
+    ) {
+      products = response.products.result;
+      console.log(
+        "[PRODUCTS] 📋 Found response.products.result array, length:",
+        products.length
+      );
+    } else {
+      console.warn(
+        "[PRODUCTS] ⚠️ Unexpected response structure:",
+        response.products
+      );
+      console.warn(
+        "[PRODUCTS] ⚠️ Available properties:",
+        Object.keys(response.products || {})
+      );
+      products = [];
+    }
 
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: "FETCH_PRODUCTS",
-        token: getToken(),
-      });
+    // Debug the actual product data structure
+    if (products.length > 0) {
+      console.log("[PRODUCTS] 🔍 First product structure:", products[0]);
+      console.log(
+        "[PRODUCTS] 🔍 First product keys:",
+        Object.keys(products[0] || {})
+      );
 
-      console.log("[PRODUCTS] Response:", response);
+      // Check if products have the required fields for display
+      const firstProduct = products[0];
+      const hasRequiredFields =
+        firstProduct &&
+        (firstProduct.title ||
+          firstProduct.name ||
+          firstProduct.productName ||
+          firstProduct.description ||
+          firstProduct.price ||
+          firstProduct.variants ||
+          firstProduct.images ||
+          firstProduct.image);
 
-      if (response.success) {
-        console.log(
-          "[PRODUCTS] ✅ Products fetched successfully via background script"
+      console.log(
+        "[PRODUCTS] 🔍 Product has required display fields:",
+        hasRequiredFields
+      );
+
+      if (!hasRequiredFields) {
+        console.warn(
+          "[PRODUCTS] ⚠️ Products appear to be references/IDs only, not full product data"
         );
-        let productsFromApiResponse = [];
-
-        // Handle different possible response structures
-        if (Array.isArray(response.products)) {
-          productsFromApiResponse = response.products;
-        } else if (
-          response.products &&
-          response.products.products &&
-          Array.isArray(response.products.products)
-        ) {
-          productsFromApiResponse = response.products.products;
-        } else if (
-          response.products &&
-          response.products.data &&
-          Array.isArray(response.products.data)
-        ) {
-          productsFromApiResponse = response.products.data;
-        } else if (
-          response.products &&
-          response.products.result &&
-          Array.isArray(response.products.result)
-        ) {
-          productsFromApiResponse = response.products.result;
-        } else {
-          console.warn(
-            "[PRODUCTS] ⚠️ Unexpected products response structure:",
-            response.products
-          );
-          productsFromApiResponse = [];
-        }
-
-        // Filter products by user's store IDs if available
-        if (productsFromApiResponse.length > 0) {
-          if (userStoreIds.length > 0) {
-            allUserProducts = productsFromApiResponse.filter((p) => {
-              const productStoreId = p.storeId || p.store_id || p._storeId;
-              return userStoreIds.includes(productStoreId);
-            });
-            console.log(
-              `[PRODUCTS] 🔍 Filtered ${allUserProducts.length} products for user's stores`
-            );
-          } else {
-            // If no specific store IDs, use all fetched products
-            allUserProducts = productsFromApiResponse;
-            console.log(
-              `[PRODUCTS] 📦 Using all ${allUserProducts.length} products (no store filtering)`
-            );
-          }
-        } else {
-          allUserProducts = [];
-          console.log("[PRODUCTS] ⚠️ No products found in API response");
-        }
-      } else {
-        console.error(
-          `[PRODUCTS] ❌ Background script fetch failed:`,
-          response.error
+        console.warn(
+          "[PRODUCTS] ⚠️ This might require additional API calls to fetch full product details"
         );
-        allUserProducts = [];
       }
-    } catch (err) {
-      // Log network errors during fetch
-      console.error(`[PRODUCTS] ❌ Error calling background script:`, err);
-      allUserProducts = [];
     }
 
-    productsCache = allUserProducts;
+    console.log(`[PRODUCTS] ✅ Received ${products.length} products`);
 
-    console.log(
-      `[PRODUCTS] 📊 Final result: ${productsCache.length} products processed`
-    );
+    // Set the global cache
+    productsCache = products;
 
     productsLoading = false;
-    // Notify all waiting listeners with the newly populated productsCache
-    productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
-    productsListeners = []; // Clear listeners after notifying
-  } catch (e) {
-    // Catch any errors during the entire fetch process
-    console.error("[PRODUCTS] ❌ Error fetching products:", e);
-    productsError = e;
+    // Notify all waiting listeners
+    productsListeners.forEach((fn) => fn(productsCache));
+    productsListeners = [];
+  } catch (err) {
+    console.error("[PRODUCTS] ❌ Error fetching products:", err);
+    productsError = err;
     productsLoading = false;
     productsCache = [];
-    productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
+    productsListeners.forEach((fn) => fn(productsCache));
     productsListeners = [];
   }
 }
@@ -851,6 +1005,7 @@ function observeActiveChat() {
               getStoresForUser((stores) => {
                 sidebarProps.stores = stores;
                 getCatalogForContact(contact, (products) => {
+                  console.log("products", products);
                   sidebarProps.catalog = products;
                   sidebarProps.notes = getNotesForContact(contact.name);
                   sidebarProps.onNotesChange = handleNotesChange;
@@ -1555,37 +1710,54 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
     }, 150);
 
     // If product has an image, add it to the chat
-    if (productItem && productItem.image) {
-      console.log(
-        "[CHAT] Product has image, attempting to add image to chat..."
-      );
-      setTimeout(async () => {
-        try {
-          const filename = `${productItem.name.replace(
-            /[^a-zA-Z0-9]/g,
-            "_"
-          )}.jpg`;
-          const imageFile = await downloadImageAsFile(
-            productItem.image,
-            filename
-          );
+    if (productItem) {
+      // Handle both image (single) and images (array) properties
+      let imageUrl = null;
 
-          if (imageFile) {
-            const imageAdded = await addImageToChat(imageFile);
-            if (imageAdded) {
-              console.log(
-                "[CHAT] ✅ Product image added to chat successfully!"
-              );
+      if (
+        productItem.images &&
+        Array.isArray(productItem.images) &&
+        productItem.images.length > 0
+      ) {
+        // Handle images array format
+        imageUrl = productItem.images[0]?.url || productItem.images[0];
+      } else if (productItem.image) {
+        // Handle single image format
+        imageUrl = productItem.image;
+      }
+
+      if (imageUrl) {
+        console.log(
+          "[CHAT] Product has image, attempting to add image to chat..."
+        );
+        console.log("[CHAT] Image URL:", imageUrl);
+
+        setTimeout(async () => {
+          try {
+            const productName =
+              productItem.name || productItem.title || "product";
+            const filename = `${productName.replace(/[^a-zA-Z0-9]/g, "_")}.jpg`;
+            const imageFile = await downloadImageAsFile(imageUrl, filename);
+
+            if (imageFile) {
+              const imageAdded = await addImageToChat(imageFile);
+              if (imageAdded) {
+                console.log(
+                  "[CHAT] ✅ Product image added to chat successfully!"
+                );
+              } else {
+                console.warn("[CHAT] Failed to add image to chat");
+              }
             } else {
-              console.warn("[CHAT] Failed to add image to chat");
+              console.warn("[CHAT] Failed to download product image");
             }
-          } else {
-            console.warn("[CHAT] Failed to download product image");
+          } catch (error) {
+            console.error("[CHAT] Error handling product image:", error);
           }
-        } catch (error) {
-          console.error("[CHAT] Error handling product image:", error);
-        }
-      }, 1000); // Wait 1 second after text is added
+        }, 1000); // Wait 1 second after text is added
+      } else {
+        console.log("[CHAT] No image URL found in product item");
+      }
     }
 
     return true;

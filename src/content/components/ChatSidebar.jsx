@@ -152,6 +152,7 @@ const ChatSidebar = ({
 }) => {
   const theme = useTheme();
 
+  console.log("catalog", catalog);
   const [search, setSearch] = useState("");
   const [filteredCatalog, setFilteredCatalog] = useState(catalog);
   const [isSearching, setIsSearching] = useState(false);
