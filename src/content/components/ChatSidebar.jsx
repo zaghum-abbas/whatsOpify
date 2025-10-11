@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
 import CustomerSupportMessages from "./CustomerSupportMessages";
-import ModalForm from "./ModalForm";
 import { formatPrice } from "../../core/utils/helperFunctions";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useTheme, getThemeColors } from "../../hooks/useTheme";
@@ -369,36 +368,45 @@ const ChatSidebar = ({
         </section>
       )}
 
-      {/* Create Order Form Section */}
+      {/* Create Order Button */}
       <section style={{ marginBottom: "28px" }}>
-        <h2
-          style={{
-            marginBottom: "12px",
-            fontSize: "1.1rem",
-            color: theme === "dark" ? "white" : "#222",
+        <button
+          onClick={() => {
+            // Switch to order form sidebar
+            if (typeof window.switchToOrderFormSidebar === "function") {
+              window.switchToOrderFormSidebar(contact);
+            }
           }}
-        >
-          Create New Order
-        </h2>
-        <div
           style={{
-            background: theme === "dark" ? "#23272a" : "#fff",
-            borderRadius: "10px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+            width: "100%",
             padding: "16px",
-            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-            color: theme === "dark" ? "white" : "#222",
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            color: "white",
+            border: "none",
+            borderRadius: "10px",
+            fontSize: "1.1rem",
+            fontWeight: "600",
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+            transition: "all 0.3s ease",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = "translateY(-2px)";
+            e.target.style.boxShadow = "0 6px 16px rgba(102, 126, 234, 0.4)";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = "translateY(0)";
+            e.target.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
           }}
         >
-          <ModalForm
-            onClose={() => {}}
-            initialData={{
-              name: contact?.name || "",
-              phone: contact?.phone || "",
-            }}
-            theme={theme}
-          />
-        </div>
+          <span style={{ fontSize: "1.3em" }}>📝</span>
+          <span>Create New Order</span>
+          <span style={{ fontSize: "1em", marginLeft: "auto" }}>→</span>
+        </button>
       </section>
 
       {/* Catalog Section */}

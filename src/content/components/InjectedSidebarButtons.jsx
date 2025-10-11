@@ -7,7 +7,6 @@ import LoginModal from "./LoginModal";
 
 const LOCAL_STORAGE_KEY = "whatsappImportedContacts";
 
-// Receive onToggleSidebar as a prop
 const InjectedSidebarButtons = ({ onToggleSidebar }) => {
   const [showChatPopup, setShowChatPopup] = useState(false);
   const [showImportPopup, setShowImportPopup] = useState(false);
@@ -260,6 +259,11 @@ const InjectedSidebarButtons = ({ onToggleSidebar }) => {
     setShowExportPopup(false);
   };
 
+  const sideBarOpen = () => {
+    if (!requireAuth(setShowLoginModal)) return;
+    onToggleSidebar();
+  };
+
   return (
     <>
       <button
@@ -269,7 +273,7 @@ const InjectedSidebarButtons = ({ onToggleSidebar }) => {
         data-navbar-item="true"
         className={whatsappButtonClasses}
         title="Toggle Custom Sidebar"
-        onClick={onToggleSidebar} // Call the passed function here
+        onClick={sideBarOpen}
       >
         <div className={whatsappDivClasses}>
           <div className={whatsappInnerDivClasses} style={{ flexGrow: 1 }}>
@@ -332,7 +336,6 @@ const InjectedSidebarButtons = ({ onToggleSidebar }) => {
                 </svg>
               </span>
             </div>
-             
           </div>
         </div>
       </button>

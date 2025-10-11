@@ -8,6 +8,7 @@ import ChatListEnhancer from "./components/ChatListEnhancer";
 import InjectedSidebarContent from "./components/InjectedSidebarContent";
 import DefaultSidebar from "./components/DefaultSidebar";
 import ChatSidebar from "./components/ChatSidebar";
+import OrderFormSidebar from "./components/OrderFormSidebar";
 import "./App.css"; // Your main CSS file
 
 import { requireAuth, useAuthState } from "./components/authMiddleware.jsx";
@@ -109,7 +110,7 @@ function getWhatsAppTheme() {
 let isSidebarOpen = true;
 let sidebarRoot = null; // Store the React root for the sidebar
 let mainAppContent = null; // Reference to the main WhatsApp content div that needs resizing
-let sidebarMode = "default"; // "default" or "chat"
+let sidebarMode = "default"; // "default", "chat", or "orderForm"
 let sidebarProps = {
   contact: {},
   catalog: [],
@@ -119,6 +120,7 @@ let sidebarProps = {
   userInfo: null,
   showOrderForm: false,
   onOrderFormToggle: null,
+  onClose: null,
 };
 let lastActiveChatId = null;
 
@@ -153,6 +155,9 @@ const renderSidebar = () => {
   } else if (sidebarMode === "chat") {
     console.log("🎨 Rendering Chat Sidebar");
     sidebarRoot.render(<ChatSidebar {...sidebarProps} />);
+  } else if (sidebarMode === "orderForm") {
+    console.log("🎨 Rendering Order Form Sidebar");
+    sidebarRoot.render(<OrderFormSidebar {...sidebarProps} />);
   }
 };
 
@@ -459,167 +464,6 @@ function getProducts(callback) {
   productsListeners.push(callback);
   fetchProductsFromAPI();
 }
-
-// async function fetchProductsFromAPI() {
-//   if (productsLoading) return;
-
-//   productsLoading = true;
-//   productsError = null;
-
-//   try {
-//     console.log(
-//       "[PRODUCTS] Fetching user-specific products from API using session-based auth..."
-//     );
-
-//     // Ensure stores are loaded before attempting to filter products by storeId
-//     if (storesCache === null && !storesLoading) {
-//       console.log(
-//         "[PRODUCTS] Stores cache is null and not loading, fetching stores first..."
-//       );
-//       await new Promise((resolve) => {
-//         getStoresForUser(() => resolve());
-//       });
-//     } else if (storesLoading) {
-//       console.log(
-//         "[PRODUCTS] Stores are currently loading, waiting for them..."
-//       );
-//       await new Promise((resolve) => {
-//         storesListeners.push(() => resolve());
-//       });
-//     }
-
-//     let allUserProducts = [];
-
-//     try {
-//       const response = await chrome.runtime.sendMessage({
-//         action: "FETCH_PRODUCTS",
-//         token: getToken(),
-//       });
-
-//       console.log("[PRODUCTS] Response:", response);
-
-//       if (response.success) {
-//         console.log(
-//           "[PRODUCTS] ✅ Products fetched successfully via background script"
-//         );
-//         console.log(
-//           "[PRODUCTS] 🔍 Full API response structure:",
-//           response.products
-//         );
-//         console.log(
-//           "[PRODUCTS] 🔍 Response.products type:",
-//           typeof response.products
-//         );
-//         console.log(
-//           "[PRODUCTS] 🔍 Response.products keys:",
-//           Object.keys(response.products || {})
-//         );
-
-//         let productsFromApiResponse = [];
-
-//         // Handle different possible response structures
-//         if (Array.isArray(response.products)) {
-//           console.log(
-//             "[PRODUCTS] 📋 Response.products is array, length:",
-//             response.products.length
-//           );
-//           productsFromApiResponse = response.products;
-//         } else if (
-//           response.products &&
-//           response.products.products &&
-//           Array.isArray(response.products.products)
-//         ) {
-//           console.log(
-//             "[PRODUCTS] 📋 Found response.products.products array, length:",
-//             response.products.products.length
-//           );
-//           productsFromApiResponse = response.products.products;
-//         } else if (
-//           response.products &&
-//           response.products.data &&
-//           Array.isArray(response.products.data)
-//         ) {
-//           console.log(
-//             "[PRODUCTS] 📋 Found response.products.data array, length:",
-//             response.products.data.length
-//           );
-//           console.log(
-//             "[PRODUCTS] 📋 First item in data array:",
-//             response.products.data[0]
-//           );
-//           productsFromApiResponse = response.products.data;
-//         } else if (
-//           response.products &&
-//           response.products.result &&
-//           Array.isArray(response.products.result)
-//         ) {
-//           console.log(
-//             "[PRODUCTS] 📋 Found response.products.result array, length:",
-//             response.products.result.length
-//           );
-//           productsFromApiResponse = response.products.result;
-//         } else {
-//           console.warn(
-//             "[PRODUCTS] ⚠️ Unexpected products response structure:",
-//             response.products
-//           );
-
-//           productsFromApiResponse = [];
-//         }
-
-//         console.log("@productsFromApiResponse", productsFromApiResponse);
-
-//         if (productsFromApiResponse.length > 0) {
-//           // if (userStoreIds.length > 0) {
-//           //   allUserProducts = productsFromApiResponse.filter((p) => {
-//           //     const productStoreId = p.storeId || p.store_id || p._storeId;
-//           //     return userStoreIds.includes(productStoreId);
-//           //   });
-//           //   console.log(
-//           //     `[PRODUCTS] 🔍 Filtered ${allUserProducts.length} products for user's stores`
-//           //   );
-//           // } else {
-//           //   allUserProducts = productsFromApiResponse;
-//           //   console.log(
-//           //     `[PRODUCTS] 📦 Using all ${allUserProducts.length} products (no store filtering)`
-//           //   );
-//           // }
-//         } else {
-//           allUserProducts = [];
-//           console.log("[PRODUCTS] ⚠️ No products found in API response");
-//         }
-//       } else {
-//         console.error(
-//           `[PRODUCTS] ❌ Background script fetch failed:`,
-//           response.error
-//         );
-//         allUserProducts = [];
-//       }
-//     } catch (err) {
-//       console.error(`[PRODUCTS] ❌ Error calling background script:`, err);
-//       allUserProducts = [];
-//     }
-
-//     productsCache = productsFromApiResponse;
-
-//     console.log(
-//       `[PRODUCTS] 📊 Final result: ${productsCache.length} products processed`
-//     );
-
-//     productsLoading = false;
-//     // Notify all waiting listeners with the newly populated productsCache
-//     productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
-//     productsListeners = []; // Clear listeners after notifying
-//   } catch (e) {
-//     // Catch any errors during the entire fetch process
-//     console.error("[PRODUCTS] ❌ Error fetching products:", e);
-//     productsError = e;
-//     productsLoading = false;
-//     productsCache = [];
-//     productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
-//     productsListeners = [];
-//   }
-// }
 
 async function fetchProductsFromAPI() {
   if (productsLoading) return;
@@ -1100,7 +944,16 @@ function observeActiveChat() {
 }
 
 window.toggleWhatsappSidebar = async (open) => {
-  // Allow sidebar to open without authentication - show login modal only when user tries to use features that require auth
+  // Check if user is logged in
+  const token = localStorage.getItem("whatsopify_token");
+  const isLoggedIn = token && token !== "null" && token !== '""';
+
+  // If trying to open sidebar and user is not logged in, don't open
+  if (open && !isLoggedIn) {
+    console.log("⚠️ Cannot open sidebar: User not logged in");
+    return;
+  }
+
   isSidebarOpen = typeof open === "boolean" ? open : !isSidebarOpen;
   console.log(`Toggling sidebar: ${isSidebarOpen ? "Open" : "Closed"}`);
 
@@ -1185,6 +1038,15 @@ window.toggleWhatsappSidebar = async (open) => {
 
     mainAppContent.style.marginRight = SIDEBAR_WIDTH;
     console.log(`✅ Main WhatsApp content shifted left by ${SIDEBAR_WIDTH}.`);
+
+    // Update margins for the custom divs
+    setTimeout(() => {
+      const chatHeader = document.querySelector(
+        'header[data-testid="conversation-header"]'
+      );
+      const isChatOpen = !!chatHeader;
+      ensureMainContentMargin(isChatOpen);
+    }, 100);
   } else {
     // Close sidebar
     if (sidebarContainer) {
@@ -1195,6 +1057,15 @@ window.toggleWhatsappSidebar = async (open) => {
     // Restore main content width by removing the right margin
     mainAppContent.style.marginRight = "0px";
     console.log("✅ Main WhatsApp content restored to full width.");
+
+    // Update margins for the custom divs
+    setTimeout(() => {
+      const chatHeader = document.querySelector(
+        'header[data-testid="conversation-header"]'
+      );
+      const isChatOpen = !!chatHeader;
+      ensureMainContentMargin(isChatOpen);
+    }, 100);
   }
 };
 
@@ -1310,10 +1181,18 @@ function injectTopToolbarIntoWhatsAppBody() {
       console.log("✅ TopToolbar mounted as fixed element at top of viewport.");
 
       // Add padding to main content to account for toolbar height
-      whatsappMainBodyContainer.style.paddingTop = TOOLBAR_HEIGHT;
+      // whatsappMainBodyContainer.style.paddingTop = TOOLBAR_HEIGHT;
 
-      // Initialize sidebar state to open by default
-      window.toggleWhatsappSidebar(true);
+      // Initialize sidebar state to open by default only if user is logged in
+      const token = localStorage.getItem("whatsopify_token");
+      const isLoggedIn = token && token !== "null" && token !== '""';
+
+      if (isLoggedIn) {
+        window.toggleWhatsappSidebar(true);
+        console.log("✅ User is logged in - opening sidebar by default");
+      } else {
+        console.log("ℹ️ User not logged in - sidebar will remain closed");
+      }
     }
   );
 }
@@ -1361,7 +1240,7 @@ function injectSidebarButtons() {
     }
 
     const root = createRoot(container);
-    // Pass the globally exposed toggle function as a prop
+
     root.render(
       <InjectedSidebarButtons onToggleSidebar={window.toggleWhatsappSidebar} />
     );
@@ -1411,11 +1290,178 @@ function injectChatListEnhancer() {
   });
 }
 
+function ensureMainContentMargin(applyToSecond = false) {
+  const allDivs = document.querySelectorAll("div");
+
+  const matchingDivs = [];
+
+  for (const element of allDivs) {
+    const classList = Array.from(element.classList);
+    const hasExactlyTheseClasses =
+      classList.length === 3 &&
+      classList.includes("x78zum5") &&
+      classList.includes("xdt5ytf") &&
+      classList.includes("x5yr21d");
+
+    if (hasExactlyTheseClasses) {
+      matchingDivs.push(element);
+    }
+  }
+
+  if (matchingDivs.length === 0) return;
+
+  let targetDiv = null;
+  let otherDiv = null;
+
+  if (applyToSecond && matchingDivs.length >= 2) {
+    targetDiv = matchingDivs[1];
+    otherDiv = matchingDivs[0];
+  } else if (matchingDivs.length >= 1) {
+    targetDiv = matchingDivs[0];
+    if (matchingDivs.length >= 2) {
+      otherDiv = matchingDivs[1];
+    }
+  }
+
+  // Check if sidebar is open
+  const sidebarElement = document.getElementById("whatsapp-sidebar-root");
+  const isSidebarOpen =
+    sidebarElement && sidebarElement.style.display !== "none";
+  const marginRight = isSidebarOpen ? "400px" : "0px";
+
+  if (targetDiv) {
+    targetDiv.style.marginTop = "48px";
+    targetDiv.style.marginRight = marginRight;
+
+    const divIndex =
+      applyToSecond && matchingDivs.length >= 2 ? "SECOND" : "FIRST";
+    console.log(
+      `✅ Applied margins to ${divIndex} div (top: 48px, right: ${marginRight}) - Sidebar ${
+        isSidebarOpen ? "OPEN" : "CLOSED"
+      }`
+    );
+  }
+
+  if (otherDiv) {
+    otherDiv.style.marginTop = "0px";
+    otherDiv.style.marginRight = "0px";
+  }
+}
+
+function setupMainContentMarginObserver() {
+  ensureMainContentMargin();
+  const marginObserver = new MutationObserver((mutations) => {
+    let needsUpdate = false;
+
+    mutations.forEach((mutation) => {
+      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+        Array.from(mutation.addedNodes).forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "DIV") {
+            const classList = Array.from(node.classList);
+            if (
+              classList.length === 3 &&
+              classList.includes("x78zum5") &&
+              classList.includes("xdt5ytf") &&
+              classList.includes("x5yr21d")
+            ) {
+              needsUpdate = true;
+            }
+            const childDivs = node.querySelectorAll
+              ? node.querySelectorAll("div")
+              : [];
+            childDivs.forEach((childDiv) => {
+              const childClassList = Array.from(childDiv.classList);
+              if (
+                childClassList.length === 3 &&
+                childClassList.includes("x78zum5") &&
+                childClassList.includes("xdt5ytf") &&
+                childClassList.includes("x5yr21d")
+              ) {
+                needsUpdate = true;
+              }
+            });
+          }
+        });
+      }
+
+      if (
+        mutation.type === "attributes" &&
+        (mutation.attributeName === "style" ||
+          mutation.attributeName === "class")
+      ) {
+        const target = mutation.target;
+        if (target.tagName === "DIV") {
+          const classList = Array.from(target.classList);
+          if (
+            classList.length === 3 &&
+            classList.includes("x78zum5") &&
+            classList.includes("xdt5ytf") &&
+            classList.includes("x5yr21d")
+          ) {
+            needsUpdate = true;
+          }
+        }
+      }
+    });
+
+    if (needsUpdate) {
+      // Debounce the updates to avoid excessive calls
+      clearTimeout(window.marginUpdateTimeout);
+      window.marginUpdateTimeout = setTimeout(() => {
+        // Check if a chat is open by looking for chat header
+        const chatHeader = document.querySelector(
+          'header[data-testid="conversation-header"]'
+        );
+        const isChatOpen = !!chatHeader;
+
+        ensureMainContentMargin(isChatOpen);
+      }, 300);
+    }
+  });
+
+  marginObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["style", "class"],
+  });
+
+  console.log("👁️ WhatsApp main content margin observer setup complete");
+
+  document.body.addEventListener("click", (event) => {
+    const chatItem = event.target.closest(
+      '[data-testid="cell-frame-container"], div[role="listitem"]'
+    );
+
+    if (chatItem) {
+      // Wait for chat to load, then check and apply margins
+      setTimeout(() => {
+        const chatHeader = document.querySelector(
+          'header[data-testid="conversation-header"]'
+        );
+        const isChatOpen = !!chatHeader;
+
+        if (isChatOpen) {
+          ensureMainContentMargin(true); // Apply to second div when chat opens
+          console.log("💬 Chat opened - applied margins to SECOND div");
+        }
+      }, 300);
+    }
+  });
+
+  console.log("👆 Click listener for chat detection setup complete");
+}
+
 // Call all injection functions
 injectTopToolbarIntoWhatsAppBody();
 injectSidebarButtons();
 injectChatHeaderHover();
 injectChatListEnhancer();
+
+// Setup main content margin observer after a short delay
+setTimeout(() => {
+  setupMainContentMarginObserver();
+}, 2000);
 
 // Always observe chat changes to update sidebar contact info
 waitForElement("#pane-side", () => {
@@ -2009,9 +2055,16 @@ fetchStoresForUser(); // Start fetching stores
 // --- Global Order Form Control ---
 window.showOrderForm = (show) => {
   console.log(`Order form ${show ? "opened" : "closed"}`);
-  sidebarProps.showOrderForm = show;
-  if (sidebarRoot && sidebarProps.onOrderFormToggle) {
-    sidebarProps.onOrderFormToggle(show);
+  if (show) {
+    // Switch to order form sidebar mode
+    switchSidebarMode("orderForm");
+  } else {
+    // Switch back to default or chat mode
+    if (lastActiveChatId) {
+      switchSidebarMode("chat");
+    } else {
+      switchSidebarMode("default");
+    }
   }
 };
 
@@ -2025,8 +2078,30 @@ window.switchToChatSidebar = (contact) => {
   console.log("🔄 Switching to chat sidebar mode with contact:", contact);
   if (contact) {
     sidebarProps.contact = contact;
+    // Fetch fresh data for the contact
+    getUserInfo((userInfo) => {
+      sidebarProps.userInfo = userInfo;
+      getStoresForUser((stores) => {
+        sidebarProps.stores = stores;
+        getCatalogForContact(contact, (products) => {
+          sidebarProps.catalog = products;
+          sidebarProps.notes = getNotesForContact(contact.name);
+          sidebarProps.onNotesChange = handleNotesChange;
+          switchSidebarMode("chat");
+        });
+      });
+    });
+  } else {
+    switchSidebarMode("chat");
   }
-  switchSidebarMode("chat");
+};
+
+window.switchToOrderFormSidebar = (contact) => {
+  console.log("🔄 Switching to order form sidebar mode");
+  if (contact) {
+    sidebarProps.contact = contact;
+  }
+  switchSidebarMode("orderForm");
 };
 
 window.getCurrentSidebarMode = () => {
@@ -2074,6 +2149,94 @@ window.updateSidebarTheme = () => {
 window.getProducts = getProducts;
 window.getUserInfo = getUserInfo;
 window.getStoresForUser = getStoresForUser;
+
+// Expose sidebarProps for external access (like in TopToolbar)
+Object.defineProperty(window, "sidebarProps", {
+  get: () => sidebarProps,
+  configurable: true,
+});
+
+// Expose margin management functions for debugging
+window.whatsappMarginManager = {
+  ensureMainContentMargin,
+  forceMarginUpdate: (applyToSecond = false) => {
+    ensureMainContentMargin(applyToSecond);
+    const target = applyToSecond ? "SECOND" : "FIRST";
+    console.log(
+      `🔧 Forced margin update to ${target} div (top: 48px, right: 400px)`
+    );
+  },
+  forceUpdateForChat: () => {
+    ensureMainContentMargin(true);
+    console.log("💬 Forced margin update for SECOND div (chat view)");
+  },
+  forceUpdateForDefault: () => {
+    ensureMainContentMargin(false);
+    console.log("🏠 Forced margin update for FIRST div (default view)");
+  },
+  checkMarginStatus: () => {
+    const allDivs = document.querySelectorAll("div");
+    const exactMatches = [];
+
+    console.log(
+      '📊 Checking for divs with EXACTLY class="x78zum5 xdt5ytf x5yr21d":'
+    );
+
+    allDivs.forEach((element) => {
+      const classList = Array.from(element.classList);
+      if (
+        classList.length === 3 &&
+        classList.includes("x78zum5") &&
+        classList.includes("xdt5ytf") &&
+        classList.includes("x5yr21d")
+      ) {
+        exactMatches.push(element);
+      }
+    });
+
+    // Check if chat is open
+    const chatHeader = document.querySelector(
+      'header[data-testid="conversation-header"]'
+    );
+    const isChatOpen = !!chatHeader;
+    const targetIndex = isChatOpen ? 1 : 0;
+
+    console.log(
+      `Found ${exactMatches.length} div(s) with EXACTLY these 3 classes:`
+    );
+    console.log(
+      `📍 Current view: ${isChatOpen ? "CHAT OPEN" : "DEFAULT VIEW"}`
+    );
+    console.log(
+      `⚠️ NOTE: Margins are applied to the ${
+        isChatOpen ? "SECOND" : "FIRST"
+      } matching div`
+    );
+
+    exactMatches.forEach((element, index) => {
+      const computedStyle = window.getComputedStyle(element);
+      const marginTop = computedStyle.marginTop;
+      const marginRight = computedStyle.marginRight;
+      const classCount = element.classList.length;
+      const isTarget = index === targetIndex;
+
+      console.log(`${isTarget ? "👉 TARGET" : "  "} Element ${index + 1}:`);
+      console.log(
+        `  - This is ${
+          isTarget
+            ? "THE TARGET (margins applied here)"
+            : "NOT the target (ignored)"
+        }`
+      );
+      console.log(`  - Class count: ${classCount} (must be exactly 3)`);
+      console.log(`  - Classes: ${element.className}`);
+      console.log(`  - margin-top: ${marginTop}`);
+      console.log(`  - margin-right: ${marginRight}`);
+    });
+
+    return exactMatches;
+  },
+};
 
 // Ensure window.whatsapofyProducts has the correct references
 Object.assign(window.whatsapofyProducts, {

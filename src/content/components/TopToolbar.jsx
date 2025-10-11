@@ -65,55 +65,25 @@ const TopToolbar = (props) => {
     if (label === "Add") {
       setShowModal(true);
     } else if (label === "CreateOrder") {
-      // Switch to default sidebar mode for order form
-      if (typeof window.switchToDefaultSidebar === "function") {
-        window.switchToDefaultSidebar();
+      // Get current contact info if in chat mode
+      const currentContact =
+        typeof window.getCurrentSidebarMode === "function" &&
+        window.getCurrentSidebarMode() === "chat" &&
+        window.sidebarProps?.contact
+          ? window.sidebarProps.contact
+          : { name: "", phone: "" };
+
+      // Switch to order form sidebar mode
+      if (typeof window.switchToOrderFormSidebar === "function") {
+        window.switchToOrderFormSidebar(currentContact);
       }
-      // Trigger order form in sidebar
-      if (typeof window.showOrderForm === "function") {
-        window.showOrderForm(true);
-      }
+
       // Ensure sidebar is open
       if (typeof window.toggleWhatsappSidebar === "function") {
         window.toggleWhatsappSidebar(true);
       }
 
-      // Smooth scroll to the order form in sidebar
-      setTimeout(() => {
-        const sidebarContainer = document.getElementById(
-          "whatsapp-sidebar-root"
-        );
-        if (sidebarContainer) {
-          // Find the order form section within the sidebar
-          const orderFormSection = Array.from(
-            sidebarContainer.querySelectorAll("section")
-          ).find((section) => {
-            const h2 = section.querySelector("h2");
-            return h2 && h2.textContent.includes("Create New Order");
-          });
-
-          if (orderFormSection) {
-            // Scroll to the order form section with smooth behavior
-            orderFormSection.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-              inline: "nearest",
-            });
-            console.log("✅ Smooth scrolled to Create Order form");
-          } else {
-            // Fallback: scroll to top of sidebar if form section not found
-            sidebarContainer.scrollTo({
-              top: 0,
-              behavior: "smooth",
-            });
-            console.log(
-              "⚠️ Order form section not found, scrolled to top of sidebar"
-            );
-          }
-        } else {
-          console.warn("⚠️ Sidebar container not found for scrolling");
-        }
-      }, 500); // Wait for sidebar and form to render
+      console.log("✅ Switched to Order Form Sidebar");
     } else if (label === "Orders") {
       // Switch to default sidebar mode for orders
       if (typeof window.switchToDefaultSidebar === "function") {
