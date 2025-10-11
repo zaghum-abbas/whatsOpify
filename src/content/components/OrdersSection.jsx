@@ -12,6 +12,10 @@ const OrdersSection = ({ whatsappTheme }) => {
   const [orders, setOrders] = useState({
     new: [],
     pending: [],
+    length: {
+      new: 0,
+      pending: 0,
+    },
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -40,7 +44,6 @@ const OrdersSection = ({ whatsappTheme }) => {
       setLoading(true);
       setError(null);
 
-      // Use background script to fetch orders with token authentication
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_ORDERS",
         token: getToken(),
@@ -49,38 +52,10 @@ const OrdersSection = ({ whatsappTheme }) => {
         limit: limit,
       });
 
-      console.log(`[ORDERS] API Response for ${status}:`, response);
-
       if (response.success) {
-        console.log(
-          `[ORDERS] ✅ ${status} orders fetched successfully:`,
-          response.orders
-        );
+        console.log("response.orders", response.orders);
 
-        let ordersData = [];
-
-        // Handle different response structures
-        if (Array.isArray(response.orders)) {
-          ordersData = response.orders;
-        } else if (
-          response.orders?.data &&
-          Array.isArray(response.orders.data)
-        ) {
-          ordersData = response.orders.data;
-        } else if (
-          response.orders?.orders &&
-          Array.isArray(response.orders.orders)
-        ) {
-          ordersData = response.orders.orders;
-        } else {
-          console.warn(
-            `[ORDERS] Unexpected response structure for ${status}:`,
-            response.orders
-          );
-          ordersData = [];
-        }
-
-        return ordersData;
+        return response.orders;
       } else {
         throw new Error(response.error || "Failed to fetch orders");
       }
@@ -92,7 +67,6 @@ const OrdersSection = ({ whatsappTheme }) => {
     }
   };
 
-  // Load orders when component mounts
   useEffect(() => {
     const loadOrders = async () => {
       try {
@@ -100,102 +74,37 @@ const OrdersSection = ({ whatsappTheme }) => {
         console.log("[ORDERS] Authentication check:", getToken());
 
         if (getToken()) {
-          // Fetch real orders from API if authenticated
           console.log("[ORDERS] Fetching real orders from API...");
 
-          try {
-            const [newOrders, pendingOrders] = await Promise.all([
-              fetchOrders("open"), // Map "new" tab to "open" status
-              fetchOrders("pending"), // Map "pending" tab to "pending" status
-            ]);
+          const [newOrders, pendingOrders] = await Promise.all([
+            fetchOrders("open"),
+            fetchOrders("pending"),
+          ]);
 
-            setOrders({
-              new: newOrders,
-              pending: pendingOrders,
-            });
+          setOrders({
+            new: newOrders.data,
+            pending: pendingOrders.data,
+            length: {
+              new: newOrders.len,
+              pending: pendingOrders.len,
+            },
+          });
 
-            console.log(
-              `[ORDERS] ✅ Loaded ${newOrders.length} new orders and ${pendingOrders.length} pending orders`
-            );
-          } catch (apiError) {
-            console.error(
-              "[ORDERS] API fetch failed, falling back to dummy data:",
-              apiError
-            );
-            setError(apiError.message);
-          }
+          console.log(
+            `[ORDERS] ✅ Loaded ${newOrders} new orders and ${pendingOrders} pending orders`
+          );
         } else {
-          // Use dummy data if not authenticated
           console.log("[ORDERS] Using dummy orders data (not authenticated)");
         }
       } catch (err) {
-        setError(err.message);
         console.error("[ORDERS] Error loading orders:", err);
-        // Fallback to dummy data on any error
+        setError(err.message);
       }
     };
 
     loadOrders();
   }, []);
 
-  useEffect(() => {
-    const reloadCurrentTab = async () => {
-      try {
-        // Only reload if we don't have data for this tab
-        if (orders[activeTab].length > 0) {
-          console.log(
-            `[ORDERS] ${activeTab} tab already has data, skipping reload`
-          );
-          return;
-        }
-
-        console.log(`[ORDERS] Reloading ${activeTab} tab...`);
-
-        if (getToken()) {
-          // Map tab names to API status values
-          const status = activeTab === "new" ? "open" : "pending";
-          console.log(
-            `[ORDERS] Fetching ${status} orders for ${activeTab} tab`
-          );
-
-          try {
-            const newOrders = await fetchOrders(status);
-
-            setOrders((prev) => ({
-              ...prev,
-              [activeTab]: newOrders,
-            }));
-
-            console.log(
-              `[ORDERS] ✅ Reloaded ${newOrders.length} orders for ${activeTab} tab`
-            );
-          } catch (apiError) {
-            console.error(
-              `[ORDERS] API fetch failed for ${activeTab} tab, using cached data:`,
-              apiError
-            );
-            // Don't update orders if API fails, keep existing data
-          }
-        } else {
-          // Use empty data for the current tab if not authenticated
-          console.log(
-            `[ORDERS] Using empty data for ${activeTab} tab (not authenticated)`
-          );
-          setOrders((prev) => ({
-            ...prev,
-            [activeTab]: [],
-          }));
-        }
-      } catch (err) {
-        console.error(`[ORDERS] Error reloading ${activeTab} orders:`, err);
-      }
-    };
-
-    // Only reload if we don't have data for this tab
-    reloadCurrentTab();
-  }, [activeTab]);
-
-  // Function to update order status
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       console.log(`[ORDERS] Updating order ${orderId} status to ${newStatus}`);
@@ -239,7 +148,6 @@ const OrdersSection = ({ whatsappTheme }) => {
     console.log("status", status);
     const data = localStorage.getItem("whatsopify_token");
     const store = JSON.parse(data)?.data?.stores;
-
     const phoneNumber = order?.shipmentDetails?.addresses[0]?.phone;
     const customerName = order?.shipmentDetails?.addresses[0]?.name;
     const orderId = order?.name;
@@ -360,8 +268,12 @@ const OrdersSection = ({ whatsappTheme }) => {
                 ]);
 
                 setOrders({
-                  new: newOrders,
-                  pending: pendingOrders,
+                  new: newOrders.data,
+                  pending: pendingOrders.data,
+                  length: {
+                    new: newOrders.len,
+                    pending: pendingOrders.len,
+                  },
                 });
               } else {
                 console.log(
@@ -370,6 +282,10 @@ const OrdersSection = ({ whatsappTheme }) => {
                 setOrders({
                   new: [],
                   pending: [],
+                  length: {
+                    new: 0,
+                    pending: 0,
+                  },
                 });
               }
             } catch (err) {
@@ -460,7 +376,7 @@ const OrdersSection = ({ whatsappTheme }) => {
             transition: "all 0.3s ease",
           }}
         >
-          New Orders ({orders.new.length})
+          New Orders ({orders.length.new})
         </button>
         <button
           onClick={() => setActiveTab("pending")}
@@ -477,7 +393,7 @@ const OrdersSection = ({ whatsappTheme }) => {
             transition: "all 0.3s ease",
           }}
         >
-          Pending Orders ({orders.pending.length})
+          Pending Orders ({orders.length.pending})
         </button>
       </div>
 
@@ -636,7 +552,11 @@ const OrdersSection = ({ whatsappTheme }) => {
                         opacity: updatingOrder === order?._id ? 0.6 : 1,
                       }}
                     >
-                      {updatingOrder === order?._id ? "Updating..." : "Confirm"}
+                      {updatingOrder === order?._id
+                        ? "Updating..."
+                        : activeTab === "new"
+                        ? "Send"
+                        : "Confirm"}
                     </button>
                     {activeTab === "pending" && (
                       <div style={{ display: "flex", gap: "10px" }}>
