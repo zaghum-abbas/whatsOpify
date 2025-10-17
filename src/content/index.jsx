@@ -164,48 +164,7 @@ const renderSidebar = () => {
   }
 };
 
-// const getActiveChatDetails = async () => {
-//   let name = "";
-//   let phone = "";
-
-//   const nameSelectors = [
-//     "header span[title]",
-//     "header div[role='button'] span[dir='auto']",
-//     "header h2[title]",
-//   ];
-
-//   for (const selector of nameSelectors) {
-//     const element = document.querySelector(selector);
-//     if (element && element.textContent.trim().length > 0) {
-//       name = element.textContent.trim();
-//       element.click();
-//       break;
-//     }
-//   }
-
-//   if (!name) {
-//     console.warn("⚠️ Could not find name element!");
-//     return { name: "", phone: "" };
-//   }
-
-//   const getPhone = extractPhoneNumberFromDOM();
-//   console.log("✅ Extracted phone:", getPhone);
-
-//   const urlMatch = window.location.href.match(/\/(\d+)@/);
-//   console.log("🔍 urlMatch", urlMatch);
-
-//   if (urlMatch) {
-//     phone = "+" + urlMatch[1];
-//     console.log("📞 Found phone from URL:", phone);
-//   } else {
-//     console.log("⚠️ No phone found in URL, using name only");
-//   }
-
-//   // 📋 Return result without opening contact info panel
-//   const result = { name, phone };
-//   console.log("✅ Final extracted contact details:", result);
-//   return result;
-// };
+console.log("🔍 sidebarMode:", sidebarMode);
 
 const getActiveChatDetails = async () => {
   console.log("🔍 Starting contact extraction...");
@@ -224,17 +183,9 @@ const getActiveChatDetails = async () => {
   for (const selector of nameSelectors) {
     const element = document.querySelector(selector);
     if (element && element.textContent.trim().length > 0) {
-      name = element.textContent.trim();
-      nameElement = element;
-      console.log("📝 Found name:", name);
       element.click(); // open contact info
       break;
     }
-  }
-
-  if (!nameElement) {
-    console.warn("⚠️ Could not find name element!");
-    return { name: "", phone: "" };
   }
 
   await new Promise((resolve) => setTimeout(resolve, 300));
