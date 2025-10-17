@@ -178,8 +178,6 @@ const getActiveChatDetails = async () => {
     "header h2[title]",
   ];
 
-  let nameElement = null;
-
   for (const selector of nameSelectors) {
     const element = document.querySelector(selector);
     if (element && element.textContent.trim().length > 0) {
@@ -206,7 +204,7 @@ const getActiveChatDetails = async () => {
     } else {
       console.warn("⚠️ Could not find close div!");
     }
-  }, 1000);
+  }, 10);
   return result;
 };
 
@@ -1336,21 +1334,19 @@ function ensureMainContentMargin(applyToSecond = false) {
   const marginRight = isSidebarOpen ? "400px" : "0px";
 
   if (targetDiv) {
-    targetDiv.style.marginTop = "48px";
+    // targetDiv.style.marginTop = "48px";
+    targetDiv.style.paddingTop = "48px";
     targetDiv.style.marginRight = marginRight;
 
     const divIndex =
       applyToSecond && matchingDivs.length >= 2 ? "SECOND" : "FIRST";
-    console.log(
-      `✅ Applied margins to ${divIndex} div (top: 48px, right: ${marginRight}) - Sidebar ${
-        isSidebarOpen ? "OPEN" : "CLOSED"
-      }`
-    );
   }
 
   if (otherDiv) {
     otherDiv.style.marginTop = "0px";
     otherDiv.style.marginRight = "0px";
+    otherDiv.style.maxHeight = "calc(100vh - 48px)";
+    otherDiv.style.overflow = "hidden";
   }
 }
 
