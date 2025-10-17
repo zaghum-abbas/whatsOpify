@@ -25,7 +25,7 @@ const TopToolbar = (props) => {
   const [showModal, setShowModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [customTabs, setCustomTabs] = useState([]);
-  const [activeTabLabel, setActiveTabLabel] = useState("Inbox"); // default active tab
+  const [activeTabLabel, setActiveTabLabel] = useState("Inbox");
   const [isAuthenticated, setIsAuthenticated] = useAuthState();
   const [showThreeDotsPopup, setShowThreeDotsPopup] = useState(false);
   const threeDotsRef = useRef(null);

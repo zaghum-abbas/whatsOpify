@@ -150,6 +150,8 @@ const OrdersSection = ({ whatsappTheme }) => {
     const store = JSON.parse(data)?.data?.stores;
     const phoneNumber = order?.shipmentDetails?.addresses[0]?.phone;
     const customerName = order?.shipmentDetails?.addresses[0]?.name;
+    const city = order?.shipmentDetails?.addresses[0]?.city;
+    const orderDateTime = formatDate(order?.createdAt);
     const orderId = order?.name;
     const storeName = store?.find((s) => s._id === order?.storeId)?.name;
     const productName = order?.lineItems?.[0]?.name;
@@ -158,7 +160,7 @@ const OrdersSection = ({ whatsappTheme }) => {
 
     try {
       setUpdatingOrder(order?._id);
-      if (status !== "") {
+      if (status !== "resend") {
         await updateOrderStatus(order?._id, status);
       }
       if (activeTab === "new") {
@@ -183,30 +185,61 @@ const OrdersSection = ({ whatsappTheme }) => {
         .replace(/^0/, "92");
       if (cleanedNumber) {
         const message =
-          activeTab === "new"
-            ? `Hello ${customerName}, 👋
+          status === "pending"
+            ? `👋 Hello ${customerName},
+we’ve just received your order #${orderId} at ${storeName} 🛍️ placed at ${orderDateTime}, for ${city}
 
-    We've received your order ${orderId} at ${storeName}.
+🛒 𝐎𝐫𝐝𝐞𝐫 𝐃𝐞𝐭𝐚𝐢𝐥𝐬
+ ${order?.lineItems
+   ?.map((item) => `${item.name} - ${item.quantity}`)
+   .join("\n")}
 
-    🛒 Product: ${productName}
-    💰 Order Total: ${orderTotal}
 
-    Please reply with *YES* to confirm your order, or *NO* if you'd like to cancel/change it.
+💰 ${orderTotal}
 
-    Thank you for choosing us!
-    – ${storeName ?? ""} Team`
-            : `Hello ${customerName}, ⏰
+Please reply: ✅ YES to confirm your order, or
+❌ NO if you’d like to cancel or make any changes.
 
-    Your order ${orderId} at ${storeName} is still awaiting confirmation.
+Thanks for shopping with ${storeName} 💚
+— 𝐓𝐞𝐚𝐦 ${storeName}`
+            : status === "resend"
+            ? `⏰ Reminder for your order #${orderId}
+👋 Hello ${customerName},
 
-    🛒 Product: ${productName}
-    💰 Order Total: ${orderTotal}
+We’re still waiting for your confirmation for your order placed at ${storeName} 🛍️ on ${orderDateTime}, for ${city}.
 
-    Please reply with *YES* to confirm or *NO* to cancel/change.
-    We'll only process the order once we get your response.
+🧾 𝐎𝐫𝐝𝐞𝐫 𝐃𝐞𝐭𝐚𝐢𝐥𝐬
+ ${order?.lineItems
+   ?.map((item) => `${item.name} - ${item.quantity}`)
+   .join("\n")}
+💰 ${orderTotal}
 
-    Thank you!
-    – ${storeName ?? ""} Team`;
+Please reply:
+✅ YES to confirm your order, or
+❌ NO if you’d like to cancel or make any changes.
+
+If we don’t hear back soon, the order may be auto-cancelled to free up stock.
+
+💚 Thank you for shopping with ${storeName}!
+— 𝐓𝐞𝐚𝐦 ${storeName}`
+            : status === "confirm"
+            ? `🎉 Thank you for confirmation,  ${customerName},
+
+Our team will start processing it soon 🚚
+You’ll receive updates once it’s packed and dispatched. 😊
+
+💚 Thank you for confirming your order with ${storeName}!
+— 𝐓𝐞𝐚𝐦 ${storeName}`
+            : status === "cancel"
+            ? `❌ Order Cancelled
+
+Your order #${orderId} at ${storeName} 🛍️ has been cancelled as per your request on ${orderDateTime}.
+
+We’re sorry to see you cancel 😔 — if there’s anything we can improve or if you’d like to place a new order, just reply here.
+
+💚 Thank you for considering ${storeName}!
+— 𝐓𝐞𝐚𝐦 ${storeName}`
+            : "";
         chrome.runtime.sendMessage(
           {
             action: "SEND_WHATSAPP_MESSAGE",
@@ -561,7 +594,9 @@ const OrdersSection = ({ whatsappTheme }) => {
                     {activeTab === "pending" && (
                       <div style={{ display: "flex", gap: "10px" }}>
                         <button
-                          onClick={() => handleWhatsAppRedirect(order, "")}
+                          onClick={() =>
+                            handleWhatsAppRedirect(order, "resend")
+                          }
                           disabled={updatingOrder === order?._id}
                           style={{
                             padding: "6px 12px",
