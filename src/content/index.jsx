@@ -2441,3 +2441,74 @@ observer.observe(document.body, {
   childList: true,
   subtree: true,
 });
+
+// --- Listen for 401 unauthorized events from background script ---
+window.addEventListener("whatsopify-unauthorized", (event) => {
+  console.log("[CONTENT] Received unauthorized event:", event.detail);
+
+  // Clear all caches
+  window.clearProductsCache && window.clearProductsCache();
+  window.clearStoresCache && window.clearStoresCache();
+  if (typeof userInfoCache !== "undefined") userInfoCache = null;
+  if (typeof storesCache !== "undefined") storesCache = null;
+
+  // Close sidebar
+  window.toggleWhatsappSidebar(false);
+
+  // Show notification to user
+  if (event.detail && event.detail.message) {
+    console.warn("[CONTENT] Authentication expired:", event.detail.message);
+    showAuthExpiredNotification(event.detail.message);
+  }
+});
+
+// Function to show authentication expired notification
+function showAuthExpiredNotification(message) {
+  // Create notification element
+  const notification = document.createElement("div");
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #ff4444;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 10001;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    max-width: 300px;
+    animation: slideIn 0.3s ease-out;
+  `;
+
+  // Add CSS animation
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  notification.textContent = message;
+  document.body.appendChild(notification);
+
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    notification.style.animation = "slideOut 0.3s ease-in";
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 300);
+  }, 5000);
+}
+
+// Expose notification function globally
+window.showAuthExpiredNotification = showAuthExpiredNotification;

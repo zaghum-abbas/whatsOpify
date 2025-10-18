@@ -157,6 +157,48 @@ function handleSendWhatsAppMessage(request, sender, sendResponse) {
   return true; // Required for async sendResponse
 }
 
+// Handle 401 Unauthorized responses by clearing token and notifying content scripts
+function handleUnauthorizedResponse() {
+  console.log(
+    "[BG] Handling 401 Unauthorized - clearing token and logging out user"
+  );
+
+  // Clear the token from storage
+  chrome.storage.local.remove(["whatsopify_token"], () => {
+    console.log("[BG] Token cleared from storage");
+  });
+
+  // Clear localStorage token and notify content scripts
+  chrome.tabs.query({ url: "*://web.whatsapp.com/*" }, (tabs) => {
+    tabs.forEach((tab) => {
+      chrome.scripting
+        .executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            // Clear token from localStorage
+            localStorage.removeItem("whatsopify_token");
+
+            // Dispatch a custom event to notify content scripts
+            window.dispatchEvent(
+              new CustomEvent("whatsopify-unauthorized", {
+                detail: {
+                  message: "Authentication expired. Please log in again.",
+                },
+              })
+            );
+
+            console.log("[CONTENT] Token cleared due to 401 response");
+          },
+        })
+        .catch((error) => {
+          console.warn("[BG] Could not clear token in tab:", tab.id, error);
+        });
+    });
+  });
+
+  console.log("[BG] Successfully cleared token and notified content scripts");
+}
+
 // Main listener setup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
@@ -197,6 +239,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             "[BG] API response headers:",
             Object.fromEntries(response.headers.entries())
           );
+
+          // Check for 401 Unauthorized status
+          if (response.status === 401) {
+            console.warn("[BG] 401 Unauthorized - Token expired or invalid");
+            handleUnauthorizedResponse();
+            return response.text().then((text) => {
+              throw new Error("Authentication required. Please log in again.");
+            });
+          }
 
           if (!response.ok) {
             return response.text().then((text) => {
@@ -255,6 +306,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             "[BG] Orders API response headers:",
             Object.fromEntries(response.headers.entries())
           );
+
+          // Check for 401 Unauthorized status
+          if (response.status === 401) {
+            console.warn("[BG] 401 Unauthorized - Token expired or invalid");
+            handleUnauthorizedResponse();
+            return response.text().then((text) => {
+              throw new Error("Authentication required. Please log in again.");
+            });
+          }
 
           if (!response.ok) {
             return response.text().then((text) => {
@@ -335,6 +395,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             Object.fromEntries(response.headers.entries())
           );
 
+          // Check for 401 Unauthorized status
+          if (response.status === 401) {
+            console.warn("[BG] 401 Unauthorized - Token expired or invalid");
+            handleUnauthorizedResponse();
+            return response.text().then((text) => {
+              throw new Error("Authentication required. Please log in again.");
+            });
+          }
+
           if (!response.ok) {
             return response.text().then((text) => {
               console.error("[BG] Update API error response:", text);
@@ -405,6 +474,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             "[BG] Search API response headers:",
             Object.fromEntries(response.headers.entries())
           );
+
+          // Check for 401 Unauthorized status
+          if (response.status === 401) {
+            console.warn("[BG] 401 Unauthorized - Token expired or invalid");
+            handleUnauthorizedResponse();
+            return response.text().then((text) => {
+              throw new Error("Authentication required. Please log in again.");
+            });
+          }
 
           if (!response.ok) {
             return response.text().then((text) => {
