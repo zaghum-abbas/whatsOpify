@@ -261,7 +261,15 @@ const InjectedSidebarButtons = ({ onToggleSidebar }) => {
 
   const sideBarOpen = () => {
     if (!requireAuth(setShowLoginModal)) return;
-    onToggleSidebar();
+
+    // Check if store is selected before toggling sidebar
+    if (typeof window.requireStoreSelection === "function") {
+      window.requireStoreSelection(() => {
+        onToggleSidebar();
+      });
+    } else {
+      onToggleSidebar();
+    }
   };
 
   return (

@@ -20,6 +20,20 @@ import {
 
 console.log("🚀 Whatsapofy content script loaded at 12:30 PM PKT, 17/07/2025");
 
+// Utility function to get selected store ID
+function getSelectedStoreId() {
+  const selectedStore = localStorage.getItem("whatsopify_selected_store");
+  if (selectedStore) {
+    try {
+      const store = JSON.parse(selectedStore);
+      return store._id;
+    } catch (err) {
+      console.warn("[STORE] Error parsing selected store:", err);
+    }
+  }
+  return "default";
+}
+
 // --- Global State Variables ---
 // Initialize caches to null to indicate data hasn't been fetched yet
 let productsCache = null;
@@ -363,11 +377,7 @@ async function fetchStoresForUser() {
 
           // Set the active store ID globally
           if (storesCache.length > 0) {
-            window.whatsapofyProducts.storeId =
-              storesCache[0]._id ||
-              storesCache[0].id ||
-              storesCache[0].storeId ||
-              storesCache[0].store_id;
+            window.whatsapofyProducts.storeId = storesCache[0]._id;
             console.log(
               "[STORES] Global active store ID set from localStorage:",
               window.whatsapofyProducts.storeId
@@ -388,9 +398,39 @@ async function fetchStoresForUser() {
       "[STORES] No stores in localStorage, fetching via background script..."
     );
 
+    // Get token for API call
+    let token = null;
+    try {
+      const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
+      if (whatsopifyTokenRaw) {
+        const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
+        if (
+          whatsopifyTokenObj &&
+          whatsopifyTokenObj.data &&
+          whatsopifyTokenObj.data.token
+        ) {
+          token = whatsopifyTokenObj.data.token;
+        } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
+          token = whatsopifyTokenObj.token;
+        }
+      }
+    } catch (err) {
+      console.warn("[STORES] Error extracting token:", err);
+    }
+
+    if (!token) {
+      console.warn("[STORES] No token found, cannot fetch stores.");
+      storesCache = [];
+      storesLoading = false;
+      storesListeners.forEach((fn) => fn(storesCache));
+      storesListeners = [];
+      return;
+    }
+
     // Use background script for API call with token authentication
     const response = await chrome.runtime.sendMessage({
       action: "FETCH_STORES",
+      token: token,
     });
 
     if (response.success) {
@@ -413,11 +453,7 @@ async function fetchStoresForUser() {
 
       // Set the active store ID globally
       if (storesCache.length > 0) {
-        window.whatsapofyProducts.storeId =
-          storesCache[0]._id ||
-          storesCache[0].id ||
-          storesCache[0].storeId ||
-          storesCache[0].store_id;
+        window.whatsapofyProducts.storeId = storesCache[0]._id;
         console.log(
           "[STORES] Global active store ID set:",
           window.whatsapofyProducts.storeId
@@ -481,6 +517,7 @@ async function fetchProductsFromAPI() {
     const response = await chrome.runtime.sendMessage({
       action: "FETCH_PRODUCTS",
       token: getToken(),
+      storeId: getSelectedStoreId(),
     });
 
     console.log("[PRODUCTS] 🔍 Full API response:", response);
@@ -958,6 +995,14 @@ window.toggleWhatsappSidebar = async (open) => {
     return;
   }
 
+  // If trying to open sidebar, check if store is selected
+  if (open) {
+    const storeSelected = window.requireStoreSelection();
+    if (!storeSelected) {
+      return; // Store selection modal will be shown
+    }
+  }
+
   isSidebarOpen = typeof open === "boolean" ? open : !isSidebarOpen;
   console.log(`Toggling sidebar: ${isSidebarOpen ? "Open" : "Closed"}`);
 
@@ -1187,15 +1232,22 @@ function injectTopToolbarIntoWhatsAppBody() {
       // Add padding to main content to account for toolbar height
       // whatsappMainBodyContainer.style.paddingTop = TOOLBAR_HEIGHT;
 
-      // Initialize sidebar state to open by default only if user is logged in
+      // Initialize sidebar state - don't open automatically, wait for store selection
       const token = localStorage.getItem("whatsopify_token");
+      const selectedStore = localStorage.getItem("whatsopify_selected_store");
       const isLoggedIn = token && token !== "null" && token !== '""';
+      const hasSelectedStore =
+        selectedStore && selectedStore !== "null" && selectedStore !== '""';
 
-      if (isLoggedIn) {
+      if (isLoggedIn && hasSelectedStore) {
         window.toggleWhatsappSidebar(true);
-        console.log("✅ User is logged in - opening sidebar by default");
+        console.log(
+          "✅ User is logged in and has selected store - opening sidebar"
+        );
       } else {
-        console.log("ℹ️ User not logged in - sidebar will remain closed");
+        console.log(
+          "ℹ️ Sidebar will remain closed until user logs in and selects a store"
+        );
       }
     }
   );
@@ -2050,8 +2102,9 @@ window.debugTokenIssue = function () {
 };
 
 // --- Initial Data Fetches (run once when script loads) ---
-fetchUserInfo(); // Start fetching user info
-fetchStoresForUser(); // Start fetching stores
+// Note: API calls are now triggered only after store selection, not immediately after login
+// fetchUserInfo(); // Moved to store selection
+// fetchStoresForUser(); // Moved to store selection
 // Products fetch will be triggered by getProducts when needed (e.g., by sidebar or modal)
 
 // --- Global Order Form Control ---
@@ -2512,3 +2565,79 @@ function showAuthExpiredNotification(message) {
 
 // Expose notification function globally
 window.showAuthExpiredNotification = showAuthExpiredNotification;
+
+// Global function to check if store is selected and show modal if not
+window.requireStoreSelection = function (callback) {
+  const selectedStore = localStorage.getItem("whatsopify_selected_store");
+  const hasSelectedStore =
+    selectedStore && selectedStore !== "null" && selectedStore !== '""';
+
+  if (!hasSelectedStore) {
+    console.log("⚠️ Store selection required - showing store selection modal");
+    // Dispatch event to show store selection modal
+    window.dispatchEvent(new CustomEvent("showStoreSelectionModal"));
+    return false;
+  }
+
+  // If callback provided and store is selected, execute it
+  if (callback && typeof callback === "function") {
+    callback();
+  }
+
+  return true;
+};
+
+// Global function to refresh orders (for store selection)
+window.refreshOrders = function (callback) {
+  console.log("[ORDERS] Global refresh orders called");
+
+  // Get selected store ID
+  const selectedStore = localStorage.getItem("whatsopify_selected_store");
+  let storeId = "default";
+  if (selectedStore) {
+    try {
+      const store = JSON.parse(selectedStore);
+      storeId =
+        store._id || store.id || store.storeId || store.store_id || "default";
+    } catch (err) {
+      console.warn("[ORDERS] Error parsing selected store:", err);
+    }
+  }
+
+  // Fetch both new and pending orders
+  Promise.all([
+    chrome.runtime.sendMessage({
+      action: "FETCH_ORDERS",
+      token: getToken(),
+      status: "open",
+      page: 1,
+      limit: 50,
+      storeId: storeId,
+    }),
+    chrome.runtime.sendMessage({
+      action: "FETCH_ORDERS",
+      token: getToken(),
+      status: "pending",
+      page: 1,
+      limit: 50,
+      storeId: storeId,
+    }),
+  ])
+    .then(([newOrdersResponse, pendingOrdersResponse]) => {
+      console.log("[ORDERS] Orders refreshed for store:", storeId);
+      if (callback) {
+        callback({
+          new: newOrdersResponse.success ? newOrdersResponse.orders : null,
+          pending: pendingOrdersResponse.success
+            ? pendingOrdersResponse.orders
+            : null,
+        });
+      }
+    })
+    .catch((error) => {
+      console.error("[ORDERS] Error refreshing orders:", error);
+      if (callback) {
+        callback(null);
+      }
+    });
+};

@@ -1,7 +1,9 @@
 function handleCreateOrder(request, sender, sendResponse) {
   console.log("[BG] Order request received:", request);
 
-  const orderApiUrl = "https://api.shopilam.com/api/v1/orders";
+  // Get store ID from request or use default
+  const createStoreId = request.storeId || "default";
+  const orderApiUrl = `https://api.shopilam.com/api/v1/orders?store_id=${createStoreId}`;
 
   const headersToSend = {
     "Content-Type": "application/json",
@@ -9,10 +11,16 @@ function handleCreateOrder(request, sender, sendResponse) {
     Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InNlbGxlckBnbWFpbC5jb20iLCJleHAiOjE3NTk0NDQ2NzV9.xXgJ-4zSawsKJ7QM4bX6yVXKws9krNQGPB0UAFcDuwA`,
   };
 
+  // Add store ID to the request data
+  const orderData = {
+    ...request.data,
+    store_id: createStoreId,
+  };
+
   fetch(orderApiUrl, {
     method: "POST",
     headers: headersToSend,
-    body: JSON.stringify(request.data),
+    body: JSON.stringify(orderData),
   })
     .then((response) => {
       // Always parse JSON first to get the data, even if response.ok is false
@@ -177,6 +185,7 @@ function handleUnauthorizedResponse() {
           func: () => {
             // Clear token from localStorage
             localStorage.removeItem("whatsopify_token");
+            localStorage.removeItem("whatsopify_selected_store");
 
             // Dispatch a custom event to notify content scripts
             window.dispatchEvent(
@@ -222,8 +231,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return false;
       }
 
-      const productsApiUrl =
-        "https://api.shopilam.com/api/v1/products?limit=3&page=1&status=active";
+      // Get store ID from request or use default
+      const storeId = request.storeId;
+      const productsApiUrl = `https://api.shopilam.com/api/v1/products?limit=3&page=1&status=active&store=${storeId}`;
 
       const productsHeaders = {
         Authorization: `Bearer ${token}`,
@@ -289,7 +299,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return false;
       }
 
-      const ordersApiUrl = `https://api.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}`;
+      // Get store ID from request or use default
+      const ordersStoreId = request.storeId;
+      const ordersApiUrl = `https://api.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}&store=${ordersStoreId}`;
 
       const ordersHeaders = {
         "Content-Type": "application/json",
@@ -377,6 +389,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       const updatePayload = {
         status: newStatus,
+        // store_id: updateStoreId,
       };
 
       console.log("[BG] Making PUT request to:", updateApiUrl);
@@ -424,6 +437,75 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       return true;
 
+    case "FETCH_STORES":
+      const storesToken = request.token;
+      console.log(
+        "[BG] FETCH_STORES request received, token:",
+        storesToken ? storesToken.substring(0, 20) + "..." : "undefined"
+      );
+
+      if (!storesToken) {
+        console.error("[BG] No token provided in FETCH_STORES request");
+        sendResponse({
+          success: false,
+          error: "No authentication token provided",
+        });
+        return false;
+      }
+
+      const storesApiUrl = "https://api.shopilam.com/api/v1/stores/";
+      const storesHeaders = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${storesToken}`,
+      };
+
+      fetch(storesApiUrl, {
+        method: "GET",
+        headers: storesHeaders,
+      })
+        .then((response) => {
+          console.log("[BG] Stores API response status:", response.status);
+          console.log(
+            "[BG] Stores API response headers:",
+            Object.fromEntries(response.headers.entries())
+          );
+
+          // Check for 401 Unauthorized status
+          if (response.status === 401) {
+            console.warn("[BG] 401 Unauthorized - Token expired or invalid");
+            handleUnauthorizedResponse();
+            return response.text().then((text) => {
+              throw new Error("Authentication required. Please log in again.");
+            });
+          }
+
+          if (!response.ok) {
+            return response.text().then((text) => {
+              console.error("[BG] Stores API error response:", text);
+              throw new Error(
+                `HTTP error! status: ${response.status}, message: ${text}`
+              );
+            });
+          }
+          return response.json();
+        })
+        .then((storesData) => {
+          console.log("[BG] Stores API success response:", storesData);
+          console.log(
+            "[BG] Stores count:",
+            Array.isArray(storesData?.data)
+              ? storesData?.data?.length
+              : "Not an array",
+            storesData
+          );
+          sendResponse({ success: true, stores: storesData });
+        })
+        .catch((error) => {
+          console.error("[BG] Stores fetch error:", error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true;
+
     case "SEARCH_PRODUCTS":
       const searchToken = request.token;
       const {
@@ -454,7 +536,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           ? `search=${encodeURIComponent(searchTerm.trim())}&`
           : "";
 
-      const searchApiUrl = `https://api.shopilam.com/api/v1/products?${searchQuery}limit=${searchLimit}&page=${searchPage}&status=active`;
+      // Get store ID from request or use default
+      const searchStoreId = request.storeId;
+      const searchApiUrl = `https://api.shopilam.com/api/v1/products?${searchQuery}limit=${searchLimit}&page=${searchPage}&status=active&store=${searchStoreId}`;
 
       const searchHeaders = {
         "Content-Type": "application/json",

@@ -262,7 +262,7 @@ class DataService {
         vendor: product.vendor || "",
         category: product.category || "",
         description: product.description || "",
-        storeId: product.storeId || product.store_id,
+        storeId: product.storeId,
         variants: Array.isArray(product.variants) ? product.variants : [],
         price:
           product.price ||

@@ -44,12 +44,16 @@ const OrdersSection = ({ whatsappTheme }) => {
       setLoading(true);
       setError(null);
 
+      const selectedStore = JSON.parse(
+        localStorage.getItem("whatsopify_selected_store")
+      );
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_ORDERS",
         token: getToken(),
         status: status,
         page: page,
         limit: limit,
+        storeId: selectedStore?._id,
       });
 
       if (response.success) {
@@ -71,11 +75,7 @@ const OrdersSection = ({ whatsappTheme }) => {
     const loadOrders = async () => {
       try {
         console.log("[ORDERS] Loading orders...");
-        console.log("[ORDERS] Authentication check:", getToken());
-
         if (getToken()) {
-          console.log("[ORDERS] Fetching real orders from API...");
-
           const [newOrders, pendingOrders] = await Promise.all([
             fetchOrders("open"),
             fetchOrders("pending"),
@@ -91,10 +91,8 @@ const OrdersSection = ({ whatsappTheme }) => {
           });
 
           console.log(
-            `[ORDERS] ✅ Loaded ${newOrders} new orders and ${pendingOrders} pending orders`
+            `[ORDERS] ✅ Loaded ${newOrders.len} new and ${pendingOrders.len} pending orders`
           );
-        } else {
-          console.log("[ORDERS] Using dummy orders data (not authenticated)");
         }
       } catch (err) {
         console.error("[ORDERS] Error loading orders:", err);
@@ -102,8 +100,22 @@ const OrdersSection = ({ whatsappTheme }) => {
       }
     };
 
+    // initial load
     loadOrders();
-  }, []);
+
+    // handle store change
+    const handleStoreChange = () => {
+      console.log("[ORDERS] Store changed — reloading orders...");
+      loadOrders();
+    };
+
+    window.addEventListener("storeChanged", handleStoreChange);
+
+    // cleanup on unmount
+    return () => {
+      window.removeEventListener("storeChanged", handleStoreChange);
+    };
+  }, []); // 👈 single effect for both mount + store change
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
@@ -121,11 +133,29 @@ const OrdersSection = ({ whatsappTheme }) => {
         throw new Error("Invalid authentication token");
       }
 
+      // Get selected store ID
+      const selectedStore = localStorage.getItem("whatsopify_selected_store");
+      let storeId = "default";
+      if (selectedStore) {
+        try {
+          const store = JSON.parse(selectedStore);
+          storeId =
+            store._id ||
+            store.id ||
+            store.storeId ||
+            store.store_id ||
+            "default";
+        } catch (err) {
+          console.warn("[ORDERS] Error parsing selected store:", err);
+        }
+      }
+
       const response = await chrome.runtime.sendMessage({
         action: "UPDATE_ORDER_STATUS",
         token: token,
         orderId: orderId,
         newStatus: newStatus,
+        storeId: storeId,
       });
 
       console.log(`[ORDERS] Update status response:`, response);
