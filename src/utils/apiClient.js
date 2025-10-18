@@ -148,7 +148,8 @@ export const productsApi = {
    * @returns {Promise} - Promise that resolves with products data
    */
   fetchProducts: () => {
-    const url = `https://api.shopilam.com/api/v1/products?limit=50&page=1&status=active`;
+    const url =
+      "https://api1.shopilam.com/api/v1/products?limit=50&page=1&status=active";
     return apiGet(url);
   },
 };

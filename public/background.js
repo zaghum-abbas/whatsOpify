@@ -216,12 +216,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case "SEND_WHATSAPP_MESSAGE":
       return handleSendWhatsAppMessage(request, sender, sendResponse);
     case "FETCH_PRODUCTS":
-      const token = request.token;
-      console.log(
-        "[BG] FETCH_PRODUCTS request received, token:",
-        token ? token.substring(0, 20) + "..." : "undefined"
-      );
-
       if (!token) {
         console.error("[BG] No token provided in FETCH_PRODUCTS request");
         sendResponse({
