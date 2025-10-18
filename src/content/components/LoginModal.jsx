@@ -132,6 +132,7 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
   const handleStoreSelectionClose = () => {
     setShowStoreSelection(false);
+    onClose();
     // Don't close the login modal, let user try again
   };
 

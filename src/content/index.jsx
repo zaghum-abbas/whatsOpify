@@ -870,12 +870,9 @@ function observeActiveChat() {
         setTimeout(async () => {
           console.log("🔄 Extracting contact details for selected chat...");
           const contact = await getActiveChatDetails();
-          console.log("📋 Contact extraction result:", contact);
-          console.log("📋 Contact has name:", !!contact?.name);
-          console.log("📋 Contact has phone:", !!contact?.phone);
 
           // Check if we have a valid contact (not null and has some data)
-          if (contact && (contact.name || contact.phone || contact.about)) {
+          if (contact) {
             // Always update sidebar with fresh contact info - even without phone number
             lastActiveChatId = contact.name || "unknown";
             sidebarProps.contact = contact;

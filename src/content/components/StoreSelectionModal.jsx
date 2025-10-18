@@ -104,6 +104,7 @@ const StoreSelectionModal = ({ isOpen, onStoreSelect, onClose }) => {
 
       if (selectedStore) {
         handleConfirmSelection(selectedStore, selectedStoreId);
+        onClose();
       }
     }
   };
