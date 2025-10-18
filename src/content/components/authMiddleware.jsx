@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-export const TOKEN_KEY = 'whatsopify_token';
+import React, { createContext, useContext, useState, useEffect } from "react";
+export const TOKEN_KEY = "whatsopify_token";
 
 // Middleware for protected actions
 export function requireAuth(setShowLoginModal) {
   const token = localStorage.getItem(TOKEN_KEY);
   if (!token) {
-    if (typeof setShowLoginModal === 'function') setShowLoginModal(true);
+    if (typeof setShowLoginModal === "function") setShowLoginModal(true);
     return false;
   }
   return true;
@@ -13,7 +13,9 @@ export function requireAuth(setShowLoginModal) {
 
 // React hook for auth state
 export function useAuthState() {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem(TOKEN_KEY));
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    !!localStorage.getItem(TOKEN_KEY)
+  );
 
   useEffect(() => {
     const checkAuth = () => {
@@ -21,13 +23,15 @@ export function useAuthState() {
       setIsAuthenticated(!!token);
     };
     checkAuth();
-    const handleStorageChange = (event) => handleAuthStorage(event, setIsAuthenticated);
-    const handleMessage = (event) => handleAuthMessage(event, setIsAuthenticated);
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('message', handleMessage);
+    const handleStorageChange = (event) =>
+      handleAuthStorage(event, setIsAuthenticated);
+    const handleMessage = (event) =>
+      handleAuthMessage(event, setIsAuthenticated);
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("message", handleMessage);
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('message', handleMessage);
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("message", handleMessage);
     };
   }, []);
 
@@ -62,7 +66,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
+    const keysToRemove = [TOKEN_KEY, "whatsopify_selected_store"];
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+
     setIsAuthenticated(false);
   };
 

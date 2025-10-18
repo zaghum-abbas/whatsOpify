@@ -1,10 +1,12 @@
 import React, { useState } from "react";
+import StoreSelectionModal from "./StoreSelectionModal";
 
 const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showStoreSelection, setShowStoreSelection] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,7 +20,7 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
       };
 
       const response = await fetch(
-        "https://api1.shopilam.com/api/v1/auth/signin",
+        `${import.meta.env.VITE_API_URL}/v1/auth/signin`,
         {
           method: "POST",
           headers: {
@@ -33,25 +35,64 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
       if (response.ok) {
         const responseData = await response.json();
-
-        // Save the entire response data structure
         localStorage.setItem("whatsopify_token", JSON.stringify(responseData));
-
-        // Force storage event for all listeners (including same tab)
         window.dispatchEvent(
           new StorageEvent("storage", {
             key: "whatsopify_token",
-            newValue: responseData?.data,
+            newValue: responseData,
           })
         );
 
-        // Call success callback
-        if (onLoginSuccess) {
-          onLoginSuccess();
-        }
+        // Check if user has stores and show store selection modal
+        const hasStores =
+          responseData?.data?.stores &&
+          Array.isArray(responseData.data.stores) &&
+          responseData.data.stores.length > 0;
 
-        // Close modal
-        onClose();
+        if (hasStores) {
+          // If only one store, auto-select it
+          if (responseData.data.stores.length === 1) {
+            const singleStore = responseData.data.stores[0];
+            const storeId = singleStore._id;
+
+            // Save selected store to localStorage
+            localStorage.setItem(
+              "whatsopify_selected_store",
+              JSON.stringify(singleStore)
+            );
+
+            // Update global store ID
+            window.whatsapofyProducts.storeId = storeId;
+
+            // Dispatch store change event to notify other components (this will trigger API calls)
+            window.dispatchEvent(
+              new CustomEvent("storeChanged", {
+                detail: { storeId, store: singleStore },
+              })
+            );
+
+            // Open sidebar after store selection
+            if (typeof window.toggleWhatsappSidebar === "function") {
+              window.toggleWhatsappSidebar(true);
+              console.log("[LOGIN] Sidebar opened after store auto-selection");
+            }
+
+            // Proceed with login
+            if (onLoginSuccess) {
+              onLoginSuccess();
+            }
+            onClose();
+          } else {
+            // Multiple stores, show store selection modal
+            setShowStoreSelection(true);
+          }
+        } else {
+          // No stores available, proceed with login
+          if (onLoginSuccess) {
+            onLoginSuccess();
+          }
+          onClose();
+        }
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.log("❌ Login failed:", response.status, errorData);
@@ -77,6 +118,21 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStoreSelect = (selectedStore) => {
+    console.log("Store selected:", selectedStore);
+    setShowStoreSelection(false);
+
+    if (onLoginSuccess) {
+      onLoginSuccess();
+    }
+    onClose();
+  };
+
+  const handleStoreSelectionClose = () => {
+    setShowStoreSelection(false);
+    // Don't close the login modal, let user try again
   };
 
   if (!isOpen) return null;
@@ -216,6 +272,13 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
           </button>
         </form>
       </div>
+
+      {/* Store Selection Modal */}
+      <StoreSelectionModal
+        isOpen={showStoreSelection}
+        onStoreSelect={handleStoreSelect}
+        onClose={handleStoreSelectionClose}
+      />
     </div>
   );
 };

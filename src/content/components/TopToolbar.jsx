@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { FaBell, FaCog } from "react-icons/fa";
 import CreateCustomTabModal from "./CreateCustomTabModal";
 import LoginModal from "./LoginModal";
+import StoreSelectionModal from "./StoreSelectionModal";
 import ThreeDotsPopup from "./ThreeDotsPopup";
 import {
   requireAuth,
@@ -10,6 +11,7 @@ import {
   handleAuthMessage,
   handleAuthStorage,
 } from "./authMiddleware.jsx";
+import { useTheme } from "../../hooks/useTheme.js";
 
 const SELECTORS = {
   Inbox: 'button#all-filter[role="tab"]',
@@ -19,10 +21,13 @@ const SELECTORS = {
 };
 
 const TopToolbar = (props) => {
+  const theme = useTheme();
+  console.log("@@theme", theme);
   const [showModal, setShowModal] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showStoreSelectionModal, setShowStoreSelectionModal] = useState(false);
   const [customTabs, setCustomTabs] = useState([]);
-  const [activeTabLabel, setActiveTabLabel] = useState("Inbox"); // default active tab
+  const [activeTabLabel, setActiveTabLabel] = useState("Inbox");
   const [isAuthenticated, setIsAuthenticated] = useAuthState();
   const [showThreeDotsPopup, setShowThreeDotsPopup] = useState(false);
   const threeDotsRef = useRef(null);
@@ -34,8 +39,23 @@ const TopToolbar = (props) => {
     }
   }, [props]);
 
+  // Listen for store selection modal events
   useEffect(() => {
-    console.log("📌 TopToolbar mounted on WhatsApp Web");
+    const handleShowStoreSelectionModal = () => {
+      setShowStoreSelectionModal(true);
+    };
+
+    window.addEventListener(
+      "showStoreSelectionModal",
+      handleShowStoreSelectionModal
+    );
+
+    return () => {
+      window.removeEventListener(
+        "showStoreSelectionModal",
+        handleShowStoreSelectionModal
+      );
+    };
   }, []);
 
   const clickWhatsAppFilterButton = useCallback(async (label) => {
@@ -66,23 +86,85 @@ const TopToolbar = (props) => {
     if (label === "Add") {
       setShowModal(true);
     } else if (label === "CreateOrder") {
-      // Trigger order form in sidebar
-      if (typeof window.showOrderForm === "function") {
-        window.showOrderForm(true);
-      }
-      // Ensure sidebar is open
-      if (typeof window.toggleWhatsappSidebar === "function") {
-        window.toggleWhatsappSidebar(true);
+      // Check if store is selected before proceeding
+      if (typeof window.requireStoreSelection === "function") {
+        window.requireStoreSelection(() => {
+          // Get current contact info if in chat mode
+          const currentContact =
+            typeof window.getCurrentSidebarMode === "function" &&
+            window.getCurrentSidebarMode() === "chat" &&
+            window.sidebarProps?.contact
+              ? window.sidebarProps.contact
+              : { name: "", phone: "" };
+
+          // Switch to order form sidebar mode
+          if (typeof window.switchToOrderFormSidebar === "function") {
+            window.switchToOrderFormSidebar(currentContact);
+          }
+
+          // Ensure sidebar is open
+          if (typeof window.toggleWhatsappSidebar === "function") {
+            window.toggleWhatsappSidebar(true);
+          }
+
+          console.log("✅ Switched to Order Form Sidebar");
+        });
       }
     } else if (label === "Orders") {
-      // Open orders section in sidebar
-      if (typeof window.showOrdersSection === "function") {
-        window.showOrdersSection();
+      // Check if store is selected before proceeding
+      if (typeof window.requireStoreSelection === "function") {
+        window.requireStoreSelection(() => {
+          // Switch to default sidebar mode for orders
+          if (typeof window.switchToDefaultSidebar === "function") {
+            window.switchToDefaultSidebar();
+          }
+          // Open orders section in sidebar
+          if (typeof window.showOrdersSection === "function") {
+            window.showOrdersSection();
+          }
+          // Ensure sidebar is open
+          if (typeof window.toggleWhatsappSidebar === "function") {
+            window.toggleWhatsappSidebar(true);
+          }
+        });
       }
-      // Ensure sidebar is open
-      if (typeof window.toggleWhatsappSidebar === "function") {
-        window.toggleWhatsappSidebar(true);
-      }
+
+      // Smooth scroll to the orders section in sidebar
+      setTimeout(() => {
+        const sidebarContainer = document.getElementById(
+          "whatsapp-sidebar-root"
+        );
+        if (sidebarContainer) {
+          // Find the orders section within the sidebar
+          const ordersSection = Array.from(
+            sidebarContainer.querySelectorAll("section")
+          ).find((section) => {
+            const h2 = section.querySelector("h2");
+            return h2 && h2.textContent.includes("Orders");
+          });
+
+          if (ordersSection) {
+            // Scroll to the orders section with smooth behavior
+            ordersSection.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+              inline: "nearest",
+            });
+            console.log("✅ Smooth scrolled to Orders section");
+          } else {
+            // Fallback: scroll to top of sidebar if orders section not found
+            sidebarContainer.scrollTo({
+              top: 0,
+              behavior: "smooth",
+            });
+            console.log(
+              "⚠️ Orders section not found, scrolled to top of sidebar"
+            );
+          }
+        } else {
+          console.warn("⚠️ Sidebar container not found for scrolling");
+        }
+      }, 500); // Wait for sidebar to render
     } else {
       setActiveTabLabel(label); // update active tab
       await clickWhatsAppFilterButton(label);
@@ -134,7 +216,8 @@ const TopToolbar = (props) => {
   };
 
   const handleToolbarLogout = () => {
-    localStorage.removeItem(TOKEN_KEY);
+    const keysToRemove = [TOKEN_KEY, "whatsopify_selected_store"];
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
     setIsAuthenticated(false);
     if (typeof window.toggleWhatsappSidebar === "function") {
       window.toggleWhatsappSidebar(false);
@@ -155,6 +238,19 @@ const TopToolbar = (props) => {
     setShowThreeDotsPopup(false);
   };
 
+  const handleSwitchStoreClick = () => {
+    setShowStoreSelectionModal(true);
+  };
+
+  const handleStoreSelect = (selectedStore) => {
+    console.log("Store selected:", selectedStore);
+    setShowStoreSelectionModal(false);
+  };
+
+  const handleStoreSelectionClose = () => {
+    setShowStoreSelectionModal(false);
+  };
+
   return (
     <div
       style={{
@@ -166,12 +262,12 @@ const TopToolbar = (props) => {
         paddingLeft: "1rem",
         paddingRight: "1rem",
         boxSizing: "border-box",
-        backgroundColor: "white",
+        backgroundColor: theme === "dark" ? "#18191a" : "white",
+        color: theme === "dark" ? "white" : "#18191a",
         zIndex: 10000,
         position: "relative",
       }}
     >
-      {/* Left side: Buttons */}
       <div
         style={{
           display: "flex",
@@ -345,6 +441,13 @@ const TopToolbar = (props) => {
         onLoginSuccess={handleLoginSuccess}
       />
 
+      {/* Store Selection Modal */}
+      <StoreSelectionModal
+        isOpen={showStoreSelectionModal}
+        onStoreSelect={handleStoreSelect}
+        onClose={handleStoreSelectionClose}
+      />
+
       {/* Three Dots Popup */}
       {showThreeDotsPopup && threeDotsRef.current && (
         <ThreeDotsPopup
@@ -361,6 +464,7 @@ const TopToolbar = (props) => {
           onSettingsClick={() => handleClick("Settings")}
           onLogoutClick={handleToolbarLogout}
           onLoginClick={() => setShowLoginModal(true)}
+          onSwitchStoreClick={handleSwitchStoreClick}
         />
       )}
     </div>

@@ -6,22 +6,33 @@ import TopToolbar from "./components/TopToolbar";
 import ChatHeaderHover from "./components/ChatHeaderHover";
 import ChatListEnhancer from "./components/ChatListEnhancer";
 import InjectedSidebarContent from "./components/InjectedSidebarContent";
+import DefaultSidebar from "./components/DefaultSidebar";
+import ChatSidebar from "./components/ChatSidebar";
+import OrderFormSidebar from "./components/OrderFormSidebar";
 import "./App.css"; // Your main CSS file
 
 import { requireAuth, useAuthState } from "./components/authMiddleware.jsx";
 import LoginModal from "./components/LoginModal";
 import {
-  debugSessionAuth,
-  testCookieDomains,
-  checkMainDomainCookies,
-} from "../utils/debugSession.js";
+  extractPhoneNumberFromDOM,
+  getToken,
+} from "../core/utils/helperFunctions.js";
 
 console.log("🚀 Whatsapofy content script loaded at 12:30 PM PKT, 17/07/2025");
 
-// Global debug functions for session authentication
-window.debugSessionAuth = debugSessionAuth;
-window.testCookieDomains = testCookieDomains;
-window.checkMainDomainCookies = checkMainDomainCookies;
+// Utility function to get selected store ID
+function getSelectedStoreId() {
+  const selectedStore = localStorage.getItem("whatsopify_selected_store");
+  if (selectedStore) {
+    try {
+      const store = JSON.parse(selectedStore);
+      return store._id;
+    } catch (err) {
+      console.warn("[STORE] Error parsing selected store:", err);
+    }
+  }
+  return "default";
+}
 
 // --- Global State Variables ---
 // Initialize caches to null to indicate data hasn't been fetched yet
@@ -90,10 +101,33 @@ function waitForElement(selector, callback) {
 const TOOLBAR_HEIGHT = "48px"; // Assuming your TopToolbar has this height
 const SIDEBAR_WIDTH = "400px"; // Define sidebar width once
 
+// Import theme colors helper from your existing hook
+import { getThemeColors } from "../hooks/useTheme";
+
+function getWhatsAppTheme() {
+  const isDark =
+    document.body.classList.contains("dark") ||
+    document.querySelector('html[data-theme="dark"]') ||
+    (localStorage.getItem("theme") &&
+      JSON.parse(localStorage.getItem("theme")) === "dark") ||
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+  const theme = isDark ? "dark" : "light";
+  const colors = getThemeColors(theme);
+
+  return {
+    isDark,
+    theme,
+    sidebarBg: colors.sidebar,
+    sidebarShadow: colors.sidebarShadow,
+  };
+}
+
 // --- Sidebar Control State (GLOBAL to this content script) ---
 let isSidebarOpen = true;
 let sidebarRoot = null; // Store the React root for the sidebar
 let mainAppContent = null; // Reference to the main WhatsApp content div that needs resizing
+let sidebarMode = "default"; // "default", "chat", or "orderForm"
 let sidebarProps = {
   contact: {},
   catalog: [],
@@ -103,602 +137,91 @@ let sidebarProps = {
   userInfo: null,
   showOrderForm: false,
   onOrderFormToggle: null,
+  onClose: null,
 };
 let lastActiveChatId = null;
 
-// Function to toggle sidebar visibility and adjust WhatsApp UI
-// This function is exposed globally to be called by React components
-// Helper: Extract contact info from active chat
-// Async: Always open contact info panel, wait for it, extract details, close panel
-async function getActiveChatDetails() {
+// Function to switch sidebar mode
+const switchSidebarMode = (mode) => {
+  console.log("🚀 switchSidebarMode called with:", mode);
+  console.log("🔍 Before switch - sidebarMode:", sidebarMode);
+  console.log("🔍 sidebarRoot exists:", !!sidebarRoot);
+  console.log("🔍 isSidebarOpen:", isSidebarOpen);
+
+  sidebarMode = mode;
+  console.log(`🔄 Sidebar mode switched to: ${mode}`);
+
+  if (sidebarRoot && isSidebarOpen) {
+    console.log("✅ Calling renderSidebar()...");
+    renderSidebar();
+  } else {
+    console.warn(
+      "⚠️ NOT rendering sidebar. sidebarRoot:",
+      !!sidebarRoot,
+      "isSidebarOpen:",
+      isSidebarOpen
+    );
+  }
+};
+
+const renderSidebar = () => {
+  if (!sidebarRoot) return;
+  if (sidebarMode === "default") {
+    console.log("🎨 Rendering Default Sidebar");
+    sidebarRoot.render(<DefaultSidebar {...sidebarProps} />);
+  } else if (sidebarMode === "chat") {
+    console.log("🎨 Rendering Chat Sidebar");
+    sidebarRoot.render(<ChatSidebar {...sidebarProps} />);
+  } else if (sidebarMode === "orderForm") {
+    console.log("🎨 Rendering Order Form Sidebar");
+    sidebarRoot.render(<OrderFormSidebar {...sidebarProps} />);
+  }
+};
+
+console.log("🔍 sidebarMode:", sidebarMode);
+
+const getActiveChatDetails = async () => {
   console.log("🔍 Starting contact extraction...");
-
-  // Try multiple selectors to find the chat panel
-  const chatPanelSelectors = [
-    'div[role="main"]',
-    '[data-testid="conversation-panel"]',
-    'div[data-testid="conversation-panel-wrapper"]',
-    'div[class*="conversation-panel"]',
-    "main",
-    "#main",
-  ];
-
-  let chatPanel = null;
-  for (const selector of chatPanelSelectors) {
-    chatPanel = document.querySelector(selector);
-    if (chatPanel) {
-      console.log("✅ Found chat panel with selector:", selector);
-      break;
-    }
-  }
-
-  if (!chatPanel) {
-    console.log("❌ No chat panel found with any selector");
-    return null;
-  }
-
-  // Check if there's actually a chat conversation open (not just the main panel)
-  const headerSelectors = [
-    "header",
-    '[data-testid="conversation-header"]',
-    'div[data-testid="conversation-info-header"]',
-    'div[class*="chat-header"]',
-    'div[class*="conversation-header"]',
-  ];
-
-  let chatHeader = null;
-  for (const selector of headerSelectors) {
-    chatHeader = chatPanel.querySelector(selector);
-    if (chatHeader) {
-      console.log("✅ Found chat header with selector:", selector);
-      break;
-    }
-  }
-
-  const messageAreaSelectors = [
-    '[data-testid="conversation-panel-messages"]',
-    '[role="log"]',
-    'div[class*="message"]',
-    '[data-testid="conversation-panel-body"]',
-    'div[class*="conversation-panel"]',
-  ];
-
-  let messageArea = null;
-  for (const selector of messageAreaSelectors) {
-    messageArea = chatPanel.querySelector(selector);
-    if (messageArea) {
-      console.log("✅ Found message area with selector:", selector);
-      break;
-    }
-  }
-
-  if (!chatHeader || !messageArea) {
-    console.log(
-      "❌ No active chat conversation found (no header or message area)"
-    );
-    console.log(
-      "Header found:",
-      !!chatHeader,
-      "Message area found:",
-      !!messageArea
-    );
-    return null;
-  }
-
-  console.log("✅ Active chat detected, proceeding with extraction...");
 
   let name = "";
   let phone = "";
 
-  // Reset phone number at the start to ensure fresh extraction for each chat
-  phone = "";
-
-  // Try to extract name from header with multiple selectors
   const nameSelectors = [
     "header span[title]",
-    "header h1",
-    'header [data-testid="conversation-info-header-chat-title"]',
-    'header span[dir="auto"]:not([role="button"])',
-    'header div[class*="chat-title"]',
-    'header span[class*="selectable-text"]:not([role="button"])',
-    'header span:first-child:not([role="button"])',
-    'header div:first-child span:not([role="button"])',
+    "header div[role='button'] span[dir='auto']",
+    "header h2[title]",
   ];
 
-  let nameElement = null;
   for (const selector of nameSelectors) {
-    nameElement = chatHeader.querySelector(selector);
-    if (nameElement && nameElement.textContent?.trim()) {
-      const extractedText =
-        nameElement.textContent?.trim() || nameElement.title?.trim() || "";
-      // Skip if it's a button text, generic text, or business account text
-      if (
-        extractedText &&
-        !extractedText.toLowerCase().includes("click here") &&
-        !extractedText.toLowerCase().includes("contact info") &&
-        !extractedText.toLowerCase().includes("online") &&
-        !extractedText.toLowerCase().includes("last seen") &&
-        !extractedText.toLowerCase().includes("business account") &&
-        !extractedText.toLowerCase().includes("verified business") &&
-        !extractedText.toLowerCase().includes("business profile") &&
-        extractedText.length > 1
-      ) {
-        name = extractedText;
-        console.log("📝 Found name with selector:", selector, "- Name:", name);
-        break;
-      }
+    const element = document.querySelector(selector);
+    if (element && element.textContent.trim().length > 0) {
+      element.click(); // open contact info
+      break;
     }
   }
 
-  // If we got "Business Account" or similar, try to find the actual contact name
-  if (
-    !name ||
-    name.toLowerCase().includes("business") ||
-    name.toLowerCase().includes("account")
-  ) {
-    console.log("🔍 Generic name detected, looking for actual contact name...");
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
-    // Try more specific selectors for the actual contact name
-    const specificNameSelectors = [
-      'header div[class*="copyable-text"] span',
-      'header span[class*="copyable-text"]',
-      'header div[title]:not([title*="Business"]):not([title*="Account"])',
-      'header span[title]:not([title*="Business"]):not([title*="Account"])',
-      'header div[class*="chat-title"]',
-      'header span[class*="chat-title"]',
-      'header div[data-testid*="name"]',
-      'header span[data-testid*="name"]',
-    ];
+  phone = extractPhoneNumberFromDOM?.() || "";
+  console.log("✅ Extracted phone:", phone);
 
-    for (const selector of specificNameSelectors) {
-      const element = chatHeader.querySelector(selector);
-      if (element && element.textContent && element.textContent.trim()) {
-        const extractedText = element.textContent.trim();
+  const result = { name, phone };
 
-        if (
-          extractedText &&
-          !extractedText.toLowerCase().includes("business") &&
-          !extractedText.toLowerCase().includes("account") &&
-          !extractedText.toLowerCase().includes("click here") &&
-          !extractedText.toLowerCase().includes("contact info") &&
-          extractedText.length > 1
-        ) {
-          name = extractedText;
-          console.log(
-            "📝 Found specific name with selector:",
-            selector,
-            "- Name:",
-            name
-          );
-          break;
-        }
-      }
-    }
-  }
-
-  if (!name) {
-    console.log(
-      "⚠️ No name found with selectors, trying to find title attribute..."
+  setTimeout(() => {
+    const closeDiv = document.querySelector(
+      'div[aria-expanded="false"][aria-label="Close"]'
     );
-    // Look for title attributes which often contain the contact name
-    const titleElements = chatHeader.querySelectorAll("[title]");
-    for (const element of titleElements) {
-      const titleText = element.getAttribute("title")?.trim();
-      if (
-        titleText &&
-        !titleText.toLowerCase().includes("click here") &&
-        !titleText.toLowerCase().includes("contact info") &&
-        !titleText.toLowerCase().includes("business account") &&
-        !titleText.toLowerCase().includes("verified business") &&
-        titleText.length > 1
-      ) {
-        name = titleText;
-        console.log("📝 Found name in title attribute:", name);
-        break;
-      }
-    }
-  }
-
-  // Quick extraction first - if we have a good name, try to get phone from URL first
-  if (name && name.length > 2 && !name.toLowerCase().includes("business")) {
-    // Try to extract phone from URL before returning quickly
-    try {
-      const url = window.location.href;
-      const phoneMatch = url.match(/(\d{10,15})/);
-      if (phoneMatch) {
-        phone = "+" + phoneMatch[1];
-      }
-    } catch (error) {
-      console.warn("⚠️ Error extracting phone from URL:", error);
-    }
-    console.log("✅ Got good name from header, phone from URL:", name, phone);
-    const result = { name: name || "", phone: phone || "" };
-    console.log("📋 Quick extracted contact details:", result);
-    return result;
-  }
-
-  // Only extract more info if we really need it
-  const needsMoreInfo =
-    !name || name.toLowerCase().includes("business") || !phone;
-
-  if (needsMoreInfo) {
-    console.log(
-      "🔍 Need more contact info, attempting to open contact info panel..."
-    );
-    const clickableSelectors = [
-      'header [data-testid="conversation-info-header"]',
-      'header img[src*="avatar"]',
-      "header span[title]",
-      'header div[role="button"]',
-      "header > div:first-child",
-      "header",
-    ];
-    let clickableElement = null;
-    for (const selector of clickableSelectors) {
-      clickableElement = chatHeader.querySelector(selector);
-      if (clickableElement) {
-        console.log("✅ Found clickable header element:", selector);
-        break;
-      }
-    }
-    if (clickableElement) {
-      console.log("🖱️ Clicking to open contact info...");
-      clickableElement.click();
-      let attempts = 0;
-      const maxAttempts = 15; // Reduced from 30
-      const contactPanelSelectors = [
-        'div[data-testid="contact-info-drawer"]',
-        'div[role="dialog"]',
-        'aside[class*="drawer"]',
-        'div[class*="contact-info"]',
-        'div[class*="drawer"]',
-        'div[aria-label="Contact info"]',
-        'div[role="complementary"]',
-        'div[role="region"]',
-        'div[tabindex="-1"]',
-      ];
-      while (attempts < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Reduced from 200ms
-        attempts++;
-        let contactInfoPanel = null;
-        for (const sel of contactPanelSelectors) {
-          const panel = document.querySelector(sel);
-          if (
-            panel &&
-            (panel.textContent?.toLowerCase().includes("contact info") ||
-              panel.querySelector('h1, [data-testid="contact-name"]'))
-          ) {
-            contactInfoPanel = panel;
-            break;
-          }
-        }
-        if (contactInfoPanel) {
-          console.log("✅ Found contact info panel");
-
-          // Reset phone number for each new contact info panel
-          phone = "";
-
-          // Extract name from contact info panel if we don't have a good one
-          if (!name || name.toLowerCase().includes("business")) {
-            const nameSelectors = [
-              "h1",
-              '[data-testid="contact-name"]',
-              'span[dir="auto"]:first-child',
-              "div:first-child h1",
-              'div:first-child span[dir="auto"]',
-              'div[role="dialog"] h1',
-              'div[aria-label="Contact info"] h1',
-            ];
-            for (const selector of nameSelectors) {
-              const nameEl = contactInfoPanel.querySelector(selector);
-              if (nameEl && nameEl.textContent?.trim()) {
-                const extractedName = nameEl.textContent.trim();
-                if (
-                  !extractedName.toLowerCase().includes("contact") &&
-                  !extractedName.toLowerCase().includes("info") &&
-                  !extractedName.toLowerCase().includes("business account") &&
-                  extractedName.length > 1
-                ) {
-                  name = extractedName;
-                  console.log("📝 Extracted name from panel:", name);
-                  break;
-                }
-              }
-            }
-          }
-
-          // Extract phone number specifically from contact info drawer's phone field
-          try {
-            // First try to find phone section by data-testid
-            const phoneContainers = Array.from(
-              contactInfoPanel.querySelectorAll(
-                '[data-testid*="contact-info-phone"], [data-testid*="cell-frame-title"]'
-              )
-            );
-
-            for (const container of phoneContainers) {
-              const text = container.textContent?.trim();
-              if (text && text.includes("+")) {
-                const match = text.match(/(\+\d{2}\s*\d{3}\s*\d{7,})/);
-                if (match) {
-                  phone = match[1].trim();
-                  console.log("📱 Found phone number in contact info:", phone);
-                  break;
-                }
-              }
-            }
-
-            // If not found, try more specific approach
-            if (!phone) {
-              // Look for the heading/label that says "Phone"
-              const phoneLabel = Array.from(
-                contactInfoPanel.querySelectorAll("div, span")
-              ).find(
-                (el) =>
-                  el.textContent?.trim().toLowerCase() === "phone" ||
-                  el.textContent?.trim().toLowerCase() === "phone number"
-              );
-
-              if (phoneLabel) {
-                // Look in siblings and parent's children for phone number
-                const parent = phoneLabel.parentElement;
-                const siblings = parent ? Array.from(parent.children) : [];
-
-                for (const el of siblings) {
-                  const text = el.textContent?.trim();
-                  if (text && text.includes("+")) {
-                    const match = text.match(/(\+\d{2}\s*\d{3}\s*\d{7,})/);
-                    if (match) {
-                      phone = match[1].trim();
-                      console.log("📱 Found phone number after label:", phone);
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-          } catch (err) {
-            console.error("Error extracting phone:", err);
-          }
-          // Look specifically for elements with phone number (with proper label/section)
-          const phoneLabels = Array.from(
-            contactInfoPanel.querySelectorAll("div, span")
-          ).filter(
-            (el) =>
-              el.textContent?.toLowerCase().includes("phone number") ||
-              el.textContent?.toLowerCase().includes("phone") ||
-              el.getAttribute("aria-label")?.toLowerCase().includes("phone")
-          );
-
-          for (const label of phoneLabels) {
-            // Look for phone number in the next sibling elements
-            let nextEl = label.nextElementSibling;
-            while (nextEl) {
-              const text = nextEl.textContent?.trim();
-              if (text) {
-                // Match international phone format
-                const phoneMatch = text.match(
-                  /(?:\+|PK\s*)?(\d{2,}[\s\-]?\d{3}[\s\-]?\d{6,})/
-                );
-                if (phoneMatch) {
-                  phone = phoneMatch[0].trim();
-                  if (!phone.startsWith("+")) {
-                    phone = "+" + phone.replace(/^PK\s*/, "");
-                  }
-                  console.log("📞 Found phone in contact info:", phone);
-                  break;
-                }
-              }
-              nextEl = nextEl.nextElementSibling;
-            }
-            if (phone) break;
-          }
-
-          // Close the contact info panel
-          console.log("🔒 Closing contact info panel...");
-          const closeButton = contactInfoPanel.querySelector(
-            '[data-testid="x"], button[aria-label*="Close"], button[aria-label*="close"], .close, [class*="close"]'
-          );
-          if (closeButton) {
-            closeButton.click();
-          } else {
-            document.dispatchEvent(
-              new KeyboardEvent("keydown", {
-                key: "Escape",
-                keyCode: 27,
-                bubbles: true,
-              })
-            );
-          }
-          await new Promise((resolve) => setTimeout(resolve, 200)); // Reduced from 350ms
-          break;
-        }
-      }
-      if (attempts >= maxAttempts) {
-        console.warn("⚠️ Contact info panel did not appear within timeout");
-      }
+    console.log("🔍 closeDiv", closeDiv);
+    if (closeDiv) {
+      closeDiv.click();
+      console.log("❌ Closed contact info panel using data-tab=1 div.");
     } else {
-      console.log("❌ No clickable header element found");
+      console.warn("⚠️ Could not find close div!");
     }
-  }
-
-  // If we still don't have a phone number, we must open contact info to get the contact's actual phone
-  if (!phone) {
-    console.log(
-      "🔍 No phone found, must open contact info panel to get contact phone number..."
-    );
-
-    // Force opening contact info panel to get the actual contact phone number
-    const clickableSelectors = [
-      'header [data-testid="conversation-info-header"]',
-      'header img[src*="avatar"]',
-      "header span[title]",
-      'header div[role="button"]',
-      "header > div:first-child",
-      "header",
-    ];
-
-    let clickableElement = null;
-    for (const selector of clickableSelectors) {
-      clickableElement = chatHeader.querySelector(selector);
-      if (clickableElement) {
-        console.log(
-          "✅ Found clickable header element for phone extraction:",
-          selector
-        );
-        break;
-      }
-    }
-
-    if (clickableElement) {
-      console.log(" ️ Clicking to open contact info for phone number...");
-      clickableElement.click();
-
-      // Wait for contact info panel to appear
-      let attempts = 0;
-      const maxAttempts = 20;
-
-      while (attempts < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Reduced from 200ms
-        attempts++;
-
-        // Look for contact info panel with more specific selectors
-        const contactInfoSelectors = [
-          'div[data-testid="contact-info-drawer"]',
-          'div[role="dialog"]',
-          'aside[class*="drawer"]',
-          'div[class*="contact-info"]',
-          'div[class*="drawer"]',
-        ];
-
-        let contactInfoPanel = null;
-        for (const selector of contactInfoSelectors) {
-          const panel = document.querySelector(selector);
-          if (
-            panel &&
-            (panel.textContent?.includes("Contact info") ||
-              panel.textContent?.includes("Phone") ||
-              panel.querySelector('h1, [data-testid="contact-name"]'))
-          ) {
-            contactInfoPanel = panel;
-            console.log("✅ Found contact info panel for phone:", selector);
-            break;
-          }
-        }
-
-        if (contactInfoPanel) {
-          console.log("📞 Extracting phone number from contact info panel...");
-
-          // Look specifically for phone number sections
-          const phoneSelectors = [
-            'div[class*="phone"]',
-            'span[class*="phone"]',
-            'a[href^="tel:"]',
-            'div:contains("Phone")',
-            'span:contains("Phone")',
-          ];
-
-          // First try specific phone selectors
-          for (const selector of phoneSelectors) {
-            const phoneEl = contactInfoPanel.querySelector(selector);
-            if (phoneEl && phoneEl.textContent) {
-              const text = phoneEl.textContent.trim();
-              const phoneMatch = text.match(
-                /(\+?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4})/
-              );
-              if (phoneMatch && phoneMatch[1].replace(/\D/g, "").length >= 7) {
-                phone = phoneMatch[1].trim();
-                console.log(
-                  "📞 Found contact phone with selector:",
-                  selector,
-                  "- Phone:",
-                  phone
-                );
-                break;
-              }
-            }
-          }
-
-          // If not found, search all text elements but be more selective
-          if (!phone) {
-            const allTextElements = Array.from(
-              contactInfoPanel.querySelectorAll("div, span, p, a")
-            );
-            for (const el of allTextElements) {
-              if (el.textContent) {
-                const text = el.textContent.trim();
-                // More specific phone number regex for contact info
-                const phoneMatch = text.match(
-                  /(\+\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4}[\s\-\(\)]?\d{1,4})/
-                );
-                if (
-                  phoneMatch &&
-                  phoneMatch[1].replace(/\D/g, "").length >= 10
-                ) {
-                  // Verify this looks like a real phone number (not a timestamp or other number)
-                  const cleanPhone = phoneMatch[1].replace(/\D/g, "");
-                  if (cleanPhone.length >= 10 && cleanPhone.length <= 15) {
-                    phone = phoneMatch[1].trim();
-                    console.log("📞 Found contact phone in panel text:", phone);
-                    break;
-                  }
-                }
-              }
-            }
-          }
-
-          // Close the contact info panel
-          console.log("🔒 Closing contact info panel...");
-
-          // Try multiple methods to close
-          const closeButton = contactInfoPanel.querySelector(
-            '[data-testid="x"], button[aria-label*="Close"], button[aria-label*="close"], .close, [class*="close"]'
-          );
-          if (closeButton) {
-            closeButton.click();
-          } else {
-            // Try clicking outside the panel
-            const backdrop = document.querySelector(
-              'div[class*="backdrop"], div[class*="overlay"]'
-            );
-            if (backdrop) {
-              backdrop.click();
-            } else {
-              // Fallback to Escape key
-              document.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                  key: "Escape",
-                  keyCode: 27,
-                  bubbles: true,
-                })
-              );
-            }
-          }
-
-          // Wait for panel to close
-          await new Promise((resolve) => setTimeout(resolve, 200)); // Reduced from 500ms
-          break;
-        }
-      }
-
-      if (attempts >= maxAttempts) {
-        console.warn(
-          "⚠️ Contact info panel did not appear within timeout for phone extraction"
-        );
-      }
-    } else {
-      console.log("❌ No clickable header element found for phone extraction");
-    }
-  }
-
-  // Do NOT extract about/status from header/status, only from contact info panel
-
-  const result = { name: name || "", phone: phone || "" };
-  console.log("📋 Final extracted contact details:", result);
+  }, 10);
   return result;
-}
+};
 
-// Fetch user information for the logged-in user
 async function fetchUserInfo() {
   if (userInfoLoading) return;
 
@@ -854,11 +377,7 @@ async function fetchStoresForUser() {
 
           // Set the active store ID globally
           if (storesCache.length > 0) {
-            window.whatsapofyProducts.storeId =
-              storesCache[0]._id ||
-              storesCache[0].id ||
-              storesCache[0].storeId ||
-              storesCache[0].store_id;
+            window.whatsapofyProducts.storeId = storesCache[0]._id;
             console.log(
               "[STORES] Global active store ID set from localStorage:",
               window.whatsapofyProducts.storeId
@@ -879,9 +398,39 @@ async function fetchStoresForUser() {
       "[STORES] No stores in localStorage, fetching via background script..."
     );
 
+    // Get token for API call
+    let token = null;
+    try {
+      const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
+      if (whatsopifyTokenRaw) {
+        const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
+        if (
+          whatsopifyTokenObj &&
+          whatsopifyTokenObj.data &&
+          whatsopifyTokenObj.data.token
+        ) {
+          token = whatsopifyTokenObj.data.token;
+        } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
+          token = whatsopifyTokenObj.token;
+        }
+      }
+    } catch (err) {
+      console.warn("[STORES] Error extracting token:", err);
+    }
+
+    if (!token) {
+      console.warn("[STORES] No token found, cannot fetch stores.");
+      storesCache = [];
+      storesLoading = false;
+      storesListeners.forEach((fn) => fn(storesCache));
+      storesListeners = [];
+      return;
+    }
+
     // Use background script for API call with token authentication
     const response = await chrome.runtime.sendMessage({
       action: "FETCH_STORES",
+      token: token,
     });
 
     if (response.success) {
@@ -904,11 +453,7 @@ async function fetchStoresForUser() {
 
       // Set the active store ID globally
       if (storesCache.length > 0) {
-        window.whatsapofyProducts.storeId =
-          storesCache[0]._id ||
-          storesCache[0].id ||
-          storesCache[0].storeId ||
-          storesCache[0].store_id;
+        window.whatsapofyProducts.storeId = storesCache[0]._id;
         console.log(
           "[STORES] Global active store ID set:",
           window.whatsapofyProducts.storeId
@@ -935,7 +480,6 @@ async function fetchStoresForUser() {
   }
 }
 
-// Helper to get stores for sidebar or other UI
 function getStoresForUser(callback) {
   if (storesCache !== null) {
     callback(storesCache);
@@ -948,179 +492,145 @@ function getStoresForUser(callback) {
 }
 
 function getProducts(callback) {
-  // If products are already in cache, return immediately
   if (productsCache !== null) {
-    // Check for null, not just empty array
     callback(productsCache);
     return;
   }
 
-  // If a fetch is in progress, add callback to listeners
   if (productsLoading) {
     productsListeners.push(callback);
     return;
   }
-
-  // Otherwise, start the fetch, and add the callback to listeners
   productsListeners.push(callback);
   fetchProductsFromAPI();
 }
 
 async function fetchProductsFromAPI() {
-  // Prevent multiple simultaneous fetches
   if (productsLoading) return;
 
   productsLoading = true;
   productsError = null;
 
   try {
-    console.log(
-      "[PRODUCTS] Fetching user-specific products from API using session-based auth..."
-    );
+    console.log("[PRODUCTS] Fetching products from API...");
 
-    // Ensure stores are loaded before attempting to filter products by storeId
-    if (storesCache === null && !storesLoading) {
-      console.log(
-        "[PRODUCTS] Stores cache is null and not loading, fetching stores first..."
-      );
-      await new Promise((resolve) => {
-        getStoresForUser(() => resolve());
-      });
-    } else if (storesLoading) {
-      console.log(
-        "[PRODUCTS] Stores are currently loading, waiting for them..."
-      );
-      await new Promise((resolve) => {
-        storesListeners.push(() => resolve());
-      });
-    }
-
-    const userStoreIds = storesCache
-      ? storesCache
-          .map(
-            (store) => store._id || store.id || store.storeId || store.store_id
-          )
-          .filter(Boolean)
-      : [];
-
-    let allUserProducts = []; // Array to hold products fetched from the API
-
-    try {
-      // Use background script to fetch products with session-based auth (bypasses CORS issues)
-      const response = await chrome.runtime.sendMessage({
-        action: "FETCH_PRODUCTS",
-      });
-
-      if (response.success) {
-        console.log(
-          "[PRODUCTS] ✅ Products fetched successfully via background script"
-        );
-        let productsFromApiResponse = [];
-
-        // Handle different possible response structures
-        if (Array.isArray(response.products)) {
-          productsFromApiResponse = response.products;
-        } else if (
-          response.products &&
-          response.products.products &&
-          Array.isArray(response.products.products)
-        ) {
-          productsFromApiResponse = response.products.products;
-        } else if (
-          response.products &&
-          response.products.data &&
-          Array.isArray(response.products.data)
-        ) {
-          productsFromApiResponse = response.products.data;
-        } else if (
-          response.products &&
-          response.products.result &&
-          Array.isArray(response.products.result)
-        ) {
-          productsFromApiResponse = response.products.result;
-        } else {
-          console.warn(
-            "[PRODUCTS] ⚠️ Unexpected products response structure:",
-            response.products
-          );
-          productsFromApiResponse = [];
-        }
-
-        // Filter products by user's store IDs if available
-        if (productsFromApiResponse.length > 0) {
-          if (userStoreIds.length > 0) {
-            allUserProducts = productsFromApiResponse.filter((p) => {
-              const productStoreId = p.storeId || p.store_id || p._storeId;
-              return userStoreIds.includes(productStoreId);
-            });
-            console.log(
-              `[PRODUCTS] 🔍 Filtered ${allUserProducts.length} products for user's stores`
-            );
-          } else {
-            // If no specific store IDs, use all fetched products
-            allUserProducts = productsFromApiResponse;
-            console.log(
-              `[PRODUCTS] 📦 Using all ${allUserProducts.length} products (no store filtering)`
-            );
-          }
-        } else {
-          allUserProducts = [];
-          console.log("[PRODUCTS] ⚠️ No products found in API response");
-        }
-      } else {
-        console.error(
-          `[PRODUCTS] ❌ Background script fetch failed:`,
-          response.error
-        );
-        allUserProducts = [];
-      }
-    } catch (err) {
-      // Log network errors during fetch
-      console.error(`[PRODUCTS] ❌ Error calling background script:`, err);
-      allUserProducts = [];
-    }
-
-    // Process the fetched products, ensuring the 'variants' array is preserved
-    productsCache = allUserProducts.map((p) => {
-      const processedProduct = {
-        id: p._id || p.id, // Use a consistent ID for keying in React
-        name: p.title || p.name || "Unnamed", // Use title, then name, then 'Unnamed'
-        vendor: p.vendor || "",
-        category: p.category || "",
-        description: p.description || "",
-        storeId: p.storeId || p.store_id,
-        // The critical change: pass the original 'variants' array directly
-        variants: Array.isArray(p.variants) ? p.variants : [],
-        // Provide a default price and image for products without variants,
-        // or for quick display before a specific variant is selected.
-        price:
-          p.price ||
-          (Array.isArray(p.variants) && p.variants.length > 0
-            ? p.variants[0].price
-            : "N/A"),
-        image:
-          Array.isArray(p.images) && p.images.length > 0
-            ? p.images[0].url
-            : null,
-      };
-      return processedProduct;
+    const response = await chrome.runtime.sendMessage({
+      action: "FETCH_PRODUCTS",
+      token: getToken(),
+      storeId: getSelectedStoreId(),
     });
 
-    console.log(
-      `[PRODUCTS] 📊 Final result: ${productsCache.length} products processed`
-    );
+    console.log("[PRODUCTS] 🔍 Full API response:", response);
+
+    if (!response?.success) {
+      console.error("[PRODUCTS] ❌ API fetch failed:", response?.error);
+      productsCache = [];
+      productsLoading = false;
+      productsListeners.forEach((fn) => fn(productsCache));
+      productsListeners = [];
+      return;
+    }
+
+    let products = [];
+
+    // Handle different response structures
+    if (Array.isArray(response.products)) {
+      products = response.products;
+      console.log(
+        "[PRODUCTS] 📋 Response.products is array, length:",
+        products.length
+      );
+    } else if (
+      response.products?.products &&
+      Array.isArray(response.products.products)
+    ) {
+      products = response.products.products;
+      console.log(
+        "[PRODUCTS] 📋 Found response.products.products array, length:",
+        products.length
+      );
+    } else if (
+      response.products?.data &&
+      Array.isArray(response.products.data)
+    ) {
+      products = response.products.data;
+      console.log(
+        "[PRODUCTS] 📋 Found response.products.data array, length:",
+        products.length
+      );
+      console.log("[PRODUCTS] 📋 First item in data array:", products[0]);
+    } else if (
+      response.products?.result &&
+      Array.isArray(response.products.result)
+    ) {
+      products = response.products.result;
+      console.log(
+        "[PRODUCTS] 📋 Found response.products.result array, length:",
+        products.length
+      );
+    } else {
+      console.warn(
+        "[PRODUCTS] ⚠️ Unexpected response structure:",
+        response.products
+      );
+      console.warn(
+        "[PRODUCTS] ⚠️ Available properties:",
+        Object.keys(response.products || {})
+      );
+      products = [];
+    }
+
+    // Debug the actual product data structure
+    if (products.length > 0) {
+      console.log("[PRODUCTS] 🔍 First product structure:", products[0]);
+      console.log(
+        "[PRODUCTS] 🔍 First product keys:",
+        Object.keys(products[0] || {})
+      );
+
+      // Check if products have the required fields for display
+      const firstProduct = products[0];
+      const hasRequiredFields =
+        firstProduct &&
+        (firstProduct.title ||
+          firstProduct.name ||
+          firstProduct.productName ||
+          firstProduct.description ||
+          firstProduct.price ||
+          firstProduct.variants ||
+          firstProduct.images ||
+          firstProduct.image);
+
+      console.log(
+        "[PRODUCTS] 🔍 Product has required display fields:",
+        hasRequiredFields
+      );
+
+      if (!hasRequiredFields) {
+        console.warn(
+          "[PRODUCTS] ⚠️ Products appear to be references/IDs only, not full product data"
+        );
+        console.warn(
+          "[PRODUCTS] ⚠️ This might require additional API calls to fetch full product details"
+        );
+      }
+    }
+
+    console.log(`[PRODUCTS] ✅ Received ${products.length} products`);
+
+    // Set the global cache
+    productsCache = products;
 
     productsLoading = false;
-    // Notify all waiting listeners with the newly populated productsCache
-    productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
-    productsListeners = []; // Clear listeners after notifying
-  } catch (e) {
-    // Catch any errors during the entire fetch process
-    console.error("[PRODUCTS] ❌ Error fetching products:", e);
-    productsError = e;
+    // Notify all waiting listeners
+    productsListeners.forEach((fn) => fn(productsCache));
+    productsListeners = [];
+  } catch (err) {
+    console.error("[PRODUCTS] ❌ Error fetching products:", err);
+    productsError = err;
     productsLoading = false;
     productsCache = [];
-    productsListeners.forEach((fn) => fn(productsCache)); // Pass data to listeners
+    productsListeners.forEach((fn) => fn(productsCache));
     productsListeners = [];
   }
 }
@@ -1285,31 +795,94 @@ window.whatsappNotesUtils = {
 function observeActiveChat() {
   console.log("🔍 Setting up chat selection observer...");
 
-  // Watch for clicks on chat list items
-  const chatListContainer = document.querySelector("#pane-side");
-  if (chatListContainer) {
-    console.log("✅ Found chat list container, setting up click listener");
+  // Wait for both #pane-side AND the actual chat list to be ready
+  const waitForChatList = () => {
+    const paneSide = document.querySelector("#pane-side");
+    const chatList = document.querySelector('[aria-label="Chat list"]');
 
+    console.log("🔍 pane-side exists:", !!paneSide);
+    console.log("🔍 Chat list exists:", !!chatList);
+
+    if (paneSide && chatList) {
+      console.log(
+        "✅ Found both chat container and chat list, setting up click listener"
+      );
+      return { paneSide, chatList };
+    }
+    return null;
+  };
+
+  const containers = waitForChatList();
+  if (containers) {
+    const { paneSide: chatListContainer } = containers;
+    setupClickListener(chatListContainer);
+  } else {
+    console.warn("⚠️ Chat list container not found, waiting for it to load...");
+
+    // Wait for chat list to load with retry mechanism
+    let retryCount = 0;
+    const maxRetries = 10;
+
+    const retrySetup = () => {
+      if (retryCount >= maxRetries) {
+        console.error(
+          "❌ Max retries reached, falling back to mutation observer"
+        );
+        setupMutationObserver();
+        return;
+      }
+
+      retryCount++;
+      console.log(
+        `🔄 Retry ${retryCount}/${maxRetries} - waiting for chat list...`
+      );
+
+      setTimeout(() => {
+        const containers = waitForChatList();
+        if (containers) {
+          console.log("✅ Chat list found on retry, setting up click listener");
+          const { paneSide: chatListContainer } = containers;
+          setupClickListener(chatListContainer);
+        } else {
+          retrySetup();
+        }
+      }, 1000); // Wait 1 second between retries
+    };
+
+    retrySetup();
+  }
+
+  function setupClickListener(chatListContainer) {
     chatListContainer.addEventListener("click", async (event) => {
+      console.log("🖱️ Click detected on chat list container");
+
       // Check if the click was on a chat item
       const chatItem = event.target.closest(
         '[data-testid="cell-frame-container"], div[role="listitem"], div[tabindex="0"]'
       );
+
+      console.log("🎯 Chat item found:", !!chatItem);
+
       if (chatItem) {
-        console.log(" ️ Chat item clicked, waiting for chat to load...");
+        console.log("✅ Chat item clicked, waiting for chat to load...");
 
         // Wait a bit for the chat to load, then extract contact info
         setTimeout(async () => {
           console.log("🔄 Extracting contact details for selected chat...");
           const contact = await getActiveChatDetails();
           console.log("📋 Contact extraction result:", contact);
+          console.log("📋 Contact has name:", !!contact?.name);
+          console.log("📋 Contact has phone:", !!contact?.phone);
 
           // Check if we have a valid contact (not null and has some data)
           if (contact && (contact.name || contact.phone || contact.about)) {
             // Always update sidebar with fresh contact info - even without phone number
             lastActiveChatId = contact.name || "unknown";
             sidebarProps.contact = contact;
-            console.log("🔄 Updating sidebar with contact:", contact);
+            console.log("🔄 Switching to chat mode with contact:", contact);
+
+            // Switch to chat mode
+            switchSidebarMode("chat");
 
             // Fetch user info, stores, and products, then render sidebar
             getUserInfo((userInfo) => {
@@ -1317,17 +890,16 @@ function observeActiveChat() {
               getStoresForUser((stores) => {
                 sidebarProps.stores = stores;
                 getCatalogForContact(contact, (products) => {
+                  console.log("products", products);
                   sidebarProps.catalog = products;
                   sidebarProps.notes = getNotesForContact(contact.name);
                   sidebarProps.onNotesChange = handleNotesChange;
                   if (sidebarRoot) {
                     console.log(
-                      "🎨 Rendering sidebar with props:",
+                      "🎨 Rendering chat sidebar with props:",
                       sidebarProps
                     );
-                    sidebarRoot.render(
-                      <InjectedSidebarContent {...sidebarProps} />
-                    );
+                    renderSidebar();
                   } else {
                     console.warn("⚠️ sidebarRoot is null, cannot render");
                   }
@@ -1341,16 +913,17 @@ function observeActiveChat() {
               );
             }
           } else if (contact === null) {
-            console.log("ℹ️ No active chat detected, clearing sidebar");
-            // Clear the sidebar when no chat is active
+            console.log(
+              "ℹ️ No active chat detected, switching to default mode"
+            );
+            // Switch back to default mode when no chat is active
             lastActiveChatId = null;
             sidebarProps.contact = { name: "", phone: "", about: "" };
-            sidebarProps.catalog = [];
-            sidebarProps.stores = [];
             sidebarProps.notes = "";
-            // Keep userInfo as it doesn't change per chat
+            // Keep userInfo, stores, and catalog as they don't change per chat
+            switchSidebarMode("default");
             if (sidebarRoot) {
-              sidebarRoot.render(<InjectedSidebarContent {...sidebarProps} />);
+              renderSidebar();
             }
           } else {
             console.log(
@@ -1360,10 +933,10 @@ function observeActiveChat() {
         }, 200); // Wait 200ms for chat to load (reduced from 500ms)
       }
     });
-  } else {
-    console.warn(
-      "⚠️ Chat list container not found, falling back to mutation observer"
-    );
+  }
+
+  function setupMutationObserver() {
+    console.log("🔄 Setting up mutation observer as fallback...");
 
     // Fallback: watch for changes in the main chat panel
     const chatPanel = document.querySelector('div[role="main"]');
@@ -1385,6 +958,9 @@ function observeActiveChat() {
             lastActiveChatId = contact.name || "unknown";
             sidebarProps.contact = contact;
 
+            // Switch to chat mode
+            switchSidebarMode("chat");
+
             // Fetch user info, stores, and products, then render sidebar
             getUserInfo((userInfo) => {
               sidebarProps.userInfo = userInfo;
@@ -1395,9 +971,7 @@ function observeActiveChat() {
                   sidebarProps.notes = getNotesForContact(contact.name);
                   sidebarProps.onNotesChange = handleNotesChange;
                   if (sidebarRoot) {
-                    sidebarRoot.render(
-                      <InjectedSidebarContent {...sidebarProps} />
-                    );
+                    renderSidebar();
                   }
                 });
               });
@@ -1411,7 +985,24 @@ function observeActiveChat() {
 }
 
 window.toggleWhatsappSidebar = async (open) => {
-  // Allow sidebar to open without authentication - show login modal only when user tries to use features that require auth
+  // Check if user is logged in
+  const token = localStorage.getItem("whatsopify_token");
+  const isLoggedIn = token && token !== "null" && token !== '""';
+
+  // If trying to open sidebar and user is not logged in, don't open
+  if (open && !isLoggedIn) {
+    console.log("⚠️ Cannot open sidebar: User not logged in");
+    return;
+  }
+
+  // If trying to open sidebar, check if store is selected
+  if (open) {
+    const storeSelected = window.requireStoreSelection();
+    if (!storeSelected) {
+      return; // Store selection modal will be shown
+    }
+  }
+
   isSidebarOpen = typeof open === "boolean" ? open : !isSidebarOpen;
   console.log(`Toggling sidebar: ${isSidebarOpen ? "Open" : "Closed"}`);
 
@@ -1426,10 +1017,20 @@ window.toggleWhatsappSidebar = async (open) => {
 
   if (isSidebarOpen) {
     // Open sidebar
-    const renderSidebarWithContact = async () => {
-      // Don't extract contact data on initial sidebar render
-      // Just render with empty data - contact extraction will happen when user clicks on a chat
-      sidebarProps.contact = { name: "", phone: "", about: "" };
+    const renderSidebarWithData = async () => {
+      // Only initialize to default mode if sidebar is being opened for the first time
+      // Don't reset mode if it's already set (e.g., to "chat")
+      if (!sidebarRoot) {
+        console.log("🆕 First time opening sidebar - setting to default mode");
+        sidebarMode = "default";
+        sidebarProps.contact = { name: "", phone: "", about: "" };
+      } else {
+        console.log(
+          "♻️ Sidebar already initialized - keeping current mode:",
+          sidebarMode
+        );
+      }
+
       // Fetch user info, stores, and products for initial render
       getUserInfo((userInfo) => {
         sidebarProps.userInfo = userInfo;
@@ -1441,15 +1042,11 @@ window.toggleWhatsappSidebar = async (open) => {
             sidebarProps.onNotesChange = handleNotesChange;
             sidebarProps.onOrderFormToggle = (show) => {
               sidebarProps.showOrderForm = show;
-              if (sidebarRoot) {
-                sidebarRoot.render(
-                  <InjectedSidebarContent {...sidebarProps} />
-                );
-              }
+              renderSidebar();
             };
             if (sidebarRoot) {
-              console.log("🎨 Initial sidebar render with empty contact data");
-              sidebarRoot.render(<InjectedSidebarContent {...sidebarProps} />);
+              console.log("🎨 Initial sidebar render in default mode");
+              renderSidebar();
             }
           });
         });
@@ -1459,14 +1056,17 @@ window.toggleWhatsappSidebar = async (open) => {
       // Create and append sidebar container if it doesn't exist
       sidebarContainer = document.createElement("div");
       sidebarContainer.id = "whatsapp-sidebar-root";
+
+      const theme = getWhatsAppTheme();
+
       Object.assign(sidebarContainer.style, {
         position: "fixed",
         right: "0",
         top: TOOLBAR_HEIGHT, // Start below the toolbar
         height: `calc(100% - ${TOOLBAR_HEIGHT})`, // Full height minus toolbar height
         width: SIDEBAR_WIDTH,
-        backgroundColor: "#f7f7f7",
-        boxShadow: "-2px 0 5px rgba(0,0,0,0.1)",
+        backgroundColor: theme.sidebarBg,
+        boxShadow: theme.sidebarShadow,
         zIndex: "9999", // Lower than toolbar but above content
         overflowY: "auto",
         display: "flex",
@@ -1475,17 +1075,27 @@ window.toggleWhatsappSidebar = async (open) => {
       });
       document.body.appendChild(sidebarContainer);
       sidebarRoot = createRoot(sidebarContainer);
-      await renderSidebarWithContact();
+      await renderSidebarWithData();
       observeActiveChat();
-      console.log("✅ InjectedSidebarContent rendered in sidebar container.");
+      console.log("✅ Sidebar rendered in container.");
     } else {
       sidebarContainer.style.display = "flex";
-      await renderSidebarWithContact();
-      console.log("✅ Sidebar container shown and updated.");
+      console.log(
+        "✅ Sidebar container shown (not re-rendering to preserve mode)."
+      );
     }
 
     mainAppContent.style.marginRight = SIDEBAR_WIDTH;
     console.log(`✅ Main WhatsApp content shifted left by ${SIDEBAR_WIDTH}.`);
+
+    // Update margins for the custom divs
+    setTimeout(() => {
+      const chatHeader = document.querySelector(
+        'header[data-testid="conversation-header"]'
+      );
+      const isChatOpen = !!chatHeader;
+      ensureMainContentMargin(isChatOpen);
+    }, 100);
   } else {
     // Close sidebar
     if (sidebarContainer) {
@@ -1496,6 +1106,15 @@ window.toggleWhatsappSidebar = async (open) => {
     // Restore main content width by removing the right margin
     mainAppContent.style.marginRight = "0px";
     console.log("✅ Main WhatsApp content restored to full width.");
+
+    // Update margins for the custom divs
+    setTimeout(() => {
+      const chatHeader = document.querySelector(
+        'header[data-testid="conversation-header"]'
+      );
+      const isChatOpen = !!chatHeader;
+      ensureMainContentMargin(isChatOpen);
+    }, 100);
   }
 };
 
@@ -1521,6 +1140,39 @@ window.addEventListener("storage", (event) => {
       }
     }
   }
+});
+
+// --- Listen for theme changes and update sidebar ---
+const themeObserver = new MutationObserver(() => {
+  const sidebarContainer = document.getElementById("whatsapp-sidebar-root");
+  if (sidebarContainer) {
+    const theme = getWhatsAppTheme();
+    sidebarContainer.style.backgroundColor = theme.sidebarBg;
+    sidebarContainer.style.boxShadow = theme.sidebarShadow;
+    console.log("🎨 Sidebar theme updated:", theme.isDark ? "Dark" : "Light");
+  }
+});
+
+// Observe changes to body class (WhatsApp theme changes)
+themeObserver.observe(document.body, {
+  attributes: true,
+  attributeFilter: ["class"],
+});
+
+// Also observe HTML element for data-theme attribute
+const htmlThemeObserver = new MutationObserver(() => {
+  const sidebarContainer = document.getElementById("whatsapp-sidebar-root");
+  if (sidebarContainer) {
+    const theme = getWhatsAppTheme();
+    sidebarContainer.style.backgroundColor = theme.sidebarBg;
+    sidebarContainer.style.boxShadow = theme.sidebarShadow;
+    console.log("🎨 Sidebar theme updated:", theme.isDark ? "Dark" : "Light");
+  }
+});
+
+htmlThemeObserver.observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ["data-theme", "class"],
 });
 
 // Inject Top Toolbar
@@ -1578,10 +1230,25 @@ function injectTopToolbarIntoWhatsAppBody() {
       console.log("✅ TopToolbar mounted as fixed element at top of viewport.");
 
       // Add padding to main content to account for toolbar height
-      whatsappMainBodyContainer.style.paddingTop = TOOLBAR_HEIGHT;
+      // whatsappMainBodyContainer.style.paddingTop = TOOLBAR_HEIGHT;
 
-      // Initialize sidebar state to open by default
-      window.toggleWhatsappSidebar(true);
+      // Initialize sidebar state - don't open automatically, wait for store selection
+      const token = localStorage.getItem("whatsopify_token");
+      const selectedStore = localStorage.getItem("whatsopify_selected_store");
+      const isLoggedIn = token && token !== "null" && token !== '""';
+      const hasSelectedStore =
+        selectedStore && selectedStore !== "null" && selectedStore !== '""';
+
+      if (isLoggedIn && hasSelectedStore) {
+        window.toggleWhatsappSidebar(true);
+        console.log(
+          "✅ User is logged in and has selected store - opening sidebar"
+        );
+      } else {
+        console.log(
+          "ℹ️ Sidebar will remain closed until user logs in and selects a store"
+        );
+      }
     }
   );
 }
@@ -1629,7 +1296,7 @@ function injectSidebarButtons() {
     }
 
     const root = createRoot(container);
-    // Pass the globally exposed toggle function as a prop
+
     root.render(
       <InjectedSidebarButtons onToggleSidebar={window.toggleWhatsappSidebar} />
     );
@@ -1679,14 +1346,180 @@ function injectChatListEnhancer() {
   });
 }
 
+function ensureMainContentMargin(applyToSecond = false) {
+  const allDivs = document.querySelectorAll("div");
+
+  const matchingDivs = [];
+
+  for (const element of allDivs) {
+    const classList = Array.from(element.classList);
+    const hasExactlyTheseClasses =
+      classList.length === 3 &&
+      classList.includes("x78zum5") &&
+      classList.includes("xdt5ytf") &&
+      classList.includes("x5yr21d");
+
+    if (hasExactlyTheseClasses) {
+      matchingDivs.push(element);
+    }
+  }
+
+  if (matchingDivs.length === 0) return;
+
+  let targetDiv = null;
+  let otherDiv = null;
+
+  if (applyToSecond && matchingDivs.length >= 2) {
+    targetDiv = matchingDivs[1];
+    otherDiv = matchingDivs[0];
+  } else if (matchingDivs.length >= 1) {
+    targetDiv = matchingDivs[0];
+    if (matchingDivs.length >= 2) {
+      otherDiv = matchingDivs[1];
+    }
+  }
+
+  // Check if sidebar is open
+  const sidebarElement = document.getElementById("whatsapp-sidebar-root");
+  const isSidebarOpen =
+    sidebarElement && sidebarElement.style.display !== "none";
+  const marginRight = isSidebarOpen ? "400px" : "0px";
+
+  if (targetDiv) {
+    // targetDiv.style.marginTop = "48px";
+    targetDiv.style.paddingTop = "48px";
+    targetDiv.style.marginRight = marginRight;
+
+    const divIndex =
+      applyToSecond && matchingDivs.length >= 2 ? "SECOND" : "FIRST";
+  }
+
+  if (otherDiv) {
+    otherDiv.style.marginTop = "0px";
+    otherDiv.style.marginRight = "0px";
+    otherDiv.style.maxHeight = "calc(100vh - 48px)";
+    otherDiv.style.overflow = "hidden";
+  }
+}
+
+function setupMainContentMarginObserver() {
+  ensureMainContentMargin();
+  const marginObserver = new MutationObserver((mutations) => {
+    let needsUpdate = false;
+
+    mutations.forEach((mutation) => {
+      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+        Array.from(mutation.addedNodes).forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "DIV") {
+            const classList = Array.from(node.classList);
+            if (
+              classList.length === 3 &&
+              classList.includes("x78zum5") &&
+              classList.includes("xdt5ytf") &&
+              classList.includes("x5yr21d")
+            ) {
+              needsUpdate = true;
+            }
+            const childDivs = node.querySelectorAll
+              ? node.querySelectorAll("div")
+              : [];
+            childDivs.forEach((childDiv) => {
+              const childClassList = Array.from(childDiv.classList);
+              if (
+                childClassList.length === 3 &&
+                childClassList.includes("x78zum5") &&
+                childClassList.includes("xdt5ytf") &&
+                childClassList.includes("x5yr21d")
+              ) {
+                needsUpdate = true;
+              }
+            });
+          }
+        });
+      }
+
+      if (
+        mutation.type === "attributes" &&
+        (mutation.attributeName === "style" ||
+          mutation.attributeName === "class")
+      ) {
+        const target = mutation.target;
+        if (target.tagName === "DIV") {
+          const classList = Array.from(target.classList);
+          if (
+            classList.length === 3 &&
+            classList.includes("x78zum5") &&
+            classList.includes("xdt5ytf") &&
+            classList.includes("x5yr21d")
+          ) {
+            needsUpdate = true;
+          }
+        }
+      }
+    });
+
+    if (needsUpdate) {
+      // Debounce the updates to avoid excessive calls
+      clearTimeout(window.marginUpdateTimeout);
+      window.marginUpdateTimeout = setTimeout(() => {
+        // Check if a chat is open by looking for chat header
+        const chatHeader = document.querySelector(
+          'header[data-testid="conversation-header"]'
+        );
+        const isChatOpen = !!chatHeader;
+
+        ensureMainContentMargin(isChatOpen);
+      }, 300);
+    }
+  });
+
+  marginObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["style", "class"],
+  });
+
+  console.log("👁️ WhatsApp main content margin observer setup complete");
+
+  document.body.addEventListener("click", (event) => {
+    const chatItem = event.target.closest(
+      '[data-testid="cell-frame-container"], div[role="listitem"]'
+    );
+
+    if (chatItem) {
+      // Wait for chat to load, then check and apply margins
+      setTimeout(() => {
+        const chatHeader = document.querySelector(
+          'header[data-testid="conversation-header"]'
+        );
+        const isChatOpen = !!chatHeader;
+
+        if (isChatOpen) {
+          ensureMainContentMargin(true); // Apply to second div when chat opens
+          console.log("💬 Chat opened - applied margins to SECOND div");
+        }
+      }, 300);
+    }
+  });
+
+  console.log("👆 Click listener for chat detection setup complete");
+}
+
 // Call all injection functions
 injectTopToolbarIntoWhatsAppBody();
 injectSidebarButtons();
 injectChatHeaderHover();
 injectChatListEnhancer();
 
+// Setup main content margin observer after a short delay
+setTimeout(() => {
+  setupMainContentMarginObserver();
+}, 2000);
+
 // Always observe chat changes to update sidebar contact info
-waitForElement('div[role="main"]', () => {
+waitForElement("#pane-side", () => {
+  console.log("🎯 #pane-side found, setting up chat observer...");
   observeActiveChat();
 });
 
@@ -1977,37 +1810,54 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
     }, 150);
 
     // If product has an image, add it to the chat
-    if (productItem && productItem.image) {
-      console.log(
-        "[CHAT] Product has image, attempting to add image to chat..."
-      );
-      setTimeout(async () => {
-        try {
-          const filename = `${productItem.name.replace(
-            /[^a-zA-Z0-9]/g,
-            "_"
-          )}.jpg`;
-          const imageFile = await downloadImageAsFile(
-            productItem.image,
-            filename
-          );
+    if (productItem) {
+      // Handle both image (single) and images (array) properties
+      let imageUrl = null;
 
-          if (imageFile) {
-            const imageAdded = await addImageToChat(imageFile);
-            if (imageAdded) {
-              console.log(
-                "[CHAT] ✅ Product image added to chat successfully!"
-              );
+      if (
+        productItem.images &&
+        Array.isArray(productItem.images) &&
+        productItem.images.length > 0
+      ) {
+        // Handle images array format
+        imageUrl = productItem.images[0]?.url || productItem.images[0];
+      } else if (productItem.image) {
+        // Handle single image format
+        imageUrl = productItem.image;
+      }
+
+      if (imageUrl) {
+        console.log(
+          "[CHAT] Product has image, attempting to add image to chat..."
+        );
+        console.log("[CHAT] Image URL:", imageUrl);
+
+        setTimeout(async () => {
+          try {
+            const productName =
+              productItem.name || productItem.title || "product";
+            const filename = `${productName.replace(/[^a-zA-Z0-9]/g, "_")}.jpg`;
+            const imageFile = await downloadImageAsFile(imageUrl, filename);
+
+            if (imageFile) {
+              const imageAdded = await addImageToChat(imageFile);
+              if (imageAdded) {
+                console.log(
+                  "[CHAT] ✅ Product image added to chat successfully!"
+                );
+              } else {
+                console.warn("[CHAT] Failed to add image to chat");
+              }
             } else {
-              console.warn("[CHAT] Failed to add image to chat");
+              console.warn("[CHAT] Failed to download product image");
             }
-          } else {
-            console.warn("[CHAT] Failed to download product image");
+          } catch (error) {
+            console.error("[CHAT] Error handling product image:", error);
           }
-        } catch (error) {
-          console.error("[CHAT] Error handling product image:", error);
-        }
-      }, 1000); // Wait 1 second after text is added
+        }, 1000); // Wait 1 second after text is added
+      } else {
+        console.log("[CHAT] No image URL found in product item");
+      }
     }
 
     return true;
@@ -2078,7 +1928,9 @@ window.testNewProductsAPI = function () {
     vendor: "",
     search: "",
   });
-  const apiUrl = `https://api1.shopilam.com/api/v1/products?${apiParams.toString()}`;
+  const apiUrl = `${
+    import.meta.env.VITE_API_URL
+  }/api/v1/products?${apiParams.toString()}`;
 
   console.log("[PRODUCTS] Testing API URL:", apiUrl);
 
@@ -2196,17 +2048,155 @@ window.debugMessageInput = function () {
   });
 };
 
+window.debugTokenIssue = function () {
+  console.log("[DEBUG] 🔑 Token debugging:");
+
+  // Check localStorage
+  const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
+  console.log("[DEBUG] Raw token from localStorage:", whatsopifyTokenRaw);
+
+  if (whatsopifyTokenRaw) {
+    try {
+      const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
+      console.log("[DEBUG] Parsed token object:", whatsopifyTokenObj);
+
+      let token = null;
+      if (
+        whatsopifyTokenObj &&
+        whatsopifyTokenObj.data &&
+        whatsopifyTokenObj.data.token
+      ) {
+        token = whatsopifyTokenObj.data.token;
+        console.log(
+          "[DEBUG] Token from new structure:",
+          token ? token.substring(0, 20) + "..." : "undefined"
+        );
+      } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
+        token = whatsopifyTokenObj.token;
+        console.log(
+          "[DEBUG] Token from old structure:",
+          token ? token.substring(0, 20) + "..." : "undefined"
+        );
+      } else {
+        console.log("[DEBUG] No token found in either structure");
+      }
+
+      if (token) {
+        console.log("[DEBUG] Testing API call with token...");
+        chrome.runtime.sendMessage(
+          {
+            action: "FETCH_PRODUCTS",
+            token: token,
+          },
+          (response) => {
+            console.log("[DEBUG] API response:", response);
+          }
+        );
+      }
+    } catch (err) {
+      console.error("[DEBUG] Error parsing token:", err);
+    }
+  } else {
+    console.log("[DEBUG] No token found in localStorage");
+  }
+};
+
 // --- Initial Data Fetches (run once when script loads) ---
-fetchUserInfo(); // Start fetching user info
-fetchStoresForUser(); // Start fetching stores
+// Note: API calls are now triggered only after store selection, not immediately after login
+// fetchUserInfo(); // Moved to store selection
+// fetchStoresForUser(); // Moved to store selection
 // Products fetch will be triggered by getProducts when needed (e.g., by sidebar or modal)
 
 // --- Global Order Form Control ---
 window.showOrderForm = (show) => {
   console.log(`Order form ${show ? "opened" : "closed"}`);
-  sidebarProps.showOrderForm = show;
-  if (sidebarRoot && sidebarProps.onOrderFormToggle) {
-    sidebarProps.onOrderFormToggle(show);
+  if (show) {
+    // Switch to order form sidebar mode
+    switchSidebarMode("orderForm");
+  } else {
+    // Switch back to default or chat mode
+    if (lastActiveChatId) {
+      switchSidebarMode("chat");
+    } else {
+      switchSidebarMode("default");
+    }
+  }
+};
+
+// --- Global Sidebar Mode Control ---
+window.switchToDefaultSidebar = () => {
+  console.log("🔄 Switching to default sidebar mode");
+  switchSidebarMode("default");
+};
+
+window.switchToChatSidebar = (contact) => {
+  console.log("🔄 Switching to chat sidebar mode with contact:", contact);
+  if (contact) {
+    sidebarProps.contact = contact;
+    // Fetch fresh data for the contact
+    getUserInfo((userInfo) => {
+      sidebarProps.userInfo = userInfo;
+      getStoresForUser((stores) => {
+        sidebarProps.stores = stores;
+        getCatalogForContact(contact, (products) => {
+          sidebarProps.catalog = products;
+          sidebarProps.notes = getNotesForContact(contact.name);
+          sidebarProps.onNotesChange = handleNotesChange;
+          switchSidebarMode("chat");
+        });
+      });
+    });
+  } else {
+    switchSidebarMode("chat");
+  }
+};
+
+window.switchToOrderFormSidebar = (contact) => {
+  console.log("🔄 Switching to order form sidebar mode");
+  if (contact) {
+    sidebarProps.contact = contact;
+  }
+  switchSidebarMode("orderForm");
+};
+
+window.getCurrentSidebarMode = () => {
+  return sidebarMode;
+};
+
+// Debug function to check sidebar state
+window.debugSidebarState = () => {
+  console.log("🔍 ===== SIDEBAR DEBUG STATE =====");
+  console.log("📊 Current sidebarMode:", sidebarMode);
+  console.log("📊 isSidebarOpen:", isSidebarOpen);
+  console.log("📊 sidebarRoot exists:", !!sidebarRoot);
+  console.log("📊 mainAppContent exists:", !!mainAppContent);
+  console.log("📊 lastActiveChatId:", lastActiveChatId);
+  console.log("📊 sidebarProps.contact:", sidebarProps.contact);
+  console.log("📊 #pane-side exists:", !!document.querySelector("#pane-side"));
+  console.log(
+    "📊 Sidebar container exists:",
+    !!document.getElementById("whatsapp-sidebar-root")
+  );
+  const theme = getWhatsAppTheme();
+  console.log("📊 Current theme:", theme.isDark ? "Dark 🌙" : "Light ☀️");
+  console.log("🔍 ================================");
+};
+
+// Function to manually update sidebar theme
+window.updateSidebarTheme = () => {
+  const sidebarContainer = document.getElementById("whatsapp-sidebar-root");
+  if (sidebarContainer) {
+    const theme = getWhatsAppTheme();
+    sidebarContainer.style.backgroundColor = theme.sidebarBg;
+    sidebarContainer.style.boxShadow = theme.sidebarShadow;
+    console.log(
+      "✅ Sidebar theme manually updated:",
+      theme.isDark ? "Dark 🌙" : "Light ☀️"
+    );
+    return theme;
+  } else {
+    console.warn("⚠️ Sidebar container not found");
+    return null;
   }
 };
 
@@ -2214,6 +2204,94 @@ window.showOrderForm = (show) => {
 window.getProducts = getProducts;
 window.getUserInfo = getUserInfo;
 window.getStoresForUser = getStoresForUser;
+
+// Expose sidebarProps for external access (like in TopToolbar)
+Object.defineProperty(window, "sidebarProps", {
+  get: () => sidebarProps,
+  configurable: true,
+});
+
+// Expose margin management functions for debugging
+window.whatsappMarginManager = {
+  ensureMainContentMargin,
+  forceMarginUpdate: (applyToSecond = false) => {
+    ensureMainContentMargin(applyToSecond);
+    const target = applyToSecond ? "SECOND" : "FIRST";
+    console.log(
+      `🔧 Forced margin update to ${target} div (top: 48px, right: 400px)`
+    );
+  },
+  forceUpdateForChat: () => {
+    ensureMainContentMargin(true);
+    console.log("💬 Forced margin update for SECOND div (chat view)");
+  },
+  forceUpdateForDefault: () => {
+    ensureMainContentMargin(false);
+    console.log("🏠 Forced margin update for FIRST div (default view)");
+  },
+  checkMarginStatus: () => {
+    const allDivs = document.querySelectorAll("div");
+    const exactMatches = [];
+
+    console.log(
+      '📊 Checking for divs with EXACTLY class="x78zum5 xdt5ytf x5yr21d":'
+    );
+
+    allDivs.forEach((element) => {
+      const classList = Array.from(element.classList);
+      if (
+        classList.length === 3 &&
+        classList.includes("x78zum5") &&
+        classList.includes("xdt5ytf") &&
+        classList.includes("x5yr21d")
+      ) {
+        exactMatches.push(element);
+      }
+    });
+
+    // Check if chat is open
+    const chatHeader = document.querySelector(
+      'header[data-testid="conversation-header"]'
+    );
+    const isChatOpen = !!chatHeader;
+    const targetIndex = isChatOpen ? 1 : 0;
+
+    console.log(
+      `Found ${exactMatches.length} div(s) with EXACTLY these 3 classes:`
+    );
+    console.log(
+      `📍 Current view: ${isChatOpen ? "CHAT OPEN" : "DEFAULT VIEW"}`
+    );
+    console.log(
+      `⚠️ NOTE: Margins are applied to the ${
+        isChatOpen ? "SECOND" : "FIRST"
+      } matching div`
+    );
+
+    exactMatches.forEach((element, index) => {
+      const computedStyle = window.getComputedStyle(element);
+      const marginTop = computedStyle.marginTop;
+      const marginRight = computedStyle.marginRight;
+      const classCount = element.classList.length;
+      const isTarget = index === targetIndex;
+
+      console.log(`${isTarget ? "👉 TARGET" : "  "} Element ${index + 1}:`);
+      console.log(
+        `  - This is ${
+          isTarget
+            ? "THE TARGET (margins applied here)"
+            : "NOT the target (ignored)"
+        }`
+      );
+      console.log(`  - Class count: ${classCount} (must be exactly 3)`);
+      console.log(`  - Classes: ${element.className}`);
+      console.log(`  - margin-top: ${marginTop}`);
+      console.log(`  - margin-right: ${marginRight}`);
+    });
+
+    return exactMatches;
+  },
+};
 
 // Ensure window.whatsapofyProducts has the correct references
 Object.assign(window.whatsapofyProducts, {
@@ -2416,3 +2494,150 @@ observer.observe(document.body, {
   childList: true,
   subtree: true,
 });
+
+// --- Listen for 401 unauthorized events from background script ---
+window.addEventListener("whatsopify-unauthorized", (event) => {
+  console.log("[CONTENT] Received unauthorized event:", event.detail);
+
+  // Clear all caches
+  window.clearProductsCache && window.clearProductsCache();
+  window.clearStoresCache && window.clearStoresCache();
+  if (typeof userInfoCache !== "undefined") userInfoCache = null;
+  if (typeof storesCache !== "undefined") storesCache = null;
+
+  // Close sidebar
+  window.toggleWhatsappSidebar(false);
+
+  // Show notification to user
+  if (event.detail && event.detail.message) {
+    console.warn("[CONTENT] Authentication expired:", event.detail.message);
+    showAuthExpiredNotification(event.detail.message);
+  }
+});
+
+// Function to show authentication expired notification
+function showAuthExpiredNotification(message) {
+  // Create notification element
+  const notification = document.createElement("div");
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #ff4444;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 10001;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    max-width: 300px;
+    animation: slideIn 0.3s ease-out;
+  `;
+
+  // Add CSS animation
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  notification.textContent = message;
+  document.body.appendChild(notification);
+
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    notification.style.animation = "slideOut 0.3s ease-in";
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
+      }
+    }, 300);
+  }, 5000);
+}
+
+// Expose notification function globally
+window.showAuthExpiredNotification = showAuthExpiredNotification;
+
+// Global function to check if store is selected and show modal if not
+window.requireStoreSelection = function (callback) {
+  const selectedStore = localStorage.getItem("whatsopify_selected_store");
+  const hasSelectedStore =
+    selectedStore && selectedStore !== "null" && selectedStore !== '""';
+
+  if (!hasSelectedStore) {
+    console.log("⚠️ Store selection required - showing store selection modal");
+    // Dispatch event to show store selection modal
+    window.dispatchEvent(new CustomEvent("showStoreSelectionModal"));
+    return false;
+  }
+
+  // If callback provided and store is selected, execute it
+  if (callback && typeof callback === "function") {
+    callback();
+  }
+
+  return true;
+};
+
+// Global function to refresh orders (for store selection)
+window.refreshOrders = function (callback) {
+  console.log("[ORDERS] Global refresh orders called");
+
+  // Get selected store ID
+  const selectedStore = localStorage.getItem("whatsopify_selected_store");
+  let storeId = "default";
+  if (selectedStore) {
+    try {
+      const store = JSON.parse(selectedStore);
+      storeId =
+        store._id || store.id || store.storeId || store.store_id || "default";
+    } catch (err) {
+      console.warn("[ORDERS] Error parsing selected store:", err);
+    }
+  }
+
+  // Fetch both new and pending orders
+  Promise.all([
+    chrome.runtime.sendMessage({
+      action: "FETCH_ORDERS",
+      token: getToken(),
+      status: "open",
+      page: 1,
+      limit: 50,
+      storeId: storeId,
+    }),
+    chrome.runtime.sendMessage({
+      action: "FETCH_ORDERS",
+      token: getToken(),
+      status: "pending",
+      page: 1,
+      limit: 50,
+      storeId: storeId,
+    }),
+  ])
+    .then(([newOrdersResponse, pendingOrdersResponse]) => {
+      console.log("[ORDERS] Orders refreshed for store:", storeId);
+      if (callback) {
+        callback({
+          new: newOrdersResponse.success ? newOrdersResponse.orders : null,
+          pending: pendingOrdersResponse.success
+            ? pendingOrdersResponse.orders
+            : null,
+        });
+      }
+    })
+    .catch((error) => {
+      console.error("[ORDERS] Error refreshing orders:", error);
+      if (callback) {
+        callback(null);
+      }
+    });
+};

@@ -190,8 +190,6 @@ const ChatHeaderHover = () => {
       }
     });
 
-    // Observe the #main element or body for chat header changes
-    // The #main element usually contains the entire chat interface.
     const mainContentObserverTarget =
       document.getElementById("main") || document.body;
     if (mainContentObserverTarget) {

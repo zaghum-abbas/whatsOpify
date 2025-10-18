@@ -1,25 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { createOrder } from "../../utils/createOrder.js"; // Assuming this path is correct
+import { createOrder } from "../../utils/createOrder.js";
+import { useDebounce } from "../../hooks/useDebounce";
+import { formatPrice, getToken } from "../../core/utils/helperFunctions";
+import { IoMdTrash } from "react-icons/io";
 
-const ModalForm = ({ onClose }) => {
-  // State to manage form data
+const ModalForm = ({ onClose, theme }) => {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
-    productName: "", // Stores the selected product's name
-    variantId: "", // Stores the selected variant's ID
-    address1: "",
-    address2: "",
+    productName: "",
+    variantId: "",
+    address: "",
     city: "",
-    province: "",
-    zip: "",
-    company: "",
     email: "",
     quantity: 1,
     paymentMethod: "COD",
   });
 
-  // State for form validation errors
   const [errors, setErrors] = useState({});
   // State for loading indicators
   const [isLoading, setIsLoading] = useState(true); // True initially as data is loading
@@ -38,14 +35,25 @@ const ModalForm = ({ onClose }) => {
   // State for displaying submission-related errors
   const [submissionError, setSubmissionError] = useState("");
 
+  // State for product selection modal
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [selectedProductForModal, setSelectedProductForModal] = useState(null);
+  const [modalSearchTerm, setModalSearchTerm] = useState("");
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [productsPerPage] = useState(10);
+  const [modalProducts, setModalProducts] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalTotalPages, setModalTotalPages] = useState(1);
+  const [modalTotalProducts, setModalTotalProducts] = useState(0);
+  const [selectedItems, setSelectedItems] = useState([]);
+
   // Effect to extract contact info from WhatsApp UI and load global data (products, user info)
   useEffect(() => {
     const loadInitialData = async () => {
       // No longer set isLoading to true here, as it's true by default.
       // It will be set to false once all data is loaded or an error occurs.
       try {
-        // --- Extract contact info from WhatsApp UI ---
-        // This part attempts to pre-fill name and phone from the active WhatsApp chat.
         const contactInfoHeader = Array.from(
           document.querySelectorAll("div")
         ).find((el) => el.textContent.trim() === "Contact info");
@@ -79,7 +87,7 @@ const ModalForm = ({ onClose }) => {
           window.getProducts((products) => {
             if (products && products.length > 0) {
               setProductsData(products);
-              console.log("📦 Products data loaded:", products.length, "items");
+              console.log("📦 Products data loaded:", products, "items");
             } else {
               console.warn("⚠️ No products found or fetch failed.");
               setSubmissionError(
@@ -212,27 +220,235 @@ const ModalForm = ({ onClose }) => {
     if (submissionError) setSubmissionError("");
   };
 
-  /**
-   * Handles variant selection from the dropdown.
-   * Finds the full variant object and sets it to selectedVariant state.
-   * @param {Object} e - The event object.
-   */
-  const handleVariantSelect = (e) => {
-    const variantId = e.target.value;
-    setFormData((prev) => ({ ...prev, variantId: variantId }));
-    if (selectedProduct && selectedProduct.variants) {
-      // Find the variant by its variantId or id
-      const variant = selectedProduct.variants.find(
-        (v) => (v.id || v.variantId) === variantId
-      );
-      setSelectedVariant(variant || null);
-    }
-    // Clear variant-related errors
-    if (errors.variantId) {
-      setErrors((prev) => ({ ...prev, variantId: "" }));
+  const handleModalProductSelect = (product, variant) => {
+    // Add to selected items list
+    const itemToAdd = {
+      id: variant
+        ? `${product._id}-${variant.id || variant.variantId}`
+        : product._id,
+      product: product,
+      variant: variant,
+      quantity: 1,
+      price: variant ? variant.price : product.price,
+      name: variant
+        ? `${product.title} - ${variant.sku || variant.name}`
+        : product.title,
+      sku: variant ? variant.sku : product.sku,
+    };
+
+    setSelectedItems((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === itemToAdd.id);
+      if (existingIndex >= 0) {
+        // Update quantity if already exists
+        const updated = [...prev];
+        updated[existingIndex].quantity += 1;
+        return updated;
+      } else {
+        // Add new item
+        return [...prev, itemToAdd];
+      }
+    });
+
+    setShowProductModal(false);
+    setSelectedProducts([]);
+
+    if (errors.productName) {
+      setErrors((prev) => ({ ...prev, productName: "" }));
     }
     if (submissionError) setSubmissionError("");
   };
+  // Server-side search function for modal
+  const searchModalProducts = async (searchTerm, page = 1) => {
+    try {
+      setModalLoading(true);
+      console.log(
+        `[MODAL] Searching products with term: "${searchTerm}", page: ${page}`
+      );
+
+      const token = getToken();
+      if (!token) {
+        console.warn("[MODAL] No token found for search");
+        return;
+      }
+
+      // Call background script to search products
+      const response = await chrome.runtime.sendMessage({
+        action: "SEARCH_PRODUCTS",
+        token: token,
+        searchTerm: searchTerm,
+        page: page,
+        limit: productsPerPage,
+      });
+
+      if (response.success) {
+        let products = [];
+        let totalPages = 1;
+        let totalProducts = 0;
+
+        if (Array.isArray(response.products)) {
+          products = response.products;
+          totalProducts = products.length;
+        } else if (
+          response.products?.data &&
+          Array.isArray(response.products.data)
+        ) {
+          products = response.products.data;
+          totalPages =
+            response.products.totalPages ||
+            Math.ceil(
+              (response.products.total ||
+                response.products.len ||
+                products.length) / productsPerPage
+            );
+          totalProducts =
+            response.products.total || response.products.len || products.length;
+        } else if (
+          response.products?.products &&
+          Array.isArray(response.products.products)
+        ) {
+          products = response.products.products;
+          totalPages =
+            response.products.totalPages ||
+            Math.ceil(
+              (response.products.total ||
+                response.products.len ||
+                products.length) / productsPerPage
+            );
+          totalProducts =
+            response.products.total || response.products.len || products.length;
+        } else {
+          console.warn(
+            "[MODAL] Unexpected search response structure:",
+            response.products
+          );
+          products = [];
+          totalProducts = 0;
+        }
+
+        setModalProducts(products);
+        setModalTotalPages(totalPages);
+        setModalTotalProducts(totalProducts);
+
+        console.log(
+          `[MODAL] ✅ Found ${products.length} products for search: "${searchTerm}"`
+        );
+      } else {
+        console.error("[MODAL] Search API failed:", response.error);
+        setModalProducts([]);
+        setModalTotalPages(1);
+        setModalTotalProducts(0);
+      }
+    } catch (error) {
+      console.error("[MODAL] Error searching products:", error);
+      setModalProducts([]);
+      setModalTotalPages(1);
+      setModalTotalProducts(0);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleCheck = (e, val) => {
+    const { checked } = e.target;
+    const updatedModalProducts = modalProducts.map((item) => {
+      // Check if it's a product selection (no variant)
+      if (item?._id === val?._id && !val?.id) {
+        return {
+          ...item,
+          checked,
+        };
+      } else {
+        // Check if it's a variant selection
+        const updatedVariants = item.variants?.map((variant) => {
+          if (variant?.id === val?.id || variant?.variantId === val?.id) {
+            // Update form data with variant info
+            setFormData((prev) => ({
+              ...prev,
+              variantId: variant.id || variant.variantId,
+            }));
+            return {
+              ...variant,
+              checked,
+            };
+          }
+          return variant;
+        });
+        return {
+          ...item,
+          variants: updatedVariants ?? item.variants,
+        };
+      }
+    });
+
+    setModalProducts(updatedModalProducts);
+
+    // Update selectedProducts array for modal footer count
+    if (checked) {
+      setSelectedProducts((prev) => [...prev, val]);
+    } else {
+      setSelectedProducts((prev) =>
+        prev.filter((p) => {
+          if (val?.id) {
+            // Remove variant
+            return !(p.id === val.id);
+          } else {
+            // Remove product
+            return !(p._id === val._id);
+          }
+        })
+      );
+    }
+  };
+
+  const handleVariantSelect = (product, variant) => {
+    handleModalProductSelect(product, variant);
+  };
+
+  // Handle quantity change
+  const handleQuantityChange = (itemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      handleRemoveItem(itemId);
+      return;
+    }
+    setSelectedItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      )
+    );
+  };
+
+  // Handle item removal
+  const handleRemoveItem = (itemId) => {
+    setSelectedItems((prev) => prev.filter((item) => item.id !== itemId));
+  };
+
+  // Handle modal close
+  const handleModalClose = () => {
+    setShowProductModal(false);
+    setModalSearchTerm("");
+    setSelectedProducts([]);
+    setCurrentPage(1);
+    setModalProducts([]);
+    setModalTotalPages(1);
+    setModalTotalProducts(0);
+  };
+
+  // Debounced search effect for modal
+  const debouncedModalSearch = useDebounce(modalSearchTerm, 500);
+
+  // Effect to handle modal search
+  useEffect(() => {
+    if (showProductModal) {
+      searchModalProducts(debouncedModalSearch, currentPage);
+    }
+  }, [debouncedModalSearch, currentPage, showProductModal]);
+
+  // Effect to handle page changes
+  useEffect(() => {
+    if (showProductModal) {
+      searchModalProducts(modalSearchTerm, currentPage);
+    }
+  }, [currentPage, showProductModal]);
 
   /**
    * Handles the form submission, creates an order, and sends a WhatsApp message.
@@ -283,7 +499,6 @@ const ModalForm = ({ onClose }) => {
         country: userInfo?.country || "Pakistan",
       };
 
-      // Construct the order payload based on the API response structure
       const orderPayload = {
         storeId: currentStoreId,
         shopify_id: 0, // Changed from null to 0 as per API schema example
@@ -403,182 +618,174 @@ const ModalForm = ({ onClose }) => {
     }
   };
 
-  // For inline rendering, we don't need modal root
-  // const modalRoot = document.getElementById('whatsapp-modal-root');
-
-  // Get unique product names for the first dropdown (Product Name)
-  const uniqueProductNames = [...new Set(productsData.map((p) => p.name))];
   // Filter selectedProduct.variants to ensure they are valid and have an ID for the second dropdown (Variant)
   const currentProductVariants =
     selectedProduct && selectedProduct.variants
       ? selectedProduct.variants.filter((v) => v.id || v.variantId)
       : [];
 
-  // Render the form inline instead of in a modal
+  console.log("modalProducts", modalProducts);
   return (
     <form onSubmit={handleSubmit} style={inlineFormStyle}>
       <div style={scrollableContentStyle}>
-        {/* <h2 style={headerStyle}>Create New Order</h2> */}
-        {/* Show loading spinner if data is still being fetched */}
         {isLoading ? (
           <div style={loadingStyle}>
             <div style={spinnerStyle}></div>
             <p>Loading contact and product information...</p>
           </div>
         ) : (
-          // Render the form sections once data is loaded
           <div style={sectionContainerStyle}>
-            {/* Customer Information Section */}
             <div style={sectionStyle}>
-              {/* <h3 style={sectionHeaderStyle}>Customer Information</h3> */}
               <div style={fieldGroupStyle}>
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>Full Name*</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-                  {errors.name && <span style={errorStyle}>{errors.name}</span>}
-                </div>
-
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Phone Number*</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-                  {errors.phone && (
-                    <span style={errorStyle}>{errors.phone}</span>
-                  )}
-                </div>
-
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Email*</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                    placeholder="customer@example.com"
-                  />
-                  {errors.email && (
-                    <span style={errorStyle}>{errors.email}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Order Details Section */}
-            <div style={sectionStyle}>
-              <h3 style={sectionHeaderStyle}>Order Details</h3>
-              <div style={fieldGroupStyle}>
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Product Name*</label>
-                  <select
-                    name="productName"
-                    value={formData.productName}
-                    onChange={handleProductSelect}
-                    // required
-                    style={inputStyle}
+                  <label style={labelStyle}>Product*</label>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      alignItems: "center",
+                    }}
                   >
-                    <option value="">Select a product</option>
-                    {/* Map through unique product names to populate the dropdown */}
-                    {uniqueProductNames.map((name, index) => (
-                      <option key={index} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
+                    <input
+                      type="text"
+                      value={
+                        selectedProduct
+                          ? selectedProduct.name || selectedProduct.title
+                          : ""
+                      }
+                      placeholder="Select Product"
+                      readOnly
+                      style={{
+                        ...inputStyle,
+                        backgroundColor: "#f9f9f9",
+                        cursor: "pointer",
+                        flex: 1,
+                      }}
+                      onClick={() => setShowProductModal(true)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowProductModal(true)}
+                      style={{
+                        padding: "10px 20px",
+                        backgroundColor: theme === "dark" ? "#25D366" : "#ccc",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontWeight: "500",
+                        fontSize: "0.95rem",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Browse
+                    </button>
+                  </div>
                   {errors.productName && (
                     <span style={errorStyle}>{errors.productName}</span>
                   )}
                 </div>
-
-                {/* Variant Dropdown - Only rendered if a product is selected */}
-                {selectedProduct && (
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>Variant*</label>
-                    <select
-                      name="variantId"
-                      value={formData.variantId}
-                      onChange={handleVariantSelect}
-                      required
-                      style={inputStyle}
-                      // Disable if no product selected or no variants available for the product
-                      disabled={
-                        !selectedProduct || currentProductVariants.length === 0
-                      }
-                    >
-                      <option value="">Select a variant</option>
-                      {/* Map through current product's variants */}
-                      {currentProductVariants.map((variant, index) => (
-                        <option
-                          key={variant.id || variant.variantId || index}
-                          value={variant.id || variant.variantId}
-                        >
-                          {variant.name || variant.variantId} (SKU:{" "}
-                          {variant.sku || "N/A"}) - PKR {variant.price || "N/A"}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.variantId && (
-                      <span style={errorStyle}>{errors.variantId}</span>
-                    )}
-                  </div>
-                )}
-
-                {/* Selected Variant Details - Only rendered if a variant is selected */}
-                {selectedVariant && (
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>Selected Variant Details:</label>
-                    <p
-                      style={{
-                        ...inputStyle,
-                        backgroundColor: "#f9f9f9",
-                        border: "1px dashed #ddd",
-                        padding: "8px 12px",
-                      }}
-                    >
-                      Price: PKR {selectedVariant.price || "N/A"}
-                      <br />
-                      SKU: {selectedVariant.sku || "N/A"}
-                      <br />
-                      Vendor: {selectedProduct?.vendor || "N/A"}
-                    </p>
-                  </div>
-                )}
-
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Quantity*</label>
-                  <input
-                    type="number"
-                    name="quantity"
-                    value={formData.quantity}
-                    onChange={handleChange}
-                    min="1"
-                    required
-                    style={inputStyle}
-                  />
-                  {errors.quantity && (
-                    <span style={errorStyle}>{errors.quantity}</span>
-                  )}
-                </div>
               </div>
             </div>
 
+            {selectedItems.length > 0 && (
+              <div style={sectionStyle}>
+                <h3 style={sectionHeaderStyle}>Selected Items</h3>
+                <div style={fieldGroupStyle}>
+                  {selectedItems.map((item) => (
+                    <div key={item.id} style={selectedItemStyle}>
+                      {/* Avatar on the left */}
+                      <div style={selectedItemAvatarStyle}>
+                        {item.product.title
+                          ? item.product.title.charAt(0).toUpperCase()
+                          : "P"}
+                      </div>
+
+                      {/* Content on the right */}
+                      <div
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px",
+                        }}
+                      >
+                        {/* Product name */}
+                        <div style={selectedItemNameStyle}>{item.name}</div>
+
+                        {/* Price and total row */}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <div style={selectedItemPriceStyle}>
+                            Rs. {formatPrice(item.price)} x {item.quantity}
+                          </div>
+                          <div style={selectedItemTotalStyle}>
+                            Rs. {formatPrice(item.price * item.quantity)}
+                          </div>
+                        </div>
+
+                        {/* Quantity controls and remove button row */}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <div style={quantityControlsStyle}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleQuantityChange(item.id, item.quantity - 1)
+                              }
+                              style={quantityButtonStyle}
+                            >
+                              -
+                            </button>
+                            <span style={quantityDisplayStyle}>
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleQuantityChange(item.id, item.quantity + 1)
+                              }
+                              style={quantityButtonStyle}
+                            >
+                              +
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(item.id)}
+                            style={removeButtonStyle}
+                          >
+                            <IoMdTrash width={20} height={20} color="red" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Payment Method Section */}
             <div style={sectionStyle}>
-              <h3 style={sectionHeaderStyle}>Payment Method*</h3>
+              <h3
+                style={{
+                  ...sectionHeaderStyle,
+                  color: theme === "dark" ? "white" : "#222",
+                }}
+              >
+                Payment Method*
+              </h3>
+
               <div style={radioGroupStyle}>
                 {paymentMethods.map((method) => (
                   <label key={method.value} style={radioLabelStyle}>
@@ -599,31 +806,51 @@ const ModalForm = ({ onClose }) => {
 
             {/* Shipping Information Section */}
             <div style={sectionStyle}>
-              <h3 style={sectionHeaderStyle}>Shipping Information</h3>
+              <h3
+                style={{
+                  ...sectionHeaderStyle,
+                  color: theme === "dark" ? "white" : "#222",
+                }}
+              >
+                Shipping Information
+              </h3>
               <div style={fieldGroupStyle}>
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>Address Line 1*</label>
-                  <textarea
-                    name="address1"
-                    value={formData.address1}
+                  <label style={labelStyle}>Name*</label>
+                  <input
+                    name="name"
+                    value={formData.name}
                     onChange={handleChange}
-                    rows="2"
                     required
-                    style={{ ...inputStyle, minHeight: "60px" }}
+                    style={{ ...inputStyle }}
                   />
-                  {errors.address1 && (
-                    <span style={errorStyle}>{errors.address1}</span>
-                  )}
+                  {errors.name && <span style={errorStyle}>{errors.name}</span>}
                 </div>
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>Address Line 2</label>
+                  <label style={labelStyle}>Phone Number*</label>
                   <input
-                    type="text"
-                    name="address2"
-                    value={formData.address2}
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
                     onChange={handleChange}
                     style={inputStyle}
                   />
+                  {errors.phone && (
+                    <span style={errorStyle}>{errors.phone}</span>
+                  )}
+                </div>
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    style={inputStyle}
+                  />
+                  {errors.email && (
+                    <span style={errorStyle}>{errors.email}</span>
+                  )}
                 </div>
                 <div style={fieldStyle}>
                   <label style={labelStyle}>City*</label>
@@ -638,47 +865,24 @@ const ModalForm = ({ onClose }) => {
                   {errors.city && <span style={errorStyle}>{errors.city}</span>}
                 </div>
                 <div style={fieldStyle}>
-                  <label style={labelStyle}>Province*</label>
-                  <input
+                  <label style={labelStyle}>Address*</label>
+                  <textarea
                     type="text"
-                    name="province"
-                    value={formData.province}
+                    name="address"
+                    value={formData.address}
                     onChange={handleChange}
                     required
                     style={inputStyle}
                   />
-                  {errors.province && (
-                    <span style={errorStyle}>{errors.province}</span>
+                  {errors.address && (
+                    <span style={errorStyle}>{errors.address}</span>
                   )}
-                </div>
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Zip Code*</label>
-                  <input
-                    type="text"
-                    name="zip"
-                    value={formData.zip}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-                  {errors.zip && <span style={errorStyle}>{errors.zip}</span>}
-                </div>
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Company (Optional)</label>
-                  <input
-                    type="text"
-                    name="company"
-                    value={formData.company}
-                    onChange={handleChange}
-                    style={inputStyle}
-                  />
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Display submission errors */}
         {submissionError && (
           <div
             style={{
@@ -694,7 +898,348 @@ const ModalForm = ({ onClose }) => {
         )}
       </div>
 
-      {/* Form Action Buttons */}
+      {showProductModal && (
+        <div style={modalOverlayStyle}>
+          <div style={{ ...modalStyle, maxWidth: "500px", maxHeight: "80vh" }}>
+            <div style={modalHeaderStyle}>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: "1.5rem",
+                  color: "#333",
+                  fontWeight: "600",
+                }}
+              >
+                All Products
+              </h2>
+              <button onClick={handleModalClose} style={closeButtonStyle}>
+                ×
+              </button>
+            </div>
+
+            <div style={searchContainerStyle}>
+              <div style={searchInputWrapperStyle}>
+                <span style={searchIconStyle}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search by any field..."
+                  value={modalSearchTerm}
+                  onChange={(e) => {
+                    setModalSearchTerm(e.target.value);
+                    setCurrentPage(1); // Reset to first page when searching
+                  }}
+                  style={searchInputStyle}
+                />
+              </div>
+            </div>
+
+            <div style={productListStyle}>
+              {modalLoading ? (
+                <div style={loadingStyle}>
+                  <div style={spinnerStyle}></div>
+                  <p>Loading products...</p>
+                </div>
+              ) : (
+                modalProducts.map((item, index) => {
+                  const isSingleVariant = item?.variants?.length === 1;
+                  const totalStock = item?.variants?.reduce(
+                    (sum, variant) => sum + (variant?.stock?.available || 0),
+                    0
+                  );
+
+                  return (
+                    <div key={item._id || index}>
+                      {/* Main Product Row */}
+                      <div style={productListItemStyle}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "20px",
+                            // marginLeft: isSingleVariant ? "0" : "40px",
+                          }}
+                        >
+                          {isSingleVariant && (
+                            <div style={checkboxStyle}>
+                              <input
+                                type="checkbox"
+                                checked={item?.variants?.[0]?.checked || false}
+                                disabled={
+                                  item?.variants?.[0]?.stock?.available === 0
+                                }
+                                onChange={(e) =>
+                                  handleCheck(e, item?.variants?.[0])
+                                }
+                                style={checkboxInputStyle}
+                              />
+                            </div>
+                          )}
+
+                          <div style={avatarStyle}>
+                            {item.title
+                              ? item.title.charAt(0).toUpperCase()
+                              : "P"}
+                          </div>
+
+                          <div style={productInfoStyle}>
+                            <div style={productNameStyle}>
+                              {item.title || ""}
+                            </div>
+                            <div style={productDescriptionStyle}>
+                              {item.category || ""}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "16px",
+                          }}
+                        >
+                          <div style={availabilityStyle}>
+                            {item?.variants?.[0]?.stock?.available === 0 ? (
+                              <span>
+                                {item?.variants?.[0]?.stock?.available} out of
+                                stock
+                              </span>
+                            ) : (
+                              <span>
+                                {formatPrice(
+                                  item?.variants?.[0]?.stock?.available
+                                ) || ""}{" "}
+                                Available
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={priceStyle}>
+                            Rs. {formatPrice(item?.variants?.[0]?.price) || 0}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Variants Section */}
+                      {!isSingleVariant && (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                            marginLeft: "48px",
+                            marginTop: "16px",
+                            paddingBottom: "16px",
+                            borderBottom: "2px solid #e0e0e0",
+                          }}
+                        >
+                          {item?.variants?.map((variant) => (
+                            <div
+                              key={variant?.id}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                margin: "8px 0",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "12px",
+                                  width: "400px",
+                                }}
+                              >
+                                <div style={checkboxStyle}>
+                                  <input
+                                    type="checkbox"
+                                    checked={variant?.checked || false}
+                                    disabled={variant?.stock?.available === 0}
+                                    onChange={(e) => handleCheck(e, variant)}
+                                    style={checkboxInputStyle}
+                                  />
+                                </div>
+
+                                <div style={avatarStyle}>
+                                  {variant?.sku
+                                    ? variant.sku.charAt(0).toUpperCase()
+                                    : "V"}
+                                </div>
+
+                                <div style={productNameStyle}>
+                                  {variant?.sku || ""}
+                                </div>
+                              </div>
+
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "flex-end",
+                                  gap: "24px",
+                                  width: "100%",
+                                }}
+                              >
+                                <div style={availabilityStyle}>
+                                  {variant?.stock?.available === 0 ? (
+                                    <span>
+                                      {variant?.stock?.available} out of stock
+                                    </span>
+                                  ) : (
+                                    <span>
+                                      {formatPrice(variant?.stock?.available) ||
+                                        ""}{" "}
+                                      Available
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div style={priceStyle}>
+                                  Rs. {formatPrice(variant?.price) || ""}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+
+              {!modalLoading && modalProducts.length === 0 && (
+                <div style={noProductsStyle}>
+                  <p>No products found</p>
+                </div>
+              )}
+            </div>
+
+            <div style={modalFooterStyle}>
+              <div style={paginationStyle}>
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  style={paginationButtonStyle}
+                >
+                  &lt;&lt;
+                </button>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
+                  disabled={currentPage === 1}
+                  style={paginationButtonStyle}
+                >
+                  &lt;
+                </button>
+                <span style={paginationInfoStyle}>
+                  {currentPage} / {modalTotalPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) =>
+                      Math.min(modalTotalPages, prev + 1)
+                    )
+                  }
+                  disabled={currentPage === modalTotalPages}
+                  style={paginationButtonStyle}
+                >
+                  &gt;
+                </button>
+                <button
+                  onClick={() => setCurrentPage(modalTotalPages)}
+                  disabled={currentPage === modalTotalPages}
+                  style={paginationButtonStyle}
+                >
+                  &gt;&gt;
+                </button>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItemstems: "center",
+                  justifyContent: "space-between",
+                  width: "100%",
+                }}
+              >
+                <div style={selectionSummaryStyle}>
+                  {selectedProducts.length} /{" "}
+                  {modalProducts.reduce((acc, item) => {
+                    const variantsLength = item?.variants?.length || 0;
+                    return acc + (variantsLength > 1 ? variantsLength : 1);
+                  }, 0)}{" "}
+                  products selected
+                </div>
+
+                <div style={actionButtonsStyle}>
+                  <button onClick={handleModalClose} style={cancelButtonStyle}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Handle add checked items
+                      const checkedItems = [];
+
+                      modalProducts.forEach((item) => {
+                        if (
+                          item?.variants?.length === 1 &&
+                          item?.variants?.[0]?.checked
+                        ) {
+                          // Single variant checked
+                          checkedItems.push({
+                            product: item,
+                            variant: item.variants[0],
+                          });
+                        } else if (item?.variants?.length > 1) {
+                          // Multiple variants - check each one
+                          item.variants.forEach((variant) => {
+                            if (variant?.checked) {
+                              checkedItems.push({
+                                product: item,
+                                variant: variant,
+                              });
+                            }
+                          });
+                        } else if (item?.checked) {
+                          // Product without variants checked
+                          checkedItems.push({
+                            product: item,
+                            variant: null,
+                          });
+                        }
+                      });
+
+                      // Add all checked items to selected items
+                      checkedItems.forEach(({ product, variant }) => {
+                        handleModalProductSelect(product, variant);
+                      });
+
+                      // Clear checked states
+                      const clearedProducts = modalProducts.map((item) => ({
+                        ...item,
+                        checked: false,
+                        variants: item.variants?.map((variant) => ({
+                          ...variant,
+                          checked: false,
+                        })),
+                      }));
+                      setModalProducts(clearedProducts);
+                      setSelectedProducts([]);
+                    }}
+                    style={addButtonStyle}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={actionsStyle}>
         <button
           type="button"
@@ -720,15 +1265,13 @@ const ModalForm = ({ onClose }) => {
   );
 };
 
-// Constants for payment methods
 const paymentMethods = [
   { value: "COD", label: "Cash on Delivery" },
-  { value: "bank_transfer", label: "Bank Transfer" },
-  { value: "credit_card", label: "Credit Card" },
-  { value: "mobile_payment", label: "Mobile Payment" },
+  { value: "prepaid", label: "Prepaid" },
+  // { value: "credit_card", label: "Credit Card" },
+  // { value: "mobile_payment", label: "Mobile Payment" },
 ];
 
-// Styles
 const modalOverlayStyle = {
   position: "fixed",
   top: 0,
@@ -796,7 +1339,6 @@ const sectionStyle = {};
 const sectionHeaderStyle = {
   margin: "0 0 12px 0",
   fontSize: "1.1rem",
-  color: "#555",
 };
 
 const fieldGroupStyle = {
@@ -904,6 +1446,327 @@ const spinnerStyle = {
     "0%": { transform: "rotate(0deg)" },
     "100%": { transform: "rotate(360deg)" },
   },
+};
+
+// Product modal styles
+const modalHeaderStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
+  paddingBottom: "15px",
+  borderBottom: "1px solid #e0e0e0",
+};
+
+const closeButtonStyle = {
+  background: "transparent",
+  border: "none",
+  fontSize: "1.5rem",
+  cursor: "pointer",
+  color: "#666",
+  padding: "5px",
+  width: "30px",
+  height: "30px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "4px",
+};
+
+const searchContainerStyle = {
+  marginBottom: "20px",
+};
+
+const searchInputWrapperStyle = {
+  position: "relative",
+  display: "flex",
+  alignItems: "center",
+};
+
+const searchIconStyle = {
+  position: "absolute",
+  left: "12px",
+  fontSize: "16px",
+  color: "#666",
+  zIndex: 1,
+};
+
+const searchInputStyle = {
+  width: "100%",
+  padding: "12px 12px 12px 40px",
+  borderRadius: "8px",
+  border: "1px solid #ddd",
+  fontSize: "1rem",
+  boxSizing: "border-box",
+  backgroundColor: "#fff",
+};
+
+const productListStyle = {
+  maxHeight: "400px",
+  overflowY: "auto",
+  marginBottom: "20px",
+  border: "1px solid #e0e0e0",
+  borderRadius: "8px",
+};
+
+const productListItemStyle = {
+  display: "flex",
+  alignItems: "center",
+  padding: "15px",
+  borderBottom: "1px solid #f0f0f0",
+  backgroundColor: "#fff",
+  position: "relative",
+};
+
+const checkboxStyle = {
+  marginRight: "15px",
+};
+
+const checkboxInputStyle = {
+  width: "16px",
+  height: "16px",
+  cursor: "pointer",
+};
+
+const avatarStyle = {
+  width: "40px",
+  height: "40px",
+  borderRadius: "50%",
+  backgroundColor: "#20B2AA",
+  color: "white",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: "14px",
+  fontWeight: "600",
+  marginRight: "15px",
+  flexShrink: 0,
+};
+
+const productInfoStyle = {
+  flex: 1,
+  marginRight: "15px",
+};
+
+const productNameStyle = {
+  fontSize: "1rem",
+  fontWeight: "600",
+  color: "#333",
+  marginBottom: "4px",
+};
+
+const productDescriptionStyle = {
+  fontSize: "0.9rem",
+  color: "#666",
+};
+
+const availabilityStyle = {
+  fontSize: "0.9rem",
+  color: "#666",
+  marginRight: "15px",
+  minWidth: "100px",
+  textAlign: "center",
+};
+
+const priceStyle = {
+  fontSize: "1rem",
+  fontWeight: "600",
+  color: "#333",
+  marginRight: "15px",
+  minWidth: "80px",
+  textAlign: "right",
+};
+
+const variantsDropdownStyle = {
+  position: "absolute",
+  top: "100%",
+  left: "0",
+  right: "0",
+  backgroundColor: "#f9f9f9",
+  border: "1px solid #ddd",
+  borderTop: "none",
+  padding: "10px",
+  zIndex: 10,
+};
+
+const variantSelectStyle = {
+  width: "100%",
+  padding: "8px",
+  borderRadius: "4px",
+  border: "1px solid #ccc",
+  fontSize: "0.9rem",
+};
+
+const modalFooterStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "10px",
+  justifyContent: "space-between",
+  alignItems: "center",
+  paddingTop: "15px",
+  borderTop: "1px solid #e0e0e0",
+};
+
+const selectionSummaryStyle = {
+  fontSize: "0.9rem",
+  color: "#666",
+};
+
+const footerActionsStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "20px",
+};
+
+const paginationStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "5px",
+  justifyContent: "end",
+  width: "100%",
+};
+
+const paginationButtonStyle = {
+  padding: "6px 10px",
+  border: "1px solid #ddd",
+  backgroundColor: "#fff",
+  borderRadius: "4px",
+  cursor: "pointer",
+  fontSize: "0.9rem",
+  color: "#333",
+};
+
+const paginationInfoStyle = {
+  fontSize: "0.9rem",
+  color: "#666",
+  margin: "0 10px",
+};
+
+const actionButtonsStyle = {
+  display: "flex",
+  gap: "10px",
+};
+
+const cancelButtonStyle = {
+  padding: "10px 20px",
+  backgroundColor: "#fff",
+  color: "#666",
+  border: "1px solid #ddd",
+  borderRadius: "6px",
+  cursor: "pointer",
+  fontSize: "0.95rem",
+  fontWeight: "500",
+};
+
+const addButtonStyle = {
+  padding: "10px 20px",
+  backgroundColor: "#007bff",
+  color: "white",
+  border: "none",
+  borderRadius: "6px",
+  cursor: "pointer",
+  fontSize: "0.95rem",
+  fontWeight: "500",
+};
+
+const noProductsStyle = {
+  padding: "40px",
+  textAlign: "center",
+  color: "#666",
+};
+
+// Selected items styles
+const selectedItemStyle = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "12px",
+  padding: "12px",
+  border: "1px solid #e0e0e0",
+  borderRadius: "8px",
+  marginBottom: "12px",
+  backgroundColor: "#fff",
+};
+
+const selectedItemAvatarStyle = {
+  width: "40px",
+  height: "40px",
+  borderRadius: "50%",
+  backgroundColor: "#20B2AA",
+  color: "white",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: "14px",
+  fontWeight: "600",
+  flexShrink: 0,
+};
+
+const selectedItemInfoStyle = {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  gap: "4px",
+};
+
+const selectedItemNameStyle = {
+  fontSize: "14px",
+  fontWeight: "600",
+  color: "#333",
+};
+
+const selectedItemPriceStyle = {
+  fontSize: "12px",
+  color: "#666",
+};
+
+const quantityControlsStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  border: "1px solid #ddd",
+  borderRadius: "4px",
+  padding: "4px",
+};
+
+const quantityButtonStyle = {
+  width: "24px",
+  height: "24px",
+  border: "none",
+  backgroundColor: "#f0f0f0",
+  borderRadius: "4px",
+  cursor: "pointer",
+  fontSize: "14px",
+  fontWeight: "600",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const quantityDisplayStyle = {
+  fontSize: "14px",
+  fontWeight: "600",
+  minWidth: "20px",
+  textAlign: "center",
+};
+
+const selectedItemTotalStyle = {
+  fontSize: "14px",
+  fontWeight: "600",
+  color: "#333",
+  minWidth: "80px",
+  textAlign: "right",
+};
+
+const removeButtonStyle = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  fontSize: "16px",
+  padding: "4px",
+  color: "#dc3545",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
 };
 
 export default ModalForm;

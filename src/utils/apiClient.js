@@ -1,15 +1,14 @@
-// API Client utility for session-based authentication
-// This utility provides a centralized way to make API calls with session cookies
+// API Client utility for token-based authentication
+// This utility provides a centralized way to make API calls with Bearer tokens
 
 /**
- * Make an API call with session-based authentication
+ * Make an API call with token-based authentication
  * @param {string} url - The API endpoint URL
  * @param {Object} options - Fetch options (method, body, headers, etc.)
  * @returns {Promise} - Promise that resolves with the response
  */
 export const apiCall = async (url, options = {}) => {
   const defaultOptions = {
-    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...options.headers,
@@ -51,7 +50,7 @@ export const apiCall = async (url, options = {}) => {
 };
 
 /**
- * GET request with session authentication
+ * GET request with token authentication
  * @param {string} url - The API endpoint URL
  * @param {Object} headers - Additional headers
  * @returns {Promise} - Promise that resolves with the response
@@ -64,7 +63,7 @@ export const apiGet = (url, headers = {}) => {
 };
 
 /**
- * POST request with session authentication
+ * POST request with token authentication
  * @param {string} url - The API endpoint URL
  * @param {Object} data - Request body data
  * @param {Object} headers - Additional headers
@@ -79,7 +78,7 @@ export const apiPost = (url, data, headers = {}) => {
 };
 
 /**
- * PUT request with session authentication
+ * PUT request with token authentication
  * @param {string} url - The API endpoint URL
  * @param {Object} data - Request body data
  * @param {Object} headers - Additional headers
@@ -94,7 +93,7 @@ export const apiPut = (url, data, headers = {}) => {
 };
 
 /**
- * DELETE request with session authentication
+ * DELETE request with token authentication
  * @param {string} url - The API endpoint URL
  * @param {Object} headers - Additional headers
  * @returns {Promise} - Promise that resolves with the response
@@ -116,7 +115,7 @@ export const ordersApi = {
    * @returns {Promise} - Promise that resolves with orders data
    */
   fetchOrders: (status, page = 1, limit = 50) => {
-    const url = `https://api1.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}`;
+    const url = `https://api.shopilam.com/api/v1/orders?status=${status}&page=${page}&limit=${limit}`;
     return apiGet(url);
   },
 
@@ -127,7 +126,7 @@ export const ordersApi = {
    * @returns {Promise} - Promise that resolves with update result
    */
   updateOrderStatus: (orderId, status) => {
-    const url = `https://api1.shopilam.com/api/v1/orders/${orderId}`;
+    const url = `https://api.shopilam.com/api/v1/orders/${orderId}`;
     return apiPut(url, { status });
   },
 
@@ -137,7 +136,7 @@ export const ordersApi = {
    * @returns {Promise} - Promise that resolves with created order
    */
   createOrder: (orderData) => {
-    const url = "https://api1.shopilam.com/api/v1/orders";
+    const url = "https://api.shopilam.com/api/v1/orders";
     return apiPost(url, orderData);
   },
 };
@@ -149,8 +148,7 @@ export const productsApi = {
    * @returns {Promise} - Promise that resolves with products data
    */
   fetchProducts: () => {
-    const url =
-      "https://api1.shopilam.com/api/v1/products?limit=50&page=1&status=active";
+    const url = `https://api.shopilam.com/api/v1/products?limit=50&page=1&status=active`;
     return apiGet(url);
   },
 };
