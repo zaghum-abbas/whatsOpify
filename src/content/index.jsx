@@ -16,6 +16,7 @@ import LoginModal from "./components/LoginModal";
 import {
   extractPhoneNumberFromDOM,
   getToken,
+  showVariantImages,
 } from "../core/utils/helperFunctions.js";
 
 console.log("🚀 Whatsapofy content script loaded at 12:30 PM PKT, 17/07/2025");
@@ -180,7 +181,17 @@ const renderSidebar = () => {
 
 console.log("🔍 sidebarMode:", sidebarMode);
 
+// Flag to prevent multiple simultaneous calls
+let isExtractingContact = false;
+
 const getActiveChatDetails = async () => {
+  // Prevent multiple simultaneous calls
+  if (isExtractingContact) {
+    console.log("⚠️ Contact extraction already in progress, skipping...");
+    return { name: "", phone: "" };
+  }
+
+  isExtractingContact = true;
   console.log("🔍 Starting contact extraction...");
 
   let name = "";
@@ -192,33 +203,64 @@ const getActiveChatDetails = async () => {
     "header h2[title]",
   ];
 
+  // Find and click the header element to open contact info
+  let headerClicked = false;
   for (const selector of nameSelectors) {
     const element = document.querySelector(selector);
     if (element && element.textContent.trim().length > 0) {
+      console.log("🔍 Clicking header element:", selector);
       element.click(); // open contact info
+      headerClicked = true;
       break;
     }
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  if (!headerClicked) {
+    console.warn("⚠️ No header element found to click");
+    return { name, phone };
+  }
 
+  // Wait longer for contact info panel to fully load
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
+  // Extract phone number
   phone = extractPhoneNumberFromDOM?.() || "";
   console.log("✅ Extracted phone:", phone);
 
   const result = { name, phone };
 
+  // Close the contact info panel after a longer delay
   setTimeout(() => {
-    const closeDiv = document.querySelector(
-      'div[aria-expanded="false"][aria-label="Close"]'
-    );
-    console.log("🔍 closeDiv", closeDiv);
+    const closeSelectors = [
+      'div[aria-expanded="false"][aria-label="Close"]',
+      'div[aria-label="Close"]',
+      'button[aria-label="Close"]',
+      '[data-testid="close"]',
+    ];
+
+    let closeDiv = null;
+    for (const selector of closeSelectors) {
+      closeDiv = document.querySelector(selector);
+      if (closeDiv) {
+        console.log("🔍 Found close button with selector:", selector);
+        break;
+      }
+    }
+
     if (closeDiv) {
       closeDiv.click();
-      console.log("❌ Closed contact info panel using data-tab=1 div.");
+      console.log("❌ Closed contact info panel");
     } else {
-      console.warn("⚠️ Could not find close div!");
+      console.warn("⚠️ Could not find close button!");
     }
-  }, 10);
+  }, 100); // Wait 1 second before closing
+
+  // Reset the flag after a delay to allow for proper cleanup
+  setTimeout(() => {
+    isExtractingContact = false;
+    console.log("✅ Contact extraction completed, flag reset");
+  }, 1500);
+
   return result;
 };
 
@@ -1919,7 +1961,11 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
         productItem.images.length > 0
       ) {
         // Handle images array format
-        imageUrl = productItem.images[0]?.url || productItem.images[0];
+        // imageUrl = productItem.images[0]?.url || productItem.images[0];
+        imageUrl =
+          productItem.variants.length > 0
+            ? showVariantImages(productItem.images, productItem)
+            : showProductImages(productItem);
       } else if (productItem.image) {
         // Handle single image format
         imageUrl = productItem.image;

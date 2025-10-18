@@ -1,25 +1,39 @@
 import React, { useMemo, useState, useEffect } from "react";
 import CustomerSupportMessages from "./CustomerSupportMessages";
-import { formatPrice } from "../../core/utils/helperFunctions";
+import {
+  formatPrice,
+  showProductImages,
+  showVariantImages,
+} from "../../core/utils/helperFunctions";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useTheme, getThemeColors } from "../../hooks/useTheme";
 
 const CatalogItem = ({ item, handleProductClick, theme }) => {
   const colors = getThemeColors(theme);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Check if product has variants
+  const hasVariants = item?.variants && item.variants.length > 1;
+
+  const handleToggleExpand = (e) => {
+    e.stopPropagation(); // Prevent triggering product click
+    setIsExpanded(!isExpanded);
+  };
+
+  const handleVariantClick = (e, variant) => {
+    e.stopPropagation(); // Prevent triggering product click
+    const variantItem = { ...item, variants: [variant] };
+    handleProductClick(variantItem);
+  };
 
   return (
     <div
-      onClick={() => handleProductClick(item)}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
         background: colors.card,
         borderRadius: "8px",
         padding: "12px",
         marginBottom: "12px",
         border: `1px solid ${colors.border}`,
-        cursor: "pointer",
         transition: "all 0.2s ease",
       }}
       onMouseEnter={(e) => {
@@ -31,114 +45,295 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
         e.target.style.boxShadow = "0 1px 4px rgba(0,0,0,0.07)";
       }}
     >
+      {/* Main Product Row */}
       <div
+        onClick={() => handleProductClick(item)}
         style={{
-          width: "50px",
-          height: "50px",
-          borderRadius: "6px",
-          overflow: "hidden",
-          border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-          flexShrink: 0,
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          gap: "12px",
+          cursor: "pointer",
         }}
       >
-        {item.images && item.images.length > 0 ? (
-          <img
-            src={item.images[0]?.url}
-            alt={item.name}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-            onError={(e) => {
-              e.target.style.display = "none";
-              e.target.nextSibling.style.display = "flex";
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              display: item.image ? "none" : "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "100%",
-              height: "100%",
-              fontSize: "1.2em",
-              color: theme === "dark" ? "white" : "#222",
-            }}
-          >
-            🛒
-          </div>
-        )}
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            color: theme === "dark" ? "white" : "#222",
-            fontWeight: 600,
-            fontSize: "0.95rem",
-            marginBottom: "4px",
+            width: "50px",
+            height: "50px",
+            borderRadius: "6px",
             overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {item?.title}
+          {item.images && item.images.length > 0 ? (
+            <img
+              src={showProductImages(item)}
+              alt={item.name}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+              onError={(e) => {
+                e.target.style.display = "none";
+                e.target.nextSibling.style.display = "flex";
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                display: item.image ? "none" : "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "100%",
+                fontSize: "1.2em",
+                color: theme === "dark" ? "white" : "#222",
+              }}
+            >
+              🛒
+            </div>
+          )}
         </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              color: theme === "dark" ? "white" : "#222",
+              fontWeight: 600,
+              fontSize: "0.95rem",
+              marginBottom: "4px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item?.title}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "0.8em",
+            }}
+          >
+            {item.vendor && (
+              <span style={{ color: theme === "dark" ? "white" : "#222" }}>
+                👤 {item.vendor}
+              </span>
+            )}
+            {item.category && (
+              <span style={{ color: theme === "dark" ? "white" : "#222" }}>
+                🏷️ {item.category}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Price and Toggle/Click Indicator */}
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            flexShrink: 0,
             gap: "8px",
-            fontSize: "0.8em",
           }}
         >
-          {item.vendor && (
-            <span style={{ color: theme === "dark" ? "white" : "#222" }}>
-              👤 {item.vendor}
-            </span>
-          )}
-          {item.category && (
-            <span style={{ color: theme === "dark" ? "white" : "#222" }}>
-              🏷️ {item.category}
-            </span>
+          <div
+            style={{
+              color: theme === "dark" ? "white" : "#222",
+              fontWeight: 700,
+              fontSize: "1rem",
+            }}
+          >
+            {hasVariants ? (
+              <span
+                style={{
+                  fontSize: "0.8em",
+                  color: theme === "dark" ? "#25d366" : "#25d366",
+                }}
+              >
+                From Rs.{" "}
+                {formatPrice(Math.min(...item.variants.map((v) => v.price)))}
+              </span>
+            ) : (
+              `Rs. ${formatPrice(item?.variants?.[0]?.price)}`
+            )}
+          </div>
+
+          {hasVariants ? (
+            <button
+              onClick={handleToggleExpand}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: "4px 8px",
+                borderRadius: "4px",
+                fontSize: "0.7em",
+                color: theme === "dark" ? "#25d366" : "#25d366",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background =
+                  theme === "dark" ? "#333" : "#f0f0f0";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = "transparent";
+              }}
+            >
+              {isExpanded ? "▼ Hide" : "▶ Show"} variants
+            </button>
+          ) : (
+            <div
+              style={{
+                fontSize: "0.7em",
+                color: theme === "dark" ? "white" : "#222",
+                fontStyle: "italic",
+              }}
+            >
+              Click to add
+            </div>
           )}
         </div>
       </div>
 
-      {/* Price and Click Indicator */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          flexShrink: 0,
-        }}
-      >
+      {/* Variants Section */}
+      {hasVariants && isExpanded && (
         <div
           style={{
-            color: theme === "dark" ? "white" : "#222",
-            fontWeight: 700,
-            fontSize: "1rem",
-            marginBottom: "4px",
+            marginTop: "12px",
+            paddingTop: "12px",
+            borderTop: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
           }}
         >
-          Rs. {formatPrice(item?.variants?.[0]?.price)}
+          <div
+            style={{
+              fontSize: "0.8em",
+              fontWeight: 600,
+              color: theme === "dark" ? "white" : "#222",
+              marginBottom: "8px",
+            }}
+          >
+            Available Variants:
+          </div>
+          <div style={{ paddingInline: `10px` }}>
+            {item.variants.map((variant, index) => (
+              <div
+                key={index}
+                onClick={(e) => handleVariantClick(e, variant)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px",
+                  marginBottom: "6px",
+                  background: theme === "dark" ? "#1a1a1a" : "#f8f9fa",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+                }}
+              >
+                {/* Variant Image */}
+                <div
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "4px",
+                    overflow: "hidden",
+                    border: `1px solid ${
+                      theme === "dark" ? "#333" : "#e2e8f0"
+                    }`,
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {variant?.imageId ? (
+                    <img
+                      src={showVariantImages(item.images, item)}
+                      alt={variant.title || `Variant ${index + 1}`}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                        e.target.nextSibling.style.display = "flex";
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        display: item.image ? "none" : "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "100%",
+                        height: "100%",
+                        fontSize: "1.2em",
+                        color: theme === "dark" ? "white" : "#222",
+                      }}
+                    >
+                      🛒
+                    </div>
+                  )}
+                </div>
+
+                {/* Variant Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      color: theme === "dark" ? "white" : "#222",
+                      fontWeight: 500,
+                      fontSize: "0.85rem",
+                      marginBottom: "2px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {variant.title || `Variant ${index + 1}`}
+                  </div>
+                  {variant.option1 && (
+                    <div
+                      style={{
+                        fontSize: "0.7em",
+                        color: theme === "dark" ? "#aaa" : "#666",
+                      }}
+                    >
+                      {variant.option1}
+                      {variant.option2 && ` • ${variant.option2}`}
+                      {variant.option3 && ` • ${variant.option3}`}
+                    </div>
+                  )}
+                </div>
+
+                {/* Variant Price */}
+                <div
+                  style={{
+                    color: theme === "dark" ? "white" : "#222",
+                    fontWeight: 600,
+                    fontSize: "0.85rem",
+                    flexShrink: 0,
+                  }}
+                >
+                  Rs. {formatPrice(variant.price)}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div
-          style={{
-            fontSize: "0.7em",
-            color: theme === "dark" ? "white" : "#222",
-            fontStyle: "italic",
-          }}
-        >
-          Click to add
-        </div>
-      </div>
+      )}
     </div>
   );
 };

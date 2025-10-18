@@ -77,3 +77,37 @@ export const ensureArray = (value) => {
   if (value === null || value === undefined) return [];
   return Array.isArray(value) ? value : [value];
 };
+
+export const showVariantImages = (images, product) => {
+  if (!images?.length || !product) {
+    return undefined;
+  }
+  const matchedImage = ensureArray(images)?.find(
+    (image) => image?.id === product?.imageId
+  );
+  if (!matchedImage?.url) {
+    return undefined;
+  }
+  return matchedImage?.thumbnailUrl ?? matchedImage?.url;
+};
+
+export const showProductImages = (product) => {
+  if (!product?.images?.length) {
+    return undefined;
+  }
+  const images = ensureArray(product?.images);
+  const variantImageIds = product?.variants
+    ?.map((variant) => variant?.imageId)
+    ?.filter(Boolean);
+  const productImages = images?.filter(
+    (image) => image?.id && !variantImageIds?.includes(image?.id)
+  );
+  if (!productImages?.length) {
+    return undefined;
+  }
+  const imageUrl = productImages?.[0]?.thumbnailUrl ?? productImages?.[0]?.url;
+  if (!imageUrl) {
+    return undefined;
+  }
+  return imageUrl;
+};
