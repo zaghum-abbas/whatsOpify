@@ -1525,21 +1525,51 @@ async function downloadImageAsFile(imageUrl, filename) {
   try {
     console.log("[IMAGE] Downloading image from:", imageUrl);
 
-    // Use CORS proxy for external images
-    const corsProxy = "https://corsproxy.io/?";
-    const proxyUrl = corsProxy + encodeURIComponent(imageUrl);
+    // Try multiple methods to download the image
+    let response = null;
 
-    const response = await fetch(proxyUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status}`);
+    // Method 1: Direct fetch (works for same-origin images)
+    try {
+      response = await fetch(imageUrl);
+      if (!response.ok)
+        throw new Error(`Direct fetch failed: ${response.status}`);
+    } catch (directError) {
+      console.log("[IMAGE] Direct fetch failed, trying CORS proxy...");
+
+      // Method 2: CORS proxy
+      try {
+        const corsProxy = "https://corsproxy.io/?";
+        const proxyUrl = corsProxy + encodeURIComponent(imageUrl);
+        response = await fetch(proxyUrl);
+        if (!response.ok)
+          throw new Error(`CORS proxy failed: ${response.status}`);
+      } catch (proxyError) {
+        console.log("[IMAGE] CORS proxy failed, trying alternative proxy...");
+
+        // Method 3: Alternative proxy
+        const altProxy = "https://api.allorigins.win/raw?url=";
+        const altProxyUrl = altProxy + encodeURIComponent(imageUrl);
+        response = await fetch(altProxyUrl);
+        if (!response.ok)
+          throw new Error(`Alternative proxy failed: ${response.status}`);
+      }
     }
 
     const blob = await response.blob();
+    console.log("[IMAGE] Blob created:", {
+      size: blob.size,
+      type: blob.type,
+    });
+
     const file = new File([blob], filename, {
       type: blob.type || "image/jpeg",
     });
 
-    console.log("[IMAGE] Image downloaded successfully:", file);
+    console.log("[IMAGE] Image downloaded successfully:", {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
     return file;
   } catch (error) {
     console.error("[IMAGE] Error downloading image:", error);
@@ -1551,41 +1581,84 @@ async function downloadImageAsFile(imageUrl, filename) {
 async function addImageToChat(imageFile) {
   try {
     console.log("[IMAGE] Adding image to chat:", imageFile);
+    console.log("[IMAGE] File details:", {
+      name: imageFile.name,
+      size: imageFile.size,
+      type: imageFile.type,
+    });
 
-    // Find the attachment button (paperclip icon)
-    const attachButton =
-      document.querySelector('[data-testid="clip"]') ||
-      document.querySelector('button[aria-label*="Attach"]') ||
-      document.querySelector('span[data-testid="clip"]') ||
-      document.querySelector('[title*="Attach"]');
+    // Enhanced selectors for attachment button
+    const attachButtonSelectors = [
+      '[data-testid="clip"]',
+      'button[aria-label*="Attach"]',
+      'span[data-testid="clip"]',
+      '[title*="Attach"]',
+      '[aria-label*="Attach"]',
+      'button[title*="Attach"]',
+      ".attach-button",
+      '[data-icon="clip"]',
+    ];
+
+    let attachButton = null;
+    for (const selector of attachButtonSelectors) {
+      attachButton = document.querySelector(selector);
+      if (attachButton) {
+        console.log("[IMAGE] Found attachment button with selector:", selector);
+        break;
+      }
+    }
 
     if (!attachButton) {
-      console.error("[IMAGE] Attachment button not found");
+      console.error(
+        "[IMAGE] Attachment button not found. Available buttons:",
+        document.querySelectorAll('button, span[role="button"]')
+      );
       return false;
     }
 
-    console.log("[IMAGE] Found attachment button, clicking...");
+    console.log("[IMAGE] Clicking attachment button...");
     attachButton.click();
 
-    // Wait for attachment menu to appear
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Wait longer for attachment menu to appear
+    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    // Find the photo/image option
-    const photoButton =
-      document.querySelector('[data-testid="mi-attach-photo"]') ||
-      document.querySelector('input[accept*="image"]') ||
-      document.querySelector('button[aria-label*="Photos"]') ||
-      document.querySelector('[title*="Photos"]');
+    // Enhanced selectors for photo/image option
+    const photoButtonSelectors = [
+      '[data-testid="mi-attach-photo"]',
+      'input[accept*="image"]',
+      'button[aria-label*="Photos"]',
+      '[title*="Photos"]',
+      '[aria-label*="Photos"]',
+      'button[title*="Photos"]',
+      '[data-testid="attach-photo"]',
+      'li[data-testid="mi-attach-photo"]',
+      'div[data-testid="mi-attach-photo"]',
+    ];
+
+    let photoButton = null;
+    for (const selector of photoButtonSelectors) {
+      photoButton = document.querySelector(selector);
+      if (photoButton) {
+        console.log("[IMAGE] Found photo button with selector:", selector);
+        break;
+      }
+    }
 
     if (!photoButton) {
-      console.error("[IMAGE] Photo button not found");
+      console.error(
+        "[IMAGE] Photo button not found. Available elements:",
+        document.querySelectorAll(
+          '[data-testid*="photo"], [aria-label*="photo"], [title*="photo"]'
+        )
+      );
       return false;
     }
 
-    console.log("[IMAGE] Found photo button");
+    console.log("[IMAGE] Photo button found, tagName:", photoButton.tagName);
 
     // If it's an input element, directly set the file
     if (photoButton.tagName === "INPUT") {
+      console.log("[IMAGE] Direct input method - setting file directly");
       const dataTransfer = new DataTransfer();
       dataTransfer.items.add(imageFile);
       photoButton.files = dataTransfer.files;
@@ -1593,32 +1666,62 @@ async function addImageToChat(imageFile) {
       const changeEvent = new Event("change", { bubbles: true });
       photoButton.dispatchEvent(changeEvent);
 
-      console.log("[IMAGE] Image file set to input");
+      console.log("[IMAGE] Image file set to input successfully");
       return true;
     } else {
       // If it's a button, click it and then handle file input
+      console.log("[IMAGE] Button method - clicking photo button");
       photoButton.click();
 
-      // Wait for file input to appear
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Wait for file input to appear with multiple attempts
+      let fileInput = null;
+      for (let i = 0; i < 5; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
 
-      const fileInput = document.querySelector(
-        'input[type="file"][accept*="image"]'
-      );
+        const fileInputSelectors = [
+          'input[type="file"][accept*="image"]',
+          'input[type="file"]',
+          'input[accept*="image"]',
+        ];
+
+        for (const selector of fileInputSelectors) {
+          fileInput = document.querySelector(selector);
+          if (fileInput) {
+            console.log("[IMAGE] Found file input with selector:", selector);
+            break;
+          }
+        }
+
+        if (fileInput) break;
+        console.log(`[IMAGE] Attempt ${i + 1}: File input not found yet...`);
+      }
+
       if (fileInput) {
+        console.log("[IMAGE] Setting file to input element");
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(imageFile);
         fileInput.files = dataTransfer.files;
 
-        const changeEvent = new Event("change", { bubbles: true });
-        fileInput.dispatchEvent(changeEvent);
+        // Trigger multiple events to ensure WhatsApp detects the file
+        const events = [
+          new Event("change", { bubbles: true }),
+          new Event("input", { bubbles: true }),
+          new Event("drop", { bubbles: true }),
+        ];
 
-        console.log("[IMAGE] Image file set to file input");
+        events.forEach((event) => {
+          fileInput.dispatchEvent(event);
+        });
+
+        console.log("[IMAGE] Image file set to file input successfully");
         return true;
+      } else {
+        console.error(
+          "[IMAGE] File input not found after clicking photo button"
+        );
+        return false;
       }
     }
-
-    return false;
   } catch (error) {
     console.error("[IMAGE] Error adding image to chat:", error);
     return false;
@@ -1692,7 +1795,6 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
 
     // Focus and prepare the input
     messageInput.focus();
-    messageInput.click();
 
     // Use a more reliable method to set content
     setTimeout(() => {
@@ -1834,24 +1936,37 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
             const productName =
               productItem.name || productItem.title || "product";
             const filename = `${productName.replace(/[^a-zA-Z0-9]/g, "_")}.jpg`;
+
+            console.log("[CHAT] Starting image download process...");
             const imageFile = await downloadImageAsFile(imageUrl, filename);
 
+            console.log("[CHAT] Image download result:", {
+              success: !!imageFile,
+              filename: filename,
+              productName: productName,
+            });
+
             if (imageFile) {
+              console.log("[CHAT] Attempting to add image to chat...");
               const imageAdded = await addImageToChat(imageFile);
               if (imageAdded) {
                 console.log(
                   "[CHAT] ✅ Product image added to chat successfully!"
                 );
               } else {
-                console.warn("[CHAT] Failed to add image to chat");
+                console.warn(
+                  "[CHAT] ❌ Failed to add image to chat - check console for details"
+                );
               }
             } else {
-              console.warn("[CHAT] Failed to download product image");
+              console.warn(
+                "[CHAT] ❌ Failed to download product image - check console for details"
+              );
             }
           } catch (error) {
             console.error("[CHAT] Error handling product image:", error);
           }
-        }, 1000); // Wait 1 second after text is added
+        }, 500); // Reduced wait time to 500ms after text is added
       } else {
         console.log("[CHAT] No image URL found in product item");
       }
@@ -1867,6 +1982,68 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
 // No explicit observer for the sidebar's presence in index.jsx needed now,
 // as the toggleWhatsappSidebar function creates it if it doesn't exist
 // and adjusts mainAppContent's margin.
+
+// Debug function to inspect WhatsApp DOM structure
+window.debugWhatsAppDOM = function () {
+  console.log("🔍 [DEBUG] WhatsApp DOM Structure Analysis:");
+
+  // Check for attachment button
+  const attachSelectors = [
+    '[data-testid="clip"]',
+    'button[aria-label*="Attach"]',
+    'span[data-testid="clip"]',
+    '[title*="Attach"]',
+  ];
+
+  console.log("📎 Attachment Button Check:");
+  attachSelectors.forEach((selector) => {
+    const element = document.querySelector(selector);
+    console.log(
+      `  ${selector}: ${element ? "✅ FOUND" : "❌ NOT FOUND"}`,
+      element
+    );
+  });
+
+  // Check for photo button (after clicking attachment)
+  const photoSelectors = [
+    '[data-testid="mi-attach-photo"]',
+    'input[accept*="image"]',
+    'button[aria-label*="Photos"]',
+    '[title*="Photos"]',
+  ];
+
+  console.log("📷 Photo Button Check:");
+  photoSelectors.forEach((selector) => {
+    const element = document.querySelector(selector);
+    console.log(
+      `  ${selector}: ${element ? "✅ FOUND" : "❌ NOT FOUND"}`,
+      element
+    );
+  });
+
+  // Check for file inputs
+  const fileInputs = document.querySelectorAll('input[type="file"]');
+  console.log(`📁 File Inputs Found: ${fileInputs.length}`, fileInputs);
+
+  // Check message input
+  const messageInputs = document.querySelectorAll('[contenteditable="true"]');
+  console.log(
+    `💬 Message Inputs Found: ${messageInputs.length}`,
+    messageInputs
+  );
+
+  // Check send button
+  const sendButtons = document.querySelectorAll('[data-testid="send"]');
+  console.log(`📤 Send Buttons Found: ${sendButtons.length}`, sendButtons);
+
+  return {
+    attachmentButton: document.querySelector('[data-testid="clip"]'),
+    photoButton: document.querySelector('[data-testid="mi-attach-photo"]'),
+    fileInputs: fileInputs,
+    messageInputs: messageInputs,
+    sendButtons: sendButtons,
+  };
+};
 
 // Debug functions for testing
 window.clearProductsCache = function () {

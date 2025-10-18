@@ -280,8 +280,9 @@ const ChatSidebar = ({
         minHeight: "100vh",
       }}
     >
+      {console.log("contact", contact)}
       {/* Contact Info Section */}
-      {contact && (contact.name || contact.phone) && (
+      {contact && (
         <section style={{ marginBottom: "28px" }}>
           <h2
             style={{
