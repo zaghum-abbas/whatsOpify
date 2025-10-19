@@ -238,38 +238,40 @@ const ThreeDotsPopup = ({
       </button>
 
       {/* Switch Store Button - Only show when authenticated */}
-      {isAuthenticated && (
-        <button
-          onClick={() => {
-            onSwitchStoreClick();
-            onClose();
-          }}
-          style={{
-            width: "100%",
-            padding: "12px 16px",
-            border: "none",
-            backgroundColor: "transparent",
-            textAlign: "left",
-            cursor: "pointer",
-            fontSize: "14px",
-            color: "#8B5CF6",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            transition: "background-color 0.2s",
-            fontWeight: "500",
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.backgroundColor = "#f3f4f6";
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.backgroundColor = "transparent";
-          }}
-        >
-          <span style={{ fontSize: "16px" }}>🏪</span>
-          Switch Store
-        </button>
-      )}
+      {isAuthenticated &&
+        JSON.parse(localStorage.getItem("whatsopify_token")).data?.stores
+          ?.length > 1 && (
+          <button
+            onClick={() => {
+              onSwitchStoreClick();
+              onClose();
+            }}
+            style={{
+              width: "100%",
+              padding: "12px 16px",
+              border: "none",
+              backgroundColor: "transparent",
+              textAlign: "left",
+              cursor: "pointer",
+              fontSize: "14px",
+              color: "#8B5CF6",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              transition: "background-color 0.2s",
+              fontWeight: "500",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = "#f3f4f6";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = "transparent";
+            }}
+          >
+            <span style={{ fontSize: "16px" }}>🏪</span>
+            Switch Store
+          </button>
+        )}
 
       {/* Login/Logout Button */}
       <button
