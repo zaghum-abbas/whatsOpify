@@ -96,6 +96,15 @@ const OrdersSection = ({ whatsappTheme }) => {
         }
       } catch (err) {
         console.error("[ORDERS] Error loading orders:", err);
+        setOrders({
+          new: [],
+          pending: [],
+          length: {
+            new: 0,
+            pending: 0,
+          },
+        });
+
         setError(err.message);
       }
     };
@@ -492,16 +501,7 @@ We’re sorry to see you cancel 😔 — if there’s anything we can improve or
                 >
                   Order ID
                 </th>
-                {/* <th
-                  style={{
-                    padding: "12px 8px",
-                    textAlign: "left",
-                    borderBottom: "1px solid #e0e0e0",
-                    fontWeight: "600",
-                  }}
-                >
-                  Order Number
-                </th> */}
+
                 <th
                   style={{
                     padding: "12px 8px",

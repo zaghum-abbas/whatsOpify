@@ -539,6 +539,67 @@ const ChatSidebar = ({
       });
     }
   };
+  const [updatingOrder, setUpdatingOrder] = useState(null);
+  const handleWhatsAppRedirect = async (order) => {
+    const data = localStorage.getItem("whatsopify_token");
+    const store = JSON.parse(data)?.data?.stores;
+    const phoneNumber = userOrders?.userInfo?.phone;
+    const city = userOrders?.userInfo?.address?.city;
+    const orderId = order?.name;
+    const storeName = store?.find((s) => s._id === order?.storeId)?.name;
+    const orderTotal = formatPrice(order?.amount);
+    console.log("store", storeName, store);
+
+    try {
+      setUpdatingOrder(order?._id);
+    } catch (updateError) {
+      setError(`Failed to update order status: ${updateError.message}`);
+      return;
+    } finally {
+      setUpdatingOrder(null);
+    }
+
+    if (phoneNumber) {
+      const cleanedNumber = phoneNumber
+        .replace(/^\+92/, "92")
+        .replace(/^0/, "92");
+      if (cleanedNumber) {
+        const message = `🎉 *Great News!* 🎉  
+
+Your order *#${orderId}* is out today to your city ${city} 🚚✨  
+
+
+
+Please keep ${orderTotal} handy as your parcel  will be at your door step in 3-4 days. 
+
+🧾 Tracking: ${`https://shopilam.com/tracking/${order?.trackingNo}`}  
+ 
+
+You can follow your parcel using the link above — it’ll be with you soon! 😄  
+
+💚 *Thanks for choosing us!*`;
+        chrome.runtime.sendMessage(
+          {
+            action: "SEND_WHATSAPP_MESSAGE",
+            phoneNumber: cleanedNumber,
+            message: message,
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.error(
+                "[ORDERS] Error sending message:",
+                chrome.runtime.lastError
+              );
+            } else {
+              console.log("[ORDERS] Message sent successfully:", response);
+            }
+          }
+        );
+      }
+    } else {
+      console.warn("[ORDERS] No phone number found for order:", order);
+    }
+  };
 
   return (
     <div
@@ -833,135 +894,166 @@ const ChatSidebar = ({
             >
               {ordersError}
             </div>
-          ) : userOrders && userOrders?.orders?.length > 0 ? (
-            <div>
-              <div
+          ) : userOrders && ensureArray(userOrders?.orders)?.length > 0 ? (
+            <div
+              style={{
+                overflowX: "auto",
+                border: "1px solid #e0e0e0",
+                borderRadius: "8px",
+              }}
+            >
+              <table
                 style={{
-                  fontSize: "0.9rem",
-                  color: theme === "dark" ? "#aaa" : "#666",
-                  marginBottom: "12px",
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: "14px",
                 }}
               >
-                Found {userOrders.length} order
-                {userOrders.length !== 1 ? "s" : ""}
-              </div>
-              {ensureArray(userOrders?.orders)?.map((order, index) => (
-                <div
-                  key={order.id || index}
-                  style={{
-                    background: theme === "dark" ? "#1a1a1a" : "#f8f9fa",
-                    borderRadius: "8px",
-                    padding: "12px",
-                    marginBottom: "8px",
-                    border: `1px solid ${
-                      theme === "dark" ? "#333" : "#e2e8f0"
-                    }`,
-                  }}
-                >
-                  <div
+                <thead>
+                  <tr
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: "8px",
+                      backgroundColor: theme === "dark" ? "#23272a" : "#f5f5f5",
                     }}
                   >
-                    <div>
-                      <div
-                        style={{
-                          fontWeight: "600",
-                          fontSize: "0.9rem",
-                          color: theme === "dark" ? "white" : "#222",
-                        }}
-                      >
-                        Order #
-                        {order.id || order.orderNumber || `#${index + 1}`}
-                      </div>
-                      {order.status && (
-                        <div
-                          style={{
-                            fontSize: "0.8rem",
-                            color:
-                              order.status === "completed"
-                                ? "#25d366"
-                                : order.status === "pending"
-                                ? "#f39c12"
-                                : order.status === "cancelled"
-                                ? "#e74c3c"
-                                : theme === "dark"
-                                ? "#aaa"
-                                : "#666",
-                            marginTop: "2px",
-                          }}
-                        >
-                          Status: {order.status}
-                        </div>
-                      )}
-                    </div>
-                    {order.total && (
-                      <div
-                        style={{
-                          fontWeight: "600",
-                          fontSize: "0.9rem",
-                          color: theme === "dark" ? "white" : "#222",
-                        }}
-                      >
-                        Rs. {order.total}
-                      </div>
-                    )}
-                  </div>
-
-                  {order.items && order.items.length > 0 && (
-                    <div style={{ marginTop: "8px" }}>
-                      <div
-                        style={{
-                          fontSize: "0.8rem",
-                          color: theme === "dark" ? "#aaa" : "#666",
-                          marginBottom: "4px",
-                        }}
-                      >
-                        Items:
-                      </div>
-                      {order.items.slice(0, 3).map((item, itemIndex) => (
-                        <div
-                          key={itemIndex}
-                          style={{
-                            fontSize: "0.8rem",
-                            color: theme === "dark" ? "white" : "#222",
-                            marginBottom: "2px",
-                          }}
-                        >
-                          • {item.name || item.title}{" "}
-                          {item.quantity && `(x${item.quantity})`}
-                        </div>
-                      ))}
-                      {order.items.length > 3 && (
-                        <div
-                          style={{
-                            fontSize: "0.8rem",
-                            color: theme === "dark" ? "#aaa" : "#666",
-                            fontStyle: "italic",
-                          }}
-                        >
-                          ... and {order.items.length - 3} more items
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {order.createdAt && (
-                    <div
+                    <th
                       style={{
-                        fontSize: "0.75rem",
-                        color: theme === "dark" ? "#aaa" : "#666",
-                        marginTop: "8px",
+                        padding: "12px 8px",
+                        textAlign: "left",
+                        borderBottom: "1px solid #e0e0e0",
+                        fontWeight: "600",
                       }}
                     >
-                      {new Date(order.createdAt).toLocaleDateString()}
-                    </div>
-                  )}
-                </div>
-              ))}
+                      Order ID
+                    </th>
+
+                    <th
+                      style={{
+                        padding: "12px 8px",
+                        textAlign: "left",
+                        borderBottom: "1px solid #e0e0e0",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Amount
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 8px",
+                        textAlign: "left",
+                        borderBottom: "1px solid #e0e0e0",
+                        fontWeight: "600",
+                        width: "200px",
+                      }}
+                    >
+                      Order Date
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 8px",
+                        textAlign: "center",
+                        borderBottom: "1px solid #e0e0e0",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Order Status
+                    </th>
+                    <th
+                      style={{
+                        padding: "12px 8px",
+                        textAlign: "center",
+                        borderBottom: "1px solid #e0e0e0",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Tracking Number
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ensureArray(userOrders?.orders)?.map((order) => (
+                    <tr
+                      key={order.id}
+                      style={{ borderBottom: "1px solid #f0f0f0" }}
+                    >
+                      <td
+                        style={{
+                          padding: "12px 8px",
+                          fontFamily: "monospace",
+                          fontSize: "12px",
+                          alignContent: "center",
+                        }}
+                      >
+                        {order.name}
+                      </td>
+                      <td
+                        style={{
+                          padding: "12px 8px",
+                          fontSize: "12px",
+                          alignContent: "center",
+                        }}
+                      >
+                        {formatPrice(order.amount)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "12px 8px",
+                          alignContent: "center",
+                        }}
+                      >
+                        <div style={{ fontWeight: "500" }}>
+                          {formatDate(order?.createdAt)}
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          padding: "12px 8px",
+                          fontSize: "12px",
+                          alignContent: "center",
+                        }}
+                      >
+                        {order?.status}
+                      </td>
+                      <td
+                        style={{
+                          padding: "12px 8px",
+                          textAlign: "center",
+                          display: "flex",
+                          gap: "10px",
+                          alignItems: "center",
+                          alignContent: "center",
+                          height: "100%",
+                          width: "100px",
+                        }}
+                      >
+                        {order?.trackingNo && (
+                          <button
+                            onClick={() => handleWhatsAppRedirect(order)}
+                            disabled={updatingOrder === order?._id}
+                            style={{
+                              padding: "6px 12px",
+                              backgroundColor: "#25D366",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "4px",
+                              cursor:
+                                updatingOrder === order?._id
+                                  ? "not-allowed"
+                                  : "pointer",
+                              fontSize: "12px",
+                              fontWeight: "500",
+                              opacity: updatingOrder === order?._id ? 0.6 : 1,
+                            }}
+                          >
+                            {updatingOrder === order?._id
+                              ? "Updating..."
+                              : "Order status"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <div
