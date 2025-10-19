@@ -111,3 +111,16 @@ export const showProductImages = (product) => {
   }
   return imageUrl;
 };
+
+export const formatPhoneNumber = (number) => {
+  // Remove all non-digits (just in case)
+  const cleaned = number.replace(/\D/g, "");
+
+  // If starts with +92 or 92, replace it with 0
+  if (cleaned.startsWith("92")) {
+    return "0" + cleaned.slice(2);
+  }
+
+  // Otherwise, return as-is
+  return cleaned;
+};

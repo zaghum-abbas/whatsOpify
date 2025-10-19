@@ -1,6 +1,9 @@
 import React, { useMemo, useState, useEffect } from "react";
 import CustomerSupportMessages from "./CustomerSupportMessages";
 import {
+  ensureArray,
+  formatDate,
+  formatPhoneNumber,
   formatPrice,
   showProductImages,
   showVariantImages,
@@ -351,15 +354,72 @@ const ChatSidebar = ({
   const [filteredCatalog, setFilteredCatalog] = useState(catalog);
   const [isSearching, setIsSearching] = useState(false);
 
+  // User orders state
+  const [userOrders, setUserOrders] = useState([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [ordersError, setOrdersError] = useState(null);
+
   // Debounce search input
   const debouncedSearch = useDebounce(search, 500);
+
+  // API function to fetch user orders by phone number
+  const fetchUserOrders = async (phoneNumber) => {
+    if (!phoneNumber) {
+      console.log("[ORDERS] No phone number provided");
+      return;
+    }
+
+    setIsLoadingOrders(true);
+    setOrdersError(null);
+
+    try {
+      console.log(`[ORDERS] Fetching orders for phone: ${phoneNumber}`);
+
+      const response = await chrome.runtime.sendMessage({
+        action: "FETCH_USER_ORDERS",
+        token: localStorage.getItem("whatsopify_token")
+          ? JSON.parse(localStorage.getItem("whatsopify_token"))?.data?.token ||
+            JSON.parse(localStorage.getItem("whatsopify_token"))?.token
+          : null,
+        phone: formatPhoneNumber(phoneNumber),
+        storeId: localStorage.getItem("whatsopify_selected_store")
+          ? JSON.parse(localStorage.getItem("whatsopify_selected_store"))?._id
+          : null,
+      });
+
+      console.log("[ORDERS] API Response:", response);
+
+      if (response.success) {
+        // Handle different response structures
+        let orders = [];
+        if (response.success) {
+          orders = response.orders;
+
+          console.log(
+            `[ORDERS] ✅ Found ${orders} orders for phone: ${phoneNumber}`
+          );
+          setUserOrders(orders);
+        }
+      } else {
+        console.error("[ORDERS] API failed:", response.error);
+        setOrdersError(response.detail);
+        setUserOrders([]);
+      }
+    } catch (error) {
+      console.error("[ORDERS] Error fetching user orders:", error);
+      setOrdersError(error.detail);
+      setUserOrders([]);
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  };
 
   const handleSearchChange = (e) => {
     const searchTerm = e.target.value;
     setSearch(searchTerm);
     setIsSearching(true);
   };
-
+  console.log("userOrders", userOrders);
   const searchProducts = async (searchTerm) => {
     try {
       console.log(`[CATALOG] Searching products with term: "${searchTerm}"`);
@@ -438,6 +498,21 @@ const ChatSidebar = ({
     }
   }, [catalog]);
 
+  // Fetch user orders when contact phone number is available
+  useEffect(() => {
+    if (contact?.phone) {
+      console.log(
+        "[ORDERS] Contact phone detected, fetching orders:",
+        contact.phone
+      );
+      fetchUserOrders(contact.phone);
+    } else {
+      console.log("[ORDERS] No contact phone available");
+      setUserOrders([]);
+      setOrdersError(null);
+    }
+  }, [contact?.phone]);
+
   const formattedDescription = (description) => {
     if (!description) return "";
     const parser = new DOMParser();
@@ -475,9 +550,17 @@ const ChatSidebar = ({
         minHeight: "100vh",
       }}
     >
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
       {console.log("contact", contact)}
       {/* Contact Info Section */}
-      {contact && (
+      {contact && userOrders?.userInfo && (
         <section style={{ marginBottom: "28px" }}>
           <h2
             style={{
@@ -514,7 +597,7 @@ const ChatSidebar = ({
                     color: theme === "dark" ? "white" : "#222",
                   }}
                 >
-                  {contact?.name || "Not available"}
+                  {userOrders?.userInfo?.name || "Not available"}
                 </p>
               </div>
               <div
@@ -531,7 +614,7 @@ const ChatSidebar = ({
                     color: theme === "dark" ? "white" : "#222",
                   }}
                 >
-                  {contact?.phone ? `${contact.phone}` : ""}
+                  {contact?.phone ? `${userOrders?.userInfo?.phone}` : ""}
                 </p>
               </div>
             </div>
@@ -563,6 +646,337 @@ const ChatSidebar = ({
           </div>
         </section>
       )}
+      {userOrders?.userStatus && (
+        <section style={{ marginBottom: "28px" }}>
+          <h2
+            style={{
+              marginBottom: "12px",
+              fontSize: "1.1rem",
+              color: theme === "dark" ? "white" : "#222",
+            }}
+          >
+            User States
+          </h2>
+          <div
+            style={{
+              background: theme === "dark" ? "#23272a" : "#fff",
+              borderRadius: "10px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+              padding: "16px",
+              fontSize: "0.98rem",
+              color: theme === "dark" ? "white" : "#222",
+              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "8px",
+                }}
+              >
+                <strong>Total Orders:</strong>
+                <p
+                  style={{
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
+                >
+                  {userOrders?.userStatus?.totalOrders || 0}
+                </p>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "8px",
+                }}
+              >
+                <strong>Total Spent:</strong>
+                <p
+                  style={{
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
+                >
+                  Rs. {formatPrice(userOrders?.userStatus?.totalSpent) || 0}
+                </p>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "8px",
+                }}
+              >
+                <strong>First Order Date:</strong>
+                <p
+                  style={{
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
+                >
+                  {formatDate(userOrders?.userStatus?.firstOrderDate) || ""}
+                </p>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "8px",
+                }}
+              >
+                <strong>Last Order Date:</strong>
+                <p
+                  style={{
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
+                >
+                  {formatDate(userOrders?.userStatus?.lastOrderDate) || ""}
+                </p>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "8px",
+                }}
+              >
+                <strong>Cancelled orders:</strong>
+                <p
+                  style={{
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
+                >
+                  {formatDate(userOrders?.userStatus?.cancelledOrders) || 0}
+                </p>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "8px",
+                }}
+              >
+                <strong>Returned orders:</strong>
+                <p
+                  style={{
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
+                >
+                  {formatDate(userOrders?.userStatus?.returnedOrders) || 0}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* User Orders Section */}
+      <section style={{ marginBottom: "28px" }}>
+        <h2
+          style={{
+            marginBottom: "12px",
+            fontSize: "1.1rem",
+            color: theme === "dark" ? "white" : "#222",
+          }}
+        >
+          Customer Orders
+        </h2>
+        <div
+          style={{
+            background: theme === "dark" ? "#23272a" : "#fff",
+            borderRadius: "10px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+            padding: "16px",
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            color: theme === "dark" ? "white" : "#222",
+          }}
+        >
+          {isLoadingOrders ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "20px",
+                gap: "8px",
+                color: theme === "dark" ? "white" : "#222",
+              }}
+            >
+              <div
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  border: `2px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+                  borderTop: `2px solid ${
+                    theme === "dark" ? "#25d366" : "#25d366"
+                  }`,
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
+              Loading orders...
+            </div>
+          ) : ordersError ? (
+            <div
+              style={{
+                color: "#e74c3c",
+                textAlign: "center",
+                padding: "20px",
+                fontSize: "14px",
+              }}
+            >
+              {ordersError}
+            </div>
+          ) : userOrders && userOrders?.orders?.length > 0 ? (
+            <div>
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  color: theme === "dark" ? "#aaa" : "#666",
+                  marginBottom: "12px",
+                }}
+              >
+                Found {userOrders.length} order
+                {userOrders.length !== 1 ? "s" : ""}
+              </div>
+              {ensureArray(userOrders?.orders)?.map((order, index) => (
+                <div
+                  key={order.id || index}
+                  style={{
+                    background: theme === "dark" ? "#1a1a1a" : "#f8f9fa",
+                    borderRadius: "8px",
+                    padding: "12px",
+                    marginBottom: "8px",
+                    border: `1px solid ${
+                      theme === "dark" ? "#333" : "#e2e8f0"
+                    }`,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontWeight: "600",
+                          fontSize: "0.9rem",
+                          color: theme === "dark" ? "white" : "#222",
+                        }}
+                      >
+                        Order #
+                        {order.id || order.orderNumber || `#${index + 1}`}
+                      </div>
+                      {order.status && (
+                        <div
+                          style={{
+                            fontSize: "0.8rem",
+                            color:
+                              order.status === "completed"
+                                ? "#25d366"
+                                : order.status === "pending"
+                                ? "#f39c12"
+                                : order.status === "cancelled"
+                                ? "#e74c3c"
+                                : theme === "dark"
+                                ? "#aaa"
+                                : "#666",
+                            marginTop: "2px",
+                          }}
+                        >
+                          Status: {order.status}
+                        </div>
+                      )}
+                    </div>
+                    {order.total && (
+                      <div
+                        style={{
+                          fontWeight: "600",
+                          fontSize: "0.9rem",
+                          color: theme === "dark" ? "white" : "#222",
+                        }}
+                      >
+                        Rs. {order.total}
+                      </div>
+                    )}
+                  </div>
+
+                  {order.items && order.items.length > 0 && (
+                    <div style={{ marginTop: "8px" }}>
+                      <div
+                        style={{
+                          fontSize: "0.8rem",
+                          color: theme === "dark" ? "#aaa" : "#666",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Items:
+                      </div>
+                      {order.items.slice(0, 3).map((item, itemIndex) => (
+                        <div
+                          key={itemIndex}
+                          style={{
+                            fontSize: "0.8rem",
+                            color: theme === "dark" ? "white" : "#222",
+                            marginBottom: "2px",
+                          }}
+                        >
+                          • {item.name || item.title}{" "}
+                          {item.quantity && `(x${item.quantity})`}
+                        </div>
+                      ))}
+                      {order.items.length > 3 && (
+                        <div
+                          style={{
+                            fontSize: "0.8rem",
+                            color: theme === "dark" ? "#aaa" : "#666",
+                            fontStyle: "italic",
+                          }}
+                        >
+                          ... and {order.items.length - 3} more items
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {order.createdAt && (
+                    <div
+                      style={{
+                        fontSize: "0.75rem",
+                        color: theme === "dark" ? "#aaa" : "#666",
+                        marginTop: "8px",
+                      }}
+                    >
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div
+              style={{
+                color: theme === "dark" ? "#aaa" : "#666",
+                textAlign: "center",
+                padding: "20px",
+                fontSize: "14px",
+              }}
+            >
+              No orders found for this customer
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Create Order Button */}
       <section style={{ marginBottom: "28px" }}>

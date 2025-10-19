@@ -596,6 +596,97 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       return true;
 
+    case "FETCH_USER_ORDERS":
+      const userOrdersToken = request.token;
+      const { phone } = request;
+
+      console.log("[BG] FETCH_USER_ORDERS request received:", {
+        phone,
+        token: userOrdersToken
+          ? userOrdersToken.substring(0, 20) + "..."
+          : "undefined",
+      });
+
+      if (!userOrdersToken) {
+        console.error("[BG] No token provided in FETCH_USER_ORDERS request");
+        sendResponse({
+          success: false,
+          error: "No authentication token provided",
+        });
+        return false;
+      }
+
+      if (!phone) {
+        console.error(
+          "[BG] No phone number provided in FETCH_USER_ORDERS request"
+        );
+        sendResponse({
+          success: false,
+          error: "No phone number provided",
+        });
+        return false;
+      }
+
+      // Get store ID from request or use default
+      const userOrdersStoreId = request.storeId;
+      const userOrdersApiUrl = `https://api.shopilam.com/api/v1/orders/user-by-phone?phone=${phone}&store=${userOrdersStoreId}`;
+
+      const userOrdersHeaders = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${userOrdersToken}`,
+      };
+
+      console.log("[BG] Making user orders request to:", userOrdersApiUrl);
+      console.log("[BG] Request headers:", userOrdersHeaders);
+
+      fetch(userOrdersApiUrl, {
+        method: "GET",
+        headers: userOrdersHeaders,
+      })
+        .then((response) => {
+          console.log("[BG] User orders API response status:", response.status);
+          console.log(
+            "[BG] User orders API response headers:",
+            Object.fromEntries(response.headers.entries())
+          );
+
+          // Check for 401 Unauthorized status
+          if (response.status === 401) {
+            console.warn("[BG] 401 Unauthorized - Token expired or invalid");
+            handleUnauthorizedResponse();
+            return response.text().then((text) => {
+              throw new Error("Authentication required. Please log in again.");
+            });
+          }
+
+          if (!response.ok) {
+            return response.text().then((text) => {
+              console.error("[BG] User orders API error response:", text);
+              throw new Error(text);
+            });
+          }
+          return response.json();
+        })
+        .then((userOrdersData) => {
+          console.log("[BG] User orders API success response:", userOrdersData);
+          console.log(
+            "[BG] User orders count:",
+            Array.isArray(userOrdersData?.data)
+              ? userOrdersData?.data?.length
+              : Array.isArray(userOrdersData?.orders)
+              ? userOrdersData?.orders?.length
+              : Array.isArray(userOrdersData)
+              ? userOrdersData.length
+              : "Not an array"
+          );
+          sendResponse({ success: true, orders: userOrdersData });
+        })
+        .catch((error) => {
+          console.error("[BG] User orders fetch error:", error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true;
+
     default:
       console.warn("Unknown message action:", request.action);
       return false;
