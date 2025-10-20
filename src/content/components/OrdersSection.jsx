@@ -189,7 +189,7 @@ const OrdersSection = ({ whatsappTheme }) => {
     const store = JSON.parse(data)?.data?.stores;
     const phoneNumber = order?.shipmentDetails?.addresses[0]?.phone;
     const customerName = order?.shipmentDetails?.addresses[0]?.name;
-    const city = order?.shipmentDetails?.addresses[0]?.city;
+    const city = order?.shipmentDetails?.addresses?.[0]?.city?.city;
     const orderDateTime = formatDate(order?.createdAt);
     const orderId = order?.name;
     const storeName = store?.find((s) => s._id === order?.storeId)?.name;

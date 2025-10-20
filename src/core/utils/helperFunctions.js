@@ -78,12 +78,12 @@ export const ensureArray = (value) => {
   return Array.isArray(value) ? value : [value];
 };
 
-export const showVariantImages = (images, variants) => {
-  if (!images?.length || !variants) {
+export const showVariantImages = (images, variant) => {
+  if (!images?.length || !variant) {
     return undefined;
   }
   const matchedImage = ensureArray(images)?.find(
-    (image) => image?.id === variants?.imageId
+    (image) => image?.id === variant?.imageId
   );
   console.log("[VARIANT] Matched image:", matchedImage);
   if (!matchedImage?.url) {

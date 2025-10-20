@@ -1962,11 +1962,7 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
         productItem.images.length > 0
       ) {
         // Handle images array format
-        imageUrl = productItem.images[0]?.url || productItem.images[0];
-        // imageUrl =
-        //   productItem.variants.length > 0
-        //     ? showVariantImages(productItem.images, productItem.variants)
-        //     : showProductImages(productItem);
+        imageUrl = productItem.images[0]?.url;
 
         console.log("[CHAT] Image URL:1234", imageUrl);
       } else if (productItem.image) {

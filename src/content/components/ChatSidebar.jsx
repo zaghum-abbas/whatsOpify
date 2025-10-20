@@ -16,7 +16,7 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Check if product has variants
-  const hasVariants = item?.variants && item.variants.length > 0;
+  const hasVariants = item?.variants && item.variants.length > 1;
 
   const handleToggleExpand = (e) => {
     e.stopPropagation(); // Prevent triggering product click
@@ -24,9 +24,19 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
   };
 
   const handleVariantClick = (e, variant) => {
-    e.stopPropagation(); // Prevent triggering product click
+    e.stopPropagation();
+
     const variantItem = { ...item, variants: [variant] };
-    handleProductClick(variantItem);
+
+    // Get matched images for that single variant
+    const variantImages = showVariantImages(item.images, variant);
+    console.log("Variant images:", variantImages);
+
+    // Pass it along with variant data
+    handleProductClick({
+      ...variantItem,
+      images: [{ url: variantImages }],
+    });
   };
 
   return (
