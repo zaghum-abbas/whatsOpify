@@ -588,26 +588,25 @@ Please keep ${orderTotal} handy as your parcel  will be at your door step in 3-4
 🧾 Tracking: ${`https://shopilam.com/tracking/${order?.trackingNo}`}  
  
 
-You can follow your parcel using the link above — it’ll be with you soon! 😄  
+You can follow your parcel using the link above — it'll be with you soon! 😄  
 
 💚 *Thanks for choosing us!*`;
-        chrome.runtime.sendMessage(
-          {
-            action: "SEND_WHATSAPP_MESSAGE",
-            phoneNumber: cleanedNumber,
-            message: message,
-          },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              console.error(
-                "[ORDERS] Error sending message:",
-                chrome.runtime.lastError
-              );
-            } else {
-              console.log("[ORDERS] Message sent successfully:", response);
-            }
-          }
-        );
+
+        // Use the existing sendMessageToCurrentChat function
+        if (window.sendMessageToCurrentChat) {
+          window.sendMessageToCurrentChat(message, order);
+          console.log("[ORDERS] Message added to current chat input");
+        } else {
+          console.warn(
+            "[ORDERS] sendMessageToCurrentChat function not available"
+          );
+          // Fallback: copy to clipboard
+          navigator.clipboard.writeText(message).then(() => {
+            alert(
+              "Order status message copied to clipboard! Paste in the chat."
+            );
+          });
+        }
       }
     } else {
       console.warn("[ORDERS] No phone number found for order:", order);
@@ -621,7 +620,7 @@ You can follow your parcel using the link above — it’ll be with you soon! �
         fontFamily: "inherit",
         // background: theme.bg,
         background: theme === "dark" ? "#18191a" : "#fff",
-        minHeight: "100vh",
+        // minHeight: "100vh",
       }}
     >
       <style>
@@ -1095,27 +1094,19 @@ You can follow your parcel using the link above — it’ll be with you soon! �
           style={{
             width: "100%",
             padding: "16px",
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            background: "#10b981",
             color: "white",
             border: "none",
             borderRadius: "10px",
             fontSize: "1.1rem",
             fontWeight: "600",
             cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
-            transition: "all 0.3s ease",
+            // boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+            // transition: "all 0.3s ease",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "10px",
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.transform = "translateY(-2px)";
-            e.target.style.boxShadow = "0 6px 16px rgba(102, 126, 234, 0.4)";
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.transform = "translateY(0)";
-            e.target.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
           }}
         >
           <span style={{ fontSize: "1.3em" }}>📝</span>

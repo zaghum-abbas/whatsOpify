@@ -1951,7 +1951,6 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
       }
     }, 150);
 
-    // If product has an image, add it to the chat
     if (productItem) {
       // Handle both image (single) and images (array) properties
       let imageUrl = null;

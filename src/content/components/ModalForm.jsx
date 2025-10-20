@@ -1686,7 +1686,7 @@ const selectedItemStyle = {
   padding: "12px",
   border: "1px solid #e0e0e0",
   borderRadius: "8px",
-  marginBottom: "12px",
+  // marginBottom: "12px",
   backgroundColor: "#fff",
 };
 
