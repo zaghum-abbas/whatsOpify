@@ -16,6 +16,7 @@ import LoginModal from "./components/LoginModal";
 import {
   extractPhoneNumberFromDOM,
   getToken,
+  showProductImages,
   showVariantImages,
 } from "../core/utils/helperFunctions.js";
 
@@ -1961,14 +1962,16 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
         productItem.images.length > 0
       ) {
         // Handle images array format
-        // imageUrl = productItem.images[0]?.url || productItem.images[0];
-        imageUrl =
-          productItem.variants.length > 0
-            ? showVariantImages(productItem.images, productItem)
-            : showProductImages(productItem);
+        imageUrl = productItem.images[0]?.url || productItem.images[0];
+        // imageUrl =
+        //   productItem.variants.length > 0
+        //     ? showVariantImages(productItem.images, productItem.variants)
+        //     : showProductImages(productItem);
+
+        console.log("[CHAT] Image URL:1234", imageUrl);
       } else if (productItem.image) {
         // Handle single image format
-        imageUrl = productItem.image;
+        imageUrl = productItem.images[0]?.url;
       }
 
       if (imageUrl) {

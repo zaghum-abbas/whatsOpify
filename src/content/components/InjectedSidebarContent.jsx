@@ -492,6 +492,9 @@ const InjectedSidebarContent = ({
         action: "SEARCH_PRODUCTS",
         token: getToken(),
         searchTerm: searchTerm,
+        storeId: localStorage.getItem("whatsopify_selected_store")
+          ? JSON.parse(localStorage.getItem("whatsopify_selected_store"))?._id
+          : null,
       });
 
       console.log("[CATALOG] Search API Response:", response);

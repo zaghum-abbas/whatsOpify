@@ -78,13 +78,14 @@ export const ensureArray = (value) => {
   return Array.isArray(value) ? value : [value];
 };
 
-export const showVariantImages = (images, product) => {
-  if (!images?.length || !product) {
+export const showVariantImages = (images, variants) => {
+  if (!images?.length || !variants) {
     return undefined;
   }
   const matchedImage = ensureArray(images)?.find(
-    (image) => image?.id === product?.imageId
+    (image) => image?.id === variants?.imageId
   );
+  console.log("[VARIANT] Matched image:", matchedImage);
   if (!matchedImage?.url) {
     return undefined;
   }
@@ -102,6 +103,8 @@ export const showProductImages = (product) => {
   const productImages = images?.filter(
     (image) => image?.id && !variantImageIds?.includes(image?.id)
   );
+  console.log("[PRODUCT] Product images:", productImages);
+
   if (!productImages?.length) {
     return undefined;
   }
@@ -109,6 +112,9 @@ export const showProductImages = (product) => {
   if (!imageUrl) {
     return undefined;
   }
+
+  console.log("[PRODUCT] Image URL:11", imageUrl);
+
   return imageUrl;
 };
 

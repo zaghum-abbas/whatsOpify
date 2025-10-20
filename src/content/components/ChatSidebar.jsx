@@ -16,7 +16,7 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Check if product has variants
-  const hasVariants = item?.variants && item.variants.length > 1;
+  const hasVariants = item?.variants && item.variants.length > 0;
 
   const handleToggleExpand = (e) => {
     e.stopPropagation(); // Prevent triggering product click
@@ -263,7 +263,7 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
                 >
                   {variant?.imageId ? (
                     <img
-                      src={showVariantImages(item.images, item)}
+                      src={showVariantImages(item.images, variant)}
                       alt={variant.title || `Variant ${index + 1}`}
                       style={{
                         width: "100%",
@@ -431,6 +431,9 @@ const ChatSidebar = ({
             JSON.parse(localStorage.getItem("whatsopify_token"))?.token
           : null,
         searchTerm: searchTerm,
+        storeId: localStorage.getItem("whatsopify_selected_store")
+          ? JSON.parse(localStorage.getItem("whatsopify_selected_store"))?._id
+          : null,
       });
 
       console.log("[CATALOG] Search API Response:", response);
