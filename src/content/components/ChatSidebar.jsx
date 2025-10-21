@@ -634,8 +634,8 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
       {console.log("contact", contact)}
       {/* Contact Info Section */}
       {contact && userOrders?.userInfo && (
-        <section style={{ marginBottom: "28px" }}>
-          <h2
+        <section style={{ marginBottom: "10px" }}>
+          {/* <h2
             style={{
               marginBottom: "12px",
               fontSize: "1.1rem",
@@ -643,7 +643,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
             }}
           >
             Contact Info
-          </h2>
+          </h2> */}
           <div
             style={{
               background: theme === "dark" ? "#23272a" : "#fff",
@@ -720,8 +720,8 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
         </section>
       )}
       {userOrders?.userStatus && (
-        <section style={{ marginBottom: "28px" }}>
-          <h2
+        <section style={{ marginBottom: "10px" }}>
+          {/* <h2
             style={{
               marginBottom: "12px",
               fontSize: "1.1rem",
@@ -729,7 +729,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
             }}
           >
             User States
-          </h2>
+          </h2> */}
           <div
             style={{
               background: theme === "dark" ? "#23272a" : "#fff",
@@ -850,8 +850,8 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
       )}
 
       {/* User Orders Section */}
-      <section style={{ marginBottom: "28px" }}>
-        <h2
+      <section style={{ marginBottom: "10px" }}>
+        {/* <h2
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
@@ -859,7 +859,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
           }}
         >
           Customer Orders
-        </h2>
+        </h2> */}
         <div
           style={{
             background: theme === "dark" ? "#23272a" : "#fff",
@@ -935,7 +935,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                         fontWeight: "600",
                       }}
                     >
-                      Order ID
+                      ID
                     </th>
 
                     <th
@@ -946,7 +946,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                         fontWeight: "600",
                       }}
                     >
-                      Amount
+                      Rs.
                     </th>
                     <th
                       style={{
@@ -954,10 +954,10 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                         textAlign: "left",
                         borderBottom: "1px solid #e0e0e0",
                         fontWeight: "600",
-                        width: "200px",
+                        width: "120px",
                       }}
                     >
-                      Order Date
+                      Date
                     </th>
                     <th
                       style={{
@@ -967,7 +967,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                         fontWeight: "600",
                       }}
                     >
-                      Order Status
+                      Status
                     </th>
                     <th
                       style={{
@@ -977,7 +977,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                         fontWeight: "600",
                       }}
                     >
-                      Tracking Number
+                      Tracking
                     </th>
                   </tr>
                 </thead>
@@ -1034,7 +1034,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                           alignItems: "center",
                           alignContent: "center",
                           height: "100%",
-                          width: "100px",
+                          // width: "100px",
                         }}
                       >
                         {order?.trackingNo && (
@@ -1058,7 +1058,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                           >
                             {updatingOrder === order?._id
                               ? "Updating..."
-                              : "Order status"}
+                              : "Tracking"}
                           </button>
                         )}
                       </td>
@@ -1083,7 +1083,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
       </section>
 
       {/* Create Order Button */}
-      <section style={{ marginBottom: "28px" }}>
+      {/* <section style={{ marginBottom: "10px" }}>
         <button
           onClick={() => {
             // Switch to order form sidebar
@@ -1113,11 +1113,52 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
           <span>Create New Order</span>
           <span style={{ fontSize: "1em", marginLeft: "auto" }}>→</span>
         </button>
-      </section>
+      </section> */}
 
+      <CustomerSupportMessages />
+      {/* Notes Section */}
+      <section style={{ marginBottom: "10px" }}>
+        {/* <h2
+          style={{
+            marginBottom: "12px",
+            fontSize: "1.1rem",
+            color: theme === "dark" ? "white" : "#222",
+          }}
+        >
+          Notes
+        </h2> */}
+        <div
+          style={{
+            background: theme === "dark" ? "#23272a" : "#fff",
+            borderRadius: "10px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+            padding: "16px",
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            color: theme === "dark" ? "white" : "#222",
+          }}
+        >
+          <textarea
+            style={{
+              width: "100%",
+              minHeight: "80px",
+              borderRadius: "6px",
+              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+              padding: "10px",
+              resize: "vertical",
+              fontSize: "1rem",
+              color: theme === "dark" ? "white" : "#222",
+              background: theme === "dark" ? "#23272a" : "#fff",
+              boxSizing: "border-box",
+            }}
+            placeholder="Type your notes here..."
+            value={notes || ""}
+            onChange={(e) => onNotesChange && onNotesChange(e.target.value)}
+          />
+        </div>
+      </section>
       {/* Catalog Section */}
-      <section style={{ marginBottom: "28px" }}>
-        <h2
+      <section style={{ marginBottom: "10px" }}>
+        {/* <h2
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
@@ -1125,7 +1166,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
           }}
         >
           Product Catalog
-        </h2>
+        </h2> */}
         <div
           style={{
             background: theme === "dark" ? "#23272a" : "#fff",
@@ -1207,49 +1248,6 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
           )}
         </div>
       </section>
-
-      {/* Notes Section */}
-      <section style={{ marginBottom: "28px" }}>
-        <h2
-          style={{
-            marginBottom: "12px",
-            fontSize: "1.1rem",
-            color: theme === "dark" ? "white" : "#222",
-          }}
-        >
-          Notes
-        </h2>
-        <div
-          style={{
-            background: theme === "dark" ? "#23272a" : "#fff",
-            borderRadius: "10px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-            padding: "16px",
-            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-            color: theme === "dark" ? "white" : "#222",
-          }}
-        >
-          <textarea
-            style={{
-              width: "100%",
-              minHeight: "80px",
-              borderRadius: "6px",
-              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-              padding: "10px",
-              resize: "vertical",
-              fontSize: "1rem",
-              color: theme === "dark" ? "white" : "#222",
-              background: theme === "dark" ? "#23272a" : "#fff",
-              boxSizing: "border-box",
-            }}
-            placeholder="Type your notes here..."
-            value={notes || ""}
-            onChange={(e) => onNotesChange && onNotesChange(e.target.value)}
-          />
-        </div>
-      </section>
-
-      <CustomerSupportMessages />
     </div>
   );
 };

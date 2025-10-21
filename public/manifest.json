@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Whatsapify v2.0",
+  "name": "Whatsopify v2.0",
   "version": "2.0",
-  "description": "Makes Enhancement on WhatsApp Web.",
+  "description": "Fasten up your Customer Service up to 20x connecting Shopify Store directly to WhatsApp",
   "background": {
     "service_worker": "background.js",
     "type": "module"

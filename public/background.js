@@ -329,11 +329,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
 
           if (!response.ok) {
-            return response.text().then((text) => {
+            return response.json().then((text) => {
               console.error("[BG] Orders API error response:", text);
-              throw new Error(
-                `HTTP error! status: ${response.status}, message: ${text}`
-              );
+              throw new Error(text.message);
             });
           }
           return response.json();

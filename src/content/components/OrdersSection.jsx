@@ -61,6 +61,7 @@ const OrdersSection = ({ whatsappTheme }) => {
 
         return response.orders;
       } else {
+        console.log("response", response);
         throw new Error(response.error || "Failed to fetch orders");
       }
     } catch (err) {
@@ -407,7 +408,7 @@ We’re sorry to see you cancel 😔 — if there’s anything we can improve or
             marginBottom: "16px",
           }}
         >
-          Error: {error}
+          {error}
           <button
             onClick={() => window.location.reload()}
             style={{
