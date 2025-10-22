@@ -19,6 +19,8 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
     error: null,
     preview: null,
   });
+  // Store images for each variant individually
+  const [variantImages, setVariantImages] = useState({});
   const colors = getThemeColors(theme);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -44,6 +46,7 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
       images: [{ url: variantImages }],
     });
   };
+
   useEffect(() => {
     const processImage = async () => {
       const imageUrl = showProductImages(item);
@@ -63,12 +66,101 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
             preview: objectUrl,
           });
         } catch (error) {
+          console.error("Error downloading image:", error);
           // Error handling
         }
       }
     };
     processImage();
   }, [item.title, item.images]);
+
+  // Process variant images for each variant individually
+  useEffect(() => {
+    const processAllVariantImages = async () => {
+      if (!item.variants || item.variants.length === 0) return;
+
+      // Process each variant's image individually
+      for (const variant of item.variants) {
+        if (!variant?.imageId) continue;
+
+        const variantKey =
+          variant.id ||
+          variant.title ||
+          `variant_${item.variants.indexOf(variant)}`;
+
+        setVariantImages((prev) => ({
+          ...prev,
+          [variantKey]: {
+            loading: true,
+            downloaded: false,
+            error: null,
+            preview: null,
+          },
+        }));
+
+        const imageUrl = showVariantImages(item.images, variant);
+        console.log(
+          `[VARIANT] Processing image for variant: ${variant.title}`,
+          imageUrl
+        );
+
+        if (imageUrl) {
+          try {
+            const filename = `${
+              variant.title?.replace(/[^a-zA-Z0-9]/g, "_") || "variant"
+            }.jpg`;
+            const imageFile = await downloadImageAsFile(imageUrl, filename);
+            console.log(
+              `[VARIANT] Image downloaded for ${variant.title}:`,
+              imageFile
+            );
+
+            if (imageFile) {
+              const objectUrl = URL.createObjectURL(imageFile);
+
+              // Store the processed image for this specific variant
+              setVariantImages((prev) => ({
+                ...prev,
+                [variantKey]: {
+                  loading: false,
+                  downloaded: true,
+                  error: null,
+                  preview: objectUrl,
+                },
+              }));
+            }
+          } catch (error) {
+            console.error(
+              `[VARIANT] Error processing image for ${variant.title}:`,
+              error
+            );
+            setVariantImages((prev) => ({
+              ...prev,
+              [variantKey]: {
+                loading: false,
+                downloaded: false,
+                error: error.message,
+                preview: null,
+              },
+            }));
+          }
+        } else {
+          // No image URL found
+          setVariantImages((prev) => ({
+            ...prev,
+            [variantKey]: {
+              loading: false,
+              downloaded: false,
+              error: null,
+              preview: null,
+            },
+          }));
+        }
+      }
+    };
+
+    processAllVariantImages();
+  }, [item.variants, item.images]);
 
   return (
     <div
@@ -300,37 +392,127 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    position: "relative",
                   }}
                 >
-                  {variant?.imageId ? (
-                    <img
-                      src={showVariantImages(item.images, variant)}
-                      alt={variant.title || `Variant ${index + 1}`}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
-                      onError={(e) => {
-                        e.target.style.display = "none";
-                        e.target.nextSibling.style.display = "flex";
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        display: item.image ? "none" : "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: "100%",
-                        height: "100%",
-                        fontSize: "1.2em",
-                        color: theme === "dark" ? "white" : "#222",
-                      }}
-                    >
-                      🛒
-                    </div>
-                  )}
+                  {(() => {
+                    const variantKey =
+                      variant.id || variant.title || `variant_${index}`;
+                    const variantImageState = variantImages[variantKey] || {
+                      loading: false,
+                      downloaded: false,
+                      error: null,
+                      preview: null,
+                    };
+
+                    if (variantImageState.loading) {
+                      return (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "100%",
+                            height: "100%",
+                            fontSize: "0.8em",
+                            color: theme === "dark" ? "white" : "#222",
+                          }}
+                        >
+                          ⏳
+                        </div>
+                      );
+                    } else if (variantImageState.preview) {
+                      return (
+                        <>
+                          <img
+                            src={variantImageState.preview}
+                            alt={variant.title}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                              e.target.nextSibling.style.display = "flex";
+                            }}
+                          />
+                          {variantImageState.downloaded && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "1px",
+                                right: "1px",
+                                width: "6px",
+                                height: "6px",
+                                backgroundColor: "#10B981",
+                                borderRadius: "50%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "4px",
+                                color: "white",
+                              }}
+                              title="Variant image downloaded and cached"
+                            >
+                              ✓
+                            </div>
+                          )}
+                        </>
+                      );
+                    } else if (variantImageState.error) {
+                      return (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "100%",
+                            height: "100%",
+                            fontSize: "0.6em",
+                            color: "#ef4444",
+                            textAlign: "center",
+                            padding: "2px",
+                          }}
+                          title={`Image failed to load: ${variantImageState.error}`}
+                        >
+                          ❌
+                        </div>
+                      );
+                    } else if (variant?.imageId) {
+                      return (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "100%",
+                            height: "100%",
+                            fontSize: "0.8em",
+                            color: theme === "dark" ? "white" : "#222",
+                          }}
+                        >
+                          🛒
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div
+                          style={{
+                            display: item.image ? "none" : "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: "100%",
+                            height: "100%",
+                            fontSize: "0.8em",
+                            color: theme === "dark" ? "white" : "#222",
+                          }}
+                        >
+                          🛒
+                        </div>
+                      );
+                    }
+                  })()}
                 </div>
 
                 {/* Variant Info */}

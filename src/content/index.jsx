@@ -1896,7 +1896,6 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
     }, 150);
 
     if (productItem) {
-      // Handle both image (single) and images (array) properties
       let imageUrl = null;
 
       if (
@@ -1904,12 +1903,8 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
         Array.isArray(productItem.images) &&
         productItem.images.length > 0
       ) {
-        // Handle images array format
         imageUrl = productItem.images[0]?.url;
-
-        console.log("[CHAT] Image URL:1234", imageUrl);
       } else if (productItem.image) {
-        // Handle single image format
         imageUrl = productItem.images[0]?.url;
       }
 
