@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Whatsopify - Connects WhatsApp with your Shopify Stores",
-  "version": "2.0",
-  "description": "Fasten up your Customer Service up to 20x connecting Shopify Store directly to WhatsApp",
+  "name": "Whatsopify: Shopify to WhatsApp - Tracking, Orders, Products.",
+  "version": "2.1",
+  "description": "Fasten up your Customer Service up to 10x connecting Shopify Store directly to WhatsApp",
 
   "icons": {
     "16": "icons/icon16.png",
