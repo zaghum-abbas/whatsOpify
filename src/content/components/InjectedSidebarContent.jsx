@@ -2,7 +2,12 @@ import React, { useMemo, useState, useEffect } from "react";
 import ModalForm from "./ModalForm";
 import CustomerSupportMessages from "./CustomerSupportMessages";
 import OrdersSection from "./OrdersSection";
-import { formatPrice, getToken } from "../../core/utils/helperFunctions";
+import {
+  formatPrice,
+  getToken,
+  showProductImages,
+  downloadImageAsFile,
+} from "../../core/utils/helperFunctions";
 import { useDebounce } from "../../hooks/useDebounce";
 import { useTheme } from "../../hooks/useTheme";
 
@@ -125,6 +130,67 @@ const StoreItem = ({ store, theme }) => {
 };
 
 const CatalogItem = ({ item, handleProductClick, theme }) => {
+  const [imageState, setImageState] = useState({
+    loading: false,
+    downloaded: false,
+    error: null,
+    preview: null,
+  });
+
+  // Process image when component mounts
+  useEffect(() => {
+    const processImage = async () => {
+      console.log(`[CATALOG_ITEM] Processing image for product: ${item.title}`);
+
+      const imageUrl = showProductImages(item);
+      if (imageUrl) {
+        console.log(`[CATALOG_ITEM] Starting image download for: ${imageUrl}`);
+        setImageState((prev) => ({ ...prev, loading: true }));
+
+        try {
+          const imageFile = await downloadImageAsFile(
+            imageUrl,
+            `${item.title.replace(/[^a-zA-Z0-9]/g, "_")}.jpg`
+          );
+
+          if (imageFile) {
+            // Create object URL from the downloaded file
+            const objectUrl = URL.createObjectURL(imageFile);
+            console.log(
+              `[CATALOG_ITEM] Image downloaded successfully for: ${item.title}`
+            );
+
+            setImageState({
+              loading: false,
+              downloaded: true,
+              error: null,
+              preview: objectUrl,
+            });
+          } else {
+            throw new Error("Failed to download image file");
+          }
+        } catch (error) {
+          console.error(
+            `[CATALOG_ITEM] Error processing image for ${item.title}:`,
+            error
+          );
+          setImageState({
+            loading: false,
+            downloaded: false,
+            error: error.message,
+            preview: null,
+          });
+        }
+      } else {
+        console.log(
+          `[CATALOG_ITEM] No image URL found for product: ${item.title}`
+        );
+      }
+    };
+
+    processImage();
+  }, [item.title, item.images]);
+
   return (
     <div
       onClick={() => handleProductClick(item)}
@@ -162,11 +228,26 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          position: "relative",
         }}
       >
-        {item.images && item.images.length > 0 ? (
+        {imageState.loading ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              height: "100%",
+              fontSize: "1.2em",
+              color: theme === "dark" ? "white" : "#222",
+            }}
+          >
+            ⏳
+          </div>
+        ) : imageState.preview ? (
           <img
-            src={item.images[0]?.url}
+            src={imageState.preview}
             alt={item.name}
             style={{
               width: "100%",
@@ -174,14 +255,32 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
               objectFit: "cover",
             }}
             onError={(e) => {
+              console.log(`[CATALOG_ITEM] Image failed to load: ${item.title}`);
               e.target.style.display = "none";
               e.target.nextSibling.style.display = "flex";
             }}
           />
+        ) : imageState.error ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "100%",
+              height: "100%",
+              fontSize: "1em",
+              color: "#ef4444",
+              textAlign: "center",
+              padding: "4px",
+            }}
+            title={`Image failed to load: ${imageState.error}`}
+          >
+            ❌
+          </div>
         ) : (
           <div
             style={{
-              display: item.image ? "none" : "flex",
+              display: "flex",
               alignItems: "center",
               justifyContent: "center",
               width: "100%",
@@ -191,6 +290,29 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
             }}
           >
             🛒
+          </div>
+        )}
+
+        {/* Download status indicator */}
+        {imageState.downloaded && (
+          <div
+            style={{
+              position: "absolute",
+              top: "2px",
+              right: "2px",
+              width: "12px",
+              height: "12px",
+              backgroundColor: "#10B981",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "8px",
+              color: "white",
+            }}
+            title="Image downloaded and cached"
+          >
+            ✓
           </div>
         )}
       </div>
@@ -569,7 +691,7 @@ const InjectedSidebarContent = ({
     return doc.body.textContent || "";
   };
 
-  const handleProductClick = (item) => {
+  const handleProductClick = async (item) => {
     console.log("[PRODUCT] Product clicked:", item);
 
     const productMessage =
@@ -579,8 +701,34 @@ const InjectedSidebarContent = ({
       `**Price**\n` +
       `Rs ${item?.variants?.[0]?.price}\n`;
 
+    // Handle product images
+    let productImages = [];
+    const imageUrl = showProductImages(item);
+    if (imageUrl) {
+      try {
+        console.log("[PRODUCT] Processing product image for sharing...");
+        const imageFile = await downloadImageAsFile(
+          imageUrl,
+          `${item.title.replace(/[^a-zA-Z0-9]/g, "_")}.jpg`
+        );
+
+        if (imageFile) {
+          // Convert File to the format expected by sendMessageToCurrentChat
+          productImages.push({
+            downloaded: true,
+            blob: imageFile,
+            url: URL.createObjectURL(imageFile),
+            originalUrl: imageUrl,
+          });
+          console.log("[PRODUCT] Image prepared for sharing");
+        }
+      } catch (error) {
+        console.error("[PRODUCT] Error processing product image:", error);
+      }
+    }
+
     if (window.sendMessageToCurrentChat) {
-      window.sendMessageToCurrentChat(productMessage, item);
+      window.sendMessageToCurrentChat(productMessage, item, productImages);
     } else {
       console.warn("[PRODUCT] sendMessageToCurrentChat not available");
       navigator.clipboard.writeText(productMessage).then(() => {

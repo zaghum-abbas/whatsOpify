@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import CustomerSupportMessages from "./CustomerSupportMessages";
 import {
+  downloadImageAsFile,
   ensureArray,
   formatDate,
   formatPhoneNumber,
@@ -12,10 +13,15 @@ import { useDebounce } from "../../hooks/useDebounce";
 import { useTheme, getThemeColors } from "../../hooks/useTheme";
 
 const CatalogItem = ({ item, handleProductClick, theme }) => {
+  const [imageState, setImageState] = useState({
+    loading: false,
+    downloaded: false,
+    error: null,
+    preview: null,
+  });
   const colors = getThemeColors(theme);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Check if product has variants
   const hasVariants = item?.variants && item.variants.length > 1;
 
   const handleToggleExpand = (e) => {
@@ -38,6 +44,31 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
       images: [{ url: variantImages }],
     });
   };
+  useEffect(() => {
+    const processImage = async () => {
+      const imageUrl = showProductImages(item);
+      console.log("imageUrl", imageUrl);
+      const filename = `${item.title.replace(/[^a-zA-Z0-9]/g, "_")}.jpg`;
+      if (imageUrl) {
+        setImageState((prev) => ({ ...prev, loading: true }));
+
+        try {
+          const imageFile = await downloadImageAsFile(imageUrl, filename);
+          console.log("imageFile", imageFile);
+          const objectUrl = URL.createObjectURL(imageFile);
+          setImageState({
+            loading: false,
+            downloaded: true,
+            error: null,
+            preview: objectUrl,
+          });
+        } catch (error) {
+          // Error handling
+        }
+      }
+    };
+    processImage();
+  }, [item.title, item.images]);
 
   return (
     <div
@@ -68,6 +99,8 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
           cursor: "pointer",
         }}
       >
+        {console.log("showimages", imageState.preview)}
+
         <div
           style={{
             width: "50px",
@@ -83,8 +116,8 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
         >
           {item.images && item.images.length > 0 ? (
             <img
-              src={showProductImages(item)}
-              alt={item.name}
+              src={imageState.preview}
+              alt={item.title}
               style={{
                 width: "100%",
                 height: "100%",
@@ -111,7 +144,6 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
             </div>
           )}
         </div>
-
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
@@ -146,7 +178,6 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
             )}
           </div>
         </div>
-
         {/* Price and Toggle/Click Indicator */}
         <div
           style={{

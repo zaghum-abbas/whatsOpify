@@ -14,6 +14,7 @@ import "./App.css"; // Your main CSS file
 import { requireAuth, useAuthState } from "./components/authMiddleware.jsx";
 import LoginModal from "./components/LoginModal";
 import {
+  downloadImageAsFile,
   extractPhoneNumberFromDOM,
   getToken,
   showProductImages,
@@ -1562,63 +1563,6 @@ waitForElement("#pane-side", () => {
   console.log("🎯 #pane-side found, setting up chat observer...");
   observeActiveChat();
 });
-
-// Function to download image from URL and convert to File object
-async function downloadImageAsFile(imageUrl, filename) {
-  try {
-    console.log("[IMAGE] Downloading image from:", imageUrl);
-
-    // Try multiple methods to download the image
-    let response = null;
-
-    // Method 1: Direct fetch (works for same-origin images)
-    try {
-      response = await fetch(imageUrl);
-      if (!response.ok)
-        throw new Error(`Direct fetch failed: ${response.status}`);
-    } catch (directError) {
-      console.log("[IMAGE] Direct fetch failed, trying CORS proxy...");
-
-      // Method 2: CORS proxy
-      try {
-        const corsProxy = "https://corsproxy.io/?";
-        const proxyUrl = corsProxy + encodeURIComponent(imageUrl);
-        response = await fetch(proxyUrl);
-        if (!response.ok)
-          throw new Error(`CORS proxy failed: ${response.status}`);
-      } catch (proxyError) {
-        console.log("[IMAGE] CORS proxy failed, trying alternative proxy...");
-
-        // Method 3: Alternative proxy
-        const altProxy = "https://api.allorigins.win/raw?url=";
-        const altProxyUrl = altProxy + encodeURIComponent(imageUrl);
-        response = await fetch(altProxyUrl);
-        if (!response.ok)
-          throw new Error(`Alternative proxy failed: ${response.status}`);
-      }
-    }
-
-    const blob = await response.blob();
-    console.log("[IMAGE] Blob created:", {
-      size: blob.size,
-      type: blob.type,
-    });
-
-    const file = new File([blob], filename, {
-      type: blob.type || "image/jpeg",
-    });
-
-    console.log("[IMAGE] Image downloaded successfully:", {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-    });
-    return file;
-  } catch (error) {
-    console.error("[IMAGE] Error downloading image:", error);
-    return null;
-  }
-}
 
 // Function to add image to WhatsApp chat
 async function addImageToChat(imageFile) {
