@@ -1,8 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "Whatsopify v2.0",
+  "name": "Whatsopify - Connects WhatsApp with your Shopify Stores",
   "version": "2.0",
   "description": "Fasten up your Customer Service up to 20x connecting Shopify Store directly to WhatsApp",
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "19": "icons/icon19.png",
+    "24": "icons/icon24.png",
+    "32": "icons/icon32.png",
+    "38": "icons/icon38.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -23,7 +34,16 @@
     }
   ],
   "action": {
-    "default_title": "Web Enhancement Whatsapify"
+    "default_title": "Web Enhancement Whatsapify",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "19": "icons/icon19.png",
+      "24": "icons/icon24.png",
+      "32": "icons/icon32.png",
+      "38": "icons/icon38.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "web_accessible_resources": [
     {
