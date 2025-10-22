@@ -756,7 +756,6 @@ const ChatSidebar = ({
       `**Price**\n` +
       `Rs ${item?.variants?.[0]?.price}\n`;
 
-    // Handle all product images, not just the first one
     let productImages = [];
 
     if (item.images && Array.isArray(item.images) && item.images.length > 0) {

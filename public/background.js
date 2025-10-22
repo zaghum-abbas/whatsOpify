@@ -20,6 +20,7 @@ function handleCreateOrder(request, sender, sendResponse) {
     method: "POST",
     headers: headersToSend,
     body: JSON.stringify(orderData),
+    credentials: "omit", // Prevent cookies from being sent
   })
     .then((response) => {
       // Always parse JSON first to get the data, even if response.ok is false
@@ -231,7 +232,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       // Get store ID from request or use default
       const storeId = request.storeId;
-      const productsApiUrl = `https://api.shopilam.com/api/v1/products?limit=6&page=1&status=active&store=${storeId}`;
+      const productsApiUrl = `https://api.shopilam.com/api/v1/products?limit=2&page=3&status=active&store=${storeId}`;
 
       const productsHeaders = {
         Authorization: `Bearer ${token}`,
@@ -240,6 +241,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       fetch(productsApiUrl, {
         method: "GET",
         headers: productsHeaders,
+        credentials: "omit", // Prevent cookies from being sent
       })
         .then((response) => {
           console.log("[BG] API response status:", response.status);
@@ -309,6 +311,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       fetch(ordersApiUrl, {
         method: "GET",
         headers: ordersHeaders,
+        credentials: "omit", // Prevent cookies from being sent
       })
         .then((response) => {
           console.log("[BG] Orders API response status:", response.status);
@@ -396,6 +399,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         method: "PUT",
         headers: updateHeaders,
         body: JSON.stringify(updatePayload),
+        credentials: "omit", // Prevent cookies from being sent
       })
         .then((response) => {
           console.log("[BG] Update API response status:", response.status);
@@ -458,6 +462,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       fetch(storesApiUrl, {
         method: "GET",
         headers: storesHeaders,
+        credentials: "omit", // Prevent cookies from being sent
       })
         .then((response) => {
           console.log("[BG] Stores API response status:", response.status);
@@ -547,6 +552,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       fetch(searchApiUrl, {
         method: "GET",
         headers: searchHeaders,
+        credentials: "omit", // Prevent cookies from being sent
       })
         .then((response) => {
           console.log("[BG] Search API response status:", response.status);
@@ -638,6 +644,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       fetch(userOrdersApiUrl, {
         method: "GET",
         headers: userOrdersHeaders,
+        credentials: "omit", // Prevent cookies from being sent
       })
         .then((response) => {
           console.log("[BG] User orders API response status:", response.status);

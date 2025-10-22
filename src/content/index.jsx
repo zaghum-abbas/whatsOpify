@@ -2176,6 +2176,7 @@ window.testNewProductsAPI = function () {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
+    credentials: "omit", // Prevent cookies from being sent
   })
     .then((response) => {
       console.log("[PRODUCTS] Response status:", response.status);

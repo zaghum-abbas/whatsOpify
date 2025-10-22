@@ -30,6 +30,7 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             user: "ext",
           },
           body: JSON.stringify(requestData),
+          credentials: "omit", // Prevent cookies from being sent
         }
       );
 

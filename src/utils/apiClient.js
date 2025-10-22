@@ -13,6 +13,7 @@ export const apiCall = async (url, options = {}) => {
       "Content-Type": "application/json",
       ...options.headers,
     },
+    credentials: "omit", // Prevent cookies from being sent
   };
 
   const mergedOptions = {
