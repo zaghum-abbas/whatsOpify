@@ -7,8 +7,7 @@ function handleCreateOrder(request, sender, sendResponse) {
 
   const headersToSend = {
     "Content-Type": "application/json",
-    // Authorization: `Bearer ${request.token}`,
-    Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InNlbGxlckBnbWFpbC5jb20iLCJleHAiOjE3NTk0NDQ2NzV9.xXgJ-4zSawsKJ7QM4bX6yVXKws9krNQGPB0UAFcDuwA`,
+    Authorization: `Bearer ${request.token}`,
   };
 
   // Add store ID to the request data
@@ -165,7 +164,6 @@ function handleSendWhatsAppMessage(request, sender, sendResponse) {
   return true; // Required for async sendResponse
 }
 
-// Handle 401 Unauthorized responses by clearing token and notifying content scripts
 function handleUnauthorizedResponse() {
   console.log(
     "[BG] Handling 401 Unauthorized - clearing token and logging out user"

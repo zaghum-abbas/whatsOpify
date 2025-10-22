@@ -218,6 +218,9 @@ const TopToolbar = (props) => {
   const handleToolbarLogout = () => {
     const keysToRemove = [TOKEN_KEY, "whatsopify_selected_store"];
     keysToRemove.forEach((key) => localStorage.removeItem(key));
+    ["session"].forEach((cookieName) => {
+      document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+    });
     setIsAuthenticated(false);
     if (typeof window.toggleWhatsappSidebar === "function") {
       window.toggleWhatsappSidebar(false);

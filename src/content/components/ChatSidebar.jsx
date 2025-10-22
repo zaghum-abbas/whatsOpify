@@ -746,7 +746,7 @@ const ChatSidebar = ({
     return doc.body.textContent || "";
   };
 
-  const handleProductClick = (item) => {
+  const handleProductClick = async (item) => {
     console.log("[PRODUCT] Product clicked:", item);
 
     const productMessage =
@@ -756,8 +756,51 @@ const ChatSidebar = ({
       `**Price**\n` +
       `Rs ${item?.variants?.[0]?.price}\n`;
 
+    // Handle all product images, not just the first one
+    let productImages = [];
+
+    if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+      console.log(
+        `[PRODUCT] Processing ${item.images.length} images for product: ${item.title}`
+      );
+
+      try {
+        const productName =
+          item.title?.replace(/[^a-zA-Z0-9]/g, "_") || "product";
+
+        // Process all images
+        for (let i = 0; i < item.images.length; i++) {
+          const image = item.images[i];
+          if (!image?.url) continue;
+
+          console.log(
+            `[PRODUCT] Processing image ${i + 1}/${item.images.length}:`,
+            image.url
+          );
+
+          const filename = `${productName}_${i + 1}.jpg`;
+          const imageFile = await downloadImageAsFile(image.url, filename);
+
+          if (imageFile) {
+            // Convert File to the format expected by sendMessageToCurrentChat
+            productImages.push({
+              downloaded: true,
+              blob: imageFile,
+              url: URL.createObjectURL(imageFile),
+              originalUrl: image.url,
+            });
+            console.log(`[PRODUCT] Image ${i + 1} prepared for sharing`);
+          } else {
+            console.warn(`[PRODUCT] Failed to download image ${i + 1}`);
+          }
+        }
+      } catch (error) {
+        console.error("[PRODUCT] Error processing product images:", error);
+      }
+    }
+
     if (window.sendMessageToCurrentChat) {
-      window.sendMessageToCurrentChat(productMessage, item);
+      window.sendMessageToCurrentChat(productMessage, item, productImages);
     } else {
       console.warn("[PRODUCT] sendMessageToCurrentChat not available");
       navigator.clipboard.writeText(productMessage).then(() => {

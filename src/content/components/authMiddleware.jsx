@@ -65,10 +65,19 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(true);
   };
 
-  const logout = () => {
-    const keysToRemove = [TOKEN_KEY, "whatsopify_selected_store"];
+  // const logout = () => {
+  //   const keysToRemove = [TOKEN_KEY, "whatsopify_selected_store"];
+  //   keysToRemove.forEach((key) => localStorage.removeItem(key));
+  //   setIsAuthenticated(false);
+  // };
 
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  const logout = () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem("whatsopify_selected_store");
+
+    ["session"].forEach((cookieName) => {
+      document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+    });
 
     setIsAuthenticated(false);
   };

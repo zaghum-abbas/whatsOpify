@@ -1564,15 +1564,13 @@ waitForElement("#pane-side", () => {
   observeActiveChat();
 });
 
-// Function to add image to WhatsApp chat
-async function addImageToChat(imageFile) {
+// Function to add multiple images to WhatsApp chat in bulk
+async function addImagesToChat(imageFiles) {
   try {
-    console.log("[IMAGE] Adding image to chat:", imageFile);
-    console.log("[IMAGE] File details:", {
-      name: imageFile.name,
-      size: imageFile.size,
-      type: imageFile.type,
-    });
+    console.log(
+      "[BULK_IMAGE] Adding multiple images to chat:",
+      imageFiles.length
+    );
 
     // Enhanced selectors for attachment button
     const attachButtonSelectors = [
@@ -1590,23 +1588,26 @@ async function addImageToChat(imageFile) {
     for (const selector of attachButtonSelectors) {
       attachButton = document.querySelector(selector);
       if (attachButton) {
-        console.log("[IMAGE] Found attachment button with selector:", selector);
+        console.log(
+          "[BULK_IMAGE] Found attachment button with selector:",
+          selector
+        );
         break;
       }
     }
 
     if (!attachButton) {
       console.error(
-        "[IMAGE] Attachment button not found. Available buttons:",
+        "[BULK_IMAGE] Attachment button not found. Available buttons:",
         document.querySelectorAll('button, span[role="button"]')
       );
       return false;
     }
 
-    console.log("[IMAGE] Clicking attachment button...");
+    console.log("[BULK_IMAGE] Clicking attachment button...");
     attachButton.click();
 
-    // Wait longer for attachment menu to appear
+    // Wait for attachment menu to appear
     await new Promise((resolve) => setTimeout(resolve, 800));
 
     // Enhanced selectors for photo/image option
@@ -1626,14 +1627,14 @@ async function addImageToChat(imageFile) {
     for (const selector of photoButtonSelectors) {
       photoButton = document.querySelector(selector);
       if (photoButton) {
-        console.log("[IMAGE] Found photo button with selector:", selector);
+        console.log("[BULK_IMAGE] Found photo button with selector:", selector);
         break;
       }
     }
 
     if (!photoButton) {
       console.error(
-        "[IMAGE] Photo button not found. Available elements:",
+        "[BULK_IMAGE] Photo button not found. Available elements:",
         document.querySelectorAll(
           '[data-testid*="photo"], [aria-label*="photo"], [title*="photo"]'
         )
@@ -1641,23 +1642,36 @@ async function addImageToChat(imageFile) {
       return false;
     }
 
-    console.log("[IMAGE] Photo button found, tagName:", photoButton.tagName);
+    console.log(
+      "[BULK_IMAGE] Photo button found, tagName:",
+      photoButton.tagName
+    );
 
-    // If it's an input element, directly set the file
+    // If it's an input element, directly set all files
     if (photoButton.tagName === "INPUT") {
-      console.log("[IMAGE] Direct input method - setting file directly");
+      console.log(
+        "[BULK_IMAGE] Direct input method - setting all files at once"
+      );
       const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(imageFile);
+
+      // Add all files to the DataTransfer
+      imageFiles.forEach((file, index) => {
+        console.log(`[BULK_IMAGE] Adding file ${index + 1}:`, file.name);
+        dataTransfer.items.add(file);
+      });
+
       photoButton.files = dataTransfer.files;
 
       const changeEvent = new Event("change", { bubbles: true });
       photoButton.dispatchEvent(changeEvent);
 
-      console.log("[IMAGE] Image file set to input successfully");
+      console.log(
+        `[BULK_IMAGE] All ${imageFiles.length} files set to input successfully`
+      );
       return true;
     } else {
       // If it's a button, click it and then handle file input
-      console.log("[IMAGE] Button method - clicking photo button");
+      console.log("[BULK_IMAGE] Button method - clicking photo button");
       photoButton.click();
 
       // Wait for file input to appear with multiple attempts
@@ -1674,22 +1688,33 @@ async function addImageToChat(imageFile) {
         for (const selector of fileInputSelectors) {
           fileInput = document.querySelector(selector);
           if (fileInput) {
-            console.log("[IMAGE] Found file input with selector:", selector);
+            console.log(
+              "[BULK_IMAGE] Found file input with selector:",
+              selector
+            );
             break;
           }
         }
 
         if (fileInput) break;
-        console.log(`[IMAGE] Attempt ${i + 1}: File input not found yet...`);
+        console.log(
+          `[BULK_IMAGE] Attempt ${i + 1}: File input not found yet...`
+        );
       }
 
       if (fileInput) {
-        console.log("[IMAGE] Setting file to input element");
+        console.log("[BULK_IMAGE] Setting all files to input element");
         const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(imageFile);
+
+        // Add all files to the DataTransfer
+        imageFiles.forEach((file, index) => {
+          console.log(`[BULK_IMAGE] Adding file ${index + 1}:`, file.name);
+          dataTransfer.items.add(file);
+        });
+
         fileInput.files = dataTransfer.files;
 
-        // Trigger multiple events to ensure WhatsApp detects the file
+        // Trigger multiple events to ensure WhatsApp detects the files
         const events = [
           new Event("change", { bubbles: true }),
           new Event("input", { bubbles: true }),
@@ -1700,25 +1725,37 @@ async function addImageToChat(imageFile) {
           fileInput.dispatchEvent(event);
         });
 
-        console.log("[IMAGE] Image file set to file input successfully");
+        console.log(
+          `[BULK_IMAGE] All ${imageFiles.length} files set to file input successfully`
+        );
         return true;
       } else {
         console.error(
-          "[IMAGE] File input not found after clicking photo button"
+          "[BULK_IMAGE] File input not found after clicking photo button"
         );
         return false;
       }
     }
   } catch (error) {
-    console.error("[IMAGE] Error adding image to chat:", error);
+    console.error("[BULK_IMAGE] Error adding images to chat:", error);
     return false;
   }
 }
 
+// Legacy function for single image (kept for compatibility)
+async function addImageToChat(imageFile) {
+  return await addImagesToChat([imageFile]);
+}
+
 // Function to add message to current chat input (manual send)
-window.sendMessageToCurrentChat = function (message, productItem = null) {
+window.sendMessageToCurrentChat = function (
+  message,
+  productItem = null,
+  productImages = []
+) {
   console.log("[CHAT] Adding product message to chat input:", message);
   console.log("[CHAT] Product item for image:", productItem);
+  console.log("[CHAT] Product images:", productImages);
 
   try {
     // First, let's try to find the message input using the most reliable method
@@ -1895,64 +1932,106 @@ window.sendMessageToCurrentChat = function (message, productItem = null) {
       }
     }, 150);
 
-    if (productItem) {
-      let imageUrl = null;
+    // Handle product images (prioritize productImages over productItem)
+    if (productImages && productImages.length > 0) {
+      console.log(
+        `[CHAT] Processing ${productImages.length} pre-downloaded images...`
+      );
 
-      if (
-        productItem.images &&
-        Array.isArray(productItem.images) &&
-        productItem.images.length > 0
-      ) {
-        imageUrl = productItem.images[0]?.url;
-      } else if (productItem.image) {
-        imageUrl = productItem.images[0]?.url;
-      }
+      setTimeout(async () => {
+        try {
+          // Convert productImages to File objects
+          const imageFiles = productImages
+            .filter((img) => img.downloaded && img.blob)
+            .map((img) => img.blob);
 
-      if (imageUrl) {
-        console.log(
-          "[CHAT] Product has image, attempting to add image to chat..."
-        );
-        console.log("[CHAT] Image URL:", imageUrl);
+          if (imageFiles.length > 0) {
+            console.log(
+              `[CHAT] Adding ${imageFiles.length} pre-downloaded images to chat in bulk...`
+            );
+            const bulkAdded = await addImagesToChat(imageFiles);
 
-        setTimeout(async () => {
-          try {
-            const productName =
-              productItem.name || productItem.title || "product";
-            const filename = `${productName.replace(/[^a-zA-Z0-9]/g, "_")}.jpg`;
-
-            console.log("[CHAT] Starting image download process...");
-            const imageFile = await downloadImageAsFile(imageUrl, filename);
-
-            console.log("[CHAT] Image download result:", {
-              success: !!imageFile,
-              filename: filename,
-              productName: productName,
-            });
-
-            if (imageFile) {
-              console.log("[CHAT] Attempting to add image to chat...");
-              const imageAdded = await addImageToChat(imageFile);
-              if (imageAdded) {
-                console.log(
-                  "[CHAT] ✅ Product image added to chat successfully!"
-                );
-              } else {
-                console.warn(
-                  "[CHAT] ❌ Failed to add image to chat - check console for details"
-                );
-              }
+            if (bulkAdded) {
+              console.log(
+                `[CHAT] ✅ All ${imageFiles.length} pre-downloaded images added to chat successfully!`
+              );
             } else {
               console.warn(
-                "[CHAT] ❌ Failed to download product image - check console for details"
+                `[CHAT] ❌ Failed to add pre-downloaded images to chat`
               );
             }
-          } catch (error) {
-            console.error("[CHAT] Error handling product image:", error);
+          } else {
+            console.warn(`[CHAT] ❌ No valid pre-downloaded images found`);
           }
-        }, 500); // Reduced wait time to 500ms after text is added
-      } else {
-        console.log("[CHAT] No image URL found in product item");
-      }
+        } catch (error) {
+          console.error("[CHAT] Error handling pre-downloaded images:", error);
+        }
+      }, 800); // Slightly longer wait to ensure text is fully set
+    } else if (
+      productItem &&
+      productItem.images &&
+      productItem.images.length > 0
+    ) {
+      // Fallback to old method if productImages not provided
+      console.log(
+        `[CHAT] Product has ${productItem.images.length} images, attempting to add all images to chat in bulk...`
+      );
+
+      setTimeout(async () => {
+        try {
+          const productName =
+            productItem.name || productItem.title || "product";
+
+          // Download all images first
+          const imageFiles = [];
+          for (let i = 0; i < productItem.images.length; i++) {
+            const image = productItem.images[i];
+            if (!image?.url) continue;
+
+            console.log(
+              `[CHAT] Downloading image ${i + 1}/${productItem.images.length}:`,
+              image.url
+            );
+
+            const filename = `${productName.replace(/[^a-zA-Z0-9]/g, "_")}_${
+              i + 1
+            }.jpg`;
+
+            const imageFile = await downloadImageAsFile(image.url, filename);
+
+            if (imageFile) {
+              imageFiles.push(imageFile);
+              console.log(`[CHAT] ✅ Image ${i + 1} downloaded successfully`);
+            } else {
+              console.warn(`[CHAT] ❌ Failed to download image ${i + 1}`);
+            }
+          }
+
+          // If we have any images, add them all at once
+          if (imageFiles.length > 0) {
+            console.log(
+              `[CHAT] Adding ${imageFiles.length} images to chat in bulk...`
+            );
+            const bulkAdded = await addImagesToChat(imageFiles);
+
+            if (bulkAdded) {
+              console.log(
+                `[CHAT] ✅ All ${imageFiles.length} images added to chat successfully!`
+              );
+            } else {
+              console.warn(
+                `[CHAT] ❌ Failed to add images to chat - check console for details`
+              );
+            }
+          } else {
+            console.warn(`[CHAT] ❌ No images were successfully downloaded`);
+          }
+        } catch (error) {
+          console.error("[CHAT] Error handling product images:", error);
+        }
+      }, 500); // Reduced wait time to 500ms after text is added
+    } else {
+      console.log("[CHAT] No images found to process");
     }
 
     return true;
