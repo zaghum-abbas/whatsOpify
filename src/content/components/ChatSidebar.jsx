@@ -739,6 +739,96 @@ const ChatSidebar = ({
     }
   }, [contact?.phone]);
 
+  // Listen for store changes and refetch products
+  useEffect(() => {
+    const handleStoreChange = (event) => {
+      console.log(
+        "[CATALOG] Store changed, refetching products:",
+        event.detail
+      );
+      const { storeId, store } = event.detail;
+
+      // Clear current catalog and search
+      setFilteredCatalog([]);
+      setSearch("");
+
+      // Trigger product refetch for the new store
+      if (typeof window.refreshProductsForStore === "function") {
+        window.refreshProductsForStore(storeId, (newProducts) => {
+          console.log(
+            "[CATALOG] New products received for store:",
+            newProducts
+          );
+          setFilteredCatalog(newProducts || []);
+        });
+      } else {
+        // Fallback: manually fetch products for the new store
+        fetchProductsForStore(storeId);
+      }
+    };
+
+    // Listen for store change events
+    window.addEventListener("storeChanged", handleStoreChange);
+
+    return () => {
+      window.removeEventListener("storeChanged", handleStoreChange);
+    };
+  }, []);
+
+  // Function to fetch products for a specific store
+  const fetchProductsForStore = async (storeId) => {
+    try {
+      console.log(`[CATALOG] Fetching products for store: ${storeId}`);
+
+      const response = await chrome.runtime.sendMessage({
+        action: "FETCH_PRODUCTS",
+        token: localStorage.getItem("whatsopify_token")
+          ? JSON.parse(localStorage.getItem("whatsopify_token"))?.data?.token ||
+            JSON.parse(localStorage.getItem("whatsopify_token"))?.token
+          : null,
+        storeId: storeId,
+      });
+
+      console.log("[CATALOG] Store products API Response:", response);
+
+      if (response.success) {
+        let products = [];
+
+        // Handle different response structures
+        if (Array.isArray(response.products)) {
+          products = response.products;
+        } else if (
+          response.products?.data &&
+          Array.isArray(response.products.data)
+        ) {
+          products = response.products.data;
+        } else if (
+          response.products?.products &&
+          Array.isArray(response.products.products)
+        ) {
+          products = response.products.products;
+        } else {
+          console.warn(
+            "[CATALOG] Unexpected store products response structure:",
+            response.products
+          );
+          products = [];
+        }
+
+        console.log(
+          `[CATALOG] ✅ Found ${products.length} products for store: ${storeId}`
+        );
+        setFilteredCatalog(products);
+      } else {
+        console.error("[CATALOG] Store products API failed:", response.error);
+        setFilteredCatalog([]);
+      }
+    } catch (error) {
+      console.error("[CATALOG] Error fetching products for store:", error);
+      setFilteredCatalog([]);
+    }
+  };
+
   const formattedDescription = (description) => {
     if (!description) return "";
     const parser = new DOMParser();
