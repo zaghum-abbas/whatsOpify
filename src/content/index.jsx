@@ -2878,3 +2878,119 @@ window.refreshOrders = function (callback) {
       }
     });
 };
+
+// Global function to refresh products for a specific store
+window.refreshProductsForStore = function (storeId, callback) {
+  console.log("[PRODUCTS] Global refresh products for store called:", storeId);
+
+  // Clear products cache
+  if (typeof window.clearProductsCache === "function") {
+    window.clearProductsCache();
+  }
+
+  // Fetch fresh products for the specific store
+  fetchProductsFromAPIForStore(storeId, (products) => {
+    console.log("[PRODUCTS] Fresh products fetched for store:", products);
+    if (callback && typeof callback === "function") {
+      callback(products);
+    }
+  });
+};
+
+// Function to fetch products for a specific store
+async function fetchProductsFromAPIForStore(storeId, callback) {
+  if (productsLoading) return;
+
+  productsLoading = true;
+  productsError = null;
+
+  try {
+    console.log(`[PRODUCTS] Fetching products for store: ${storeId}`);
+
+    const token = localStorage.getItem("whatsopify_token");
+    if (!token) {
+      throw new Error("No authentication token found");
+    }
+
+    const parsedToken = JSON.parse(token);
+    const authToken = parsedToken?.data?.token || parsedToken?.token;
+
+    if (!authToken) {
+      throw new Error("Invalid token format");
+    }
+
+    const response = await chrome.runtime.sendMessage({
+      action: "FETCH_PRODUCTS",
+      token: authToken,
+      storeId: storeId,
+    });
+
+    console.log("[PRODUCTS] Store API Response:", response);
+
+    if (response.success) {
+      let products = [];
+
+      // Handle different response structures
+      if (Array.isArray(response.products)) {
+        products = response.products;
+      } else if (
+        response.products?.data &&
+        Array.isArray(response.products.data)
+      ) {
+        products = response.products.data;
+      } else if (
+        response.products?.products &&
+        Array.isArray(response.products.products)
+      ) {
+        products = response.products.products;
+      } else {
+        console.warn(
+          "[PRODUCTS] Unexpected store products response structure:",
+          response.products
+        );
+        products = [];
+      }
+
+      console.log(
+        `[PRODUCTS] ✅ Found ${products.length} products for store: ${storeId}`
+      );
+
+      // Update cache
+      productsCache = products;
+      window.whatsapofyProducts.catalog = products;
+
+      // Notify all listeners
+      productsListeners.forEach((listener) => {
+        try {
+          listener(products);
+        } catch (error) {
+          console.error("[PRODUCTS] Error in products listener:", error);
+        }
+      });
+
+      if (callback && typeof callback === "function") {
+        callback(products);
+      }
+    } else {
+      console.error("[PRODUCTS] Store API failed:", response.error);
+      productsError = response.error;
+      productsCache = [];
+      window.whatsapofyProducts.catalog = [];
+
+      if (callback && typeof callback === "function") {
+        callback([]);
+      }
+    }
+  } catch (error) {
+    console.error("[PRODUCTS] Error fetching products for store:", error);
+    productsError = error.message;
+    productsCache = [];
+    window.whatsapofyProducts.catalog = [];
+
+    if (callback && typeof callback === "function") {
+      callback([]);
+    }
+  } finally {
+    productsLoading = false;
+  }
+}
