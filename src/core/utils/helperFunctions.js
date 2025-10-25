@@ -48,7 +48,6 @@ export const extractPhoneNumberFromDOM = () => {
   let text = el.textContent || "";
   console.log("🧾 Raw text:", text);
 
-  // Clean hidden characters and normalize spaces
   text = text
     .replace(/\u200B/g, "") // zero-width spaces
     .replace(/\u00A0/g, " ") // non-breaking spaces

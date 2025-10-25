@@ -5,14 +5,20 @@ import {
   getToken,
 } from "../../core/utils/helperFunctions";
 
-const AddProductSidebar = ({ onClose, onProductAdd }) => {
+const AddProductSidebar = ({ onClose }) => {
   const [imageStates, setImageStates] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSubCategory, setSelectedSubCategory] = useState("");
+  const [subCategories, setSubCategories] = useState([]);
   const theme = useTheme();
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     price: "",
     images: [],
+    category: "",
+    subCategory: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
@@ -24,6 +30,60 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
     }));
   };
 
+  const handleCategoryChange = (categoryId) => {
+    console.log("categoryId", categoryId);
+    setSelectedCategory(categoryId);
+    setSelectedSubCategory("");
+    setSubCategories([]);
+
+    // Find the selected category and get its subcategories
+    const selectedCategoryObj = categories.find(
+      (cat) => cat._id === categoryId
+    );
+    if (selectedCategoryObj && selectedCategoryObj.subCategory) {
+      setSubCategories(selectedCategoryObj.subCategory);
+    }
+
+    // Update form data with category name instead of ID
+    setFormData((prev) => ({
+      ...prev,
+      category: selectedCategoryObj ? selectedCategoryObj.name : "",
+      subCategory: "",
+    }));
+  };
+
+  const handleSubCategoryChange = (subCategoryName) => {
+    setSelectedSubCategory(subCategoryName);
+
+    // Update form data with subcategory name
+    setFormData((prev) => ({
+      ...prev,
+      subCategory: subCategoryName,
+    }));
+  };
+
+  useEffect(() => {
+    const getCategories = async () => {
+      try {
+        const response = await fetch(
+          "https://api.shopilam.com/api/v1/category",
+          {
+            headers: {
+              Authorization: `Bearer ${getToken()}`,
+            },
+          }
+        );
+        const data = await response.json();
+        console.log("Fetched categories:", data);
+        setCategories(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        setCategories([]);
+      }
+    };
+    getCategories();
+  }, []);
+
   const handleImageSelect = (event) => {
     const files = Array.from(event.target.files);
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
@@ -31,10 +91,7 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
     if (imageFiles.length > 0) {
       const newImages = imageFiles.map((file) => ({
         id: `${Date.now()}`,
-        file: file,
         url: URL.createObjectURL(file),
-        name: file.name,
-        size: file.size,
       }));
 
       setFormData((prev) => ({
@@ -60,9 +117,8 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
 
   const processImageFromChat = async (responseData) => {
     try {
-      const imageId = `chat_${Date.now()}_${Math.random()}`;
+      const imageId = Date.now();
 
-      // Set loading state
       setImageStates((prev) => ({
         ...prev,
         [imageId]: {
@@ -73,14 +129,12 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
         },
       }));
 
-      // Convert base64 to file using downloadImageAsFile
       const imageFile = await downloadImageAsFile(
         responseData,
         `${Date.now()}.jpg`
       );
       const objectUrl = URL.createObjectURL(imageFile);
 
-      // Update state with preview
       setImageStates((prev) => ({
         ...prev,
         [imageId]: {
@@ -91,14 +145,14 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
         },
       }));
 
-      // Add to form data
+      // Add to form data with just id and url from API response
       setFormData((prev) => ({
         ...prev,
         images: [
           ...prev.images,
           {
             id: imageId,
-            url: objectUrl,
+            url: responseData,
           },
         ],
       }));
@@ -141,8 +195,8 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
     try {
       const newProduct = {
         title: formData.title,
-        category: "",
-        subCategory: "",
+        category: formData.category,
+        subCategory: formData.subCategory,
         description: formData.description,
         productType: "",
         trackStockNull: false,
@@ -189,14 +243,37 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
               inHand: 0,
             },
             sku: "",
-            weight: "1000",
+            weight: 1000,
             unit: "g",
           },
         ],
       };
 
-      if (onProductAdd) {
-        await onProductAdd(newProduct);
+      console.log("📦 Product data being sent:", {
+        category: newProduct.category,
+        subCategory: newProduct.subCategory,
+        title: newProduct.title,
+        description: newProduct.description,
+      });
+
+      try {
+        const response = await fetch(
+          "https://api.shopilam.com/api/v1/products",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getToken()}`,
+            },
+            body: JSON.stringify(newProduct),
+          }
+        );
+        const data = await response.json();
+        console.log("Product added:", data);
+        showNotification("✅ Product added successfully!", "success");
+      } catch (error) {
+        console.error("Error adding product:", error);
+        showNotification("❌ Failed to add product", "error");
       }
 
       setFormData({
@@ -204,13 +281,14 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
         description: "",
         price: "",
         images: [],
+        category: "",
+        subCategory: "",
       });
 
-      if (onClose) {
-        onClose();
-      }
-
-      showNotification("✅ Product added successfully!", "success");
+      // Reset category states
+      setSelectedCategory("");
+      setSelectedSubCategory("");
+      setSubCategories([]);
     } catch (error) {
       console.error("Error adding product:", error);
       showNotification("❌ Failed to add product", "error");
@@ -559,7 +637,7 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
           <input
             type="number"
             value={formData.price}
-            onChange={(e) => handleInputChange("price", e.target.value)}
+            onChange={(e) => handleInputChange("price", Number(e.target.value))}
             placeholder="Enter price"
             min="0"
             step="0.01"
@@ -576,6 +654,85 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
             }}
           />
         </div>
+
+        {/* Category Selection */}
+        <div style={{ marginBottom: "20px" }}>
+          <label
+            style={{
+              display: "block",
+              marginBottom: "8px",
+              fontSize: "14px",
+              fontWeight: "500",
+              color: theme === "dark" ? "#ffffff" : "#000000",
+            }}
+          >
+            Category *
+          </label>
+          <select
+            value={selectedCategory}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            required
+            style={{
+              width: "100%",
+              padding: "12px",
+              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+              borderRadius: "8px",
+              fontSize: "14px",
+              backgroundColor: theme === "dark" ? "#2a2a2a" : "#ffffff",
+              color: theme === "dark" ? "#ffffff" : "#000000",
+              outline: "none",
+              boxSizing: "border-box",
+              cursor: "pointer",
+            }}
+          >
+            <option value="">Select a category</option>
+            {categories.map((category) => (
+              <option key={category._id} value={category._id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Subcategory Selection */}
+        {subCategories.length > 0 && (
+          <div style={{ marginBottom: "20px" }}>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontSize: "14px",
+                fontWeight: "500",
+                color: theme === "dark" ? "#ffffff" : "#000000",
+              }}
+            >
+              Subcategory
+            </label>
+            <select
+              value={selectedSubCategory}
+              onChange={(e) => handleSubCategoryChange(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+                borderRadius: "8px",
+                fontSize: "14px",
+                backgroundColor: theme === "dark" ? "#2a2a2a" : "#ffffff",
+                color: theme === "dark" ? "#ffffff" : "#000000",
+                outline: "none",
+                boxSizing: "border-box",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">Select a subcategory</option>
+              {subCategories.map((subCategory, index) => (
+                <option key={index} value={subCategory.name}>
+                  {subCategory.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Image Selection */}
         <div style={{ marginBottom: "20px" }}>
@@ -641,7 +798,6 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
                   error: null,
                   preview: image.url,
                 };
-
                 return (
                   <div
                     key={image.id}

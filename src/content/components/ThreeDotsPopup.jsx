@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 const ThreeDotsPopup = ({
   isOpen,
@@ -14,6 +14,22 @@ const ThreeDotsPopup = ({
   onOrdersClick = () => {},
 }) => {
   const popupRef = useRef(null);
+
+  const [userDetails, setUserDetails] = useState({
+    userEmail: "",
+    userSelectedStore: "",
+  });
+
+  useEffect(() => {
+    const savedStore = JSON.parse(
+      localStorage.getItem("whatsopify_selected_store")
+    );
+    const userInfo = JSON.parse(localStorage.getItem("whatsopify_user_info"));
+    setUserDetails({
+      userEmail: userInfo?.data?.user?.email,
+      userSelectedStore: savedStore?.name || "",
+    });
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -118,6 +134,17 @@ const ThreeDotsPopup = ({
           }
         `}
       </style>
+
+      {userDetails.userEmail && userDetails.userSelectedStore && (
+        <div
+          style={{ padding: "12px 16px", fontSize: "14px", color: "#374151" }}
+        >
+          <div style={{ marginBottom: "4px" }}>
+            Email: {userDetails.userEmail}
+          </div>
+          <div>Store: {userDetails.userSelectedStore}</div>
+        </div>
+      )}
 
       <button
         onClick={() => handleMenuItemClick("billing")}

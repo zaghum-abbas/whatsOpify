@@ -3008,51 +3008,6 @@ async function fetchProductsFromAPIForStore(storeId, callback) {
   }
 }
 
-// Function to add product to catalog
-const addProductToCatalog = async (product) => {
-  try {
-    console.log("[ADD_PRODUCT] Adding product to catalog:", product);
-
-    // Get current catalog
-    const currentCatalog = window.whatsapofyProducts?.catalog || [];
-
-    // Add new product to catalog
-    const updatedCatalog = [...currentCatalog, product];
-
-    // Update global state
-    window.whatsapofyProducts.catalog = updatedCatalog;
-
-    // Notify all listeners
-    if (window.whatsapofyProducts?.listeners) {
-      window.whatsapofyProducts.listeners.forEach((listener) => {
-        try {
-          listener(updatedCatalog);
-        } catch (error) {
-          console.error("[ADD_PRODUCT] Error in catalog listener:", error);
-        }
-      });
-    }
-
-    // Update products cache
-    productsCache = updatedCatalog;
-
-    // Notify products listeners
-    productsListeners.forEach((listener) => {
-      try {
-        listener(updatedCatalog);
-      } catch (error) {
-        console.error("[ADD_PRODUCT] Error in products listener:", error);
-      }
-    });
-
-    console.log("[ADD_PRODUCT] ✅ Product added to catalog successfully");
-    return true;
-  } catch (error) {
-    console.error("[ADD_PRODUCT] Error adding product to catalog:", error);
-    return false;
-  }
-};
-
 // Global function to switch sidebar mode
 window.switchSidebarMode = switchSidebarMode;
 
@@ -3079,7 +3034,6 @@ window.openAddProductSidebar = function () {
   sidebarProps.onClose = () => {
     switchSidebarMode("default");
   };
-  sidebarProps.onProductAdd = addProductToCatalog;
 
   // Switch to Add Product mode
   switchSidebarMode("addProduct");
