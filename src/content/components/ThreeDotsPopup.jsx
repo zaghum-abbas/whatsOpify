@@ -9,6 +9,9 @@ const ThreeDotsPopup = ({
   onLogoutClick = () => {},
   onLoginClick = () => {},
   onSwitchStoreClick = () => {},
+  onAddProductsClick = () => {},
+  onCreateOrderClick = () => {},
+  onOrdersClick = () => {},
 }) => {
   const popupRef = useRef(null);
 
@@ -196,6 +199,117 @@ const ThreeDotsPopup = ({
         <span style={{ fontSize: "16px" }}>📞</span>
         Contact US
       </button>
+
+      {/* Divider */}
+      <div
+        style={{
+          height: "1px",
+          backgroundColor: "#e5e7eb",
+          margin: "8px 0",
+        }}
+      />
+
+      {/* Add Products Button - Only show when authenticated */}
+      {isAuthenticated && (
+        <button
+          onClick={() => {
+            onAddProductsClick();
+            onClose();
+          }}
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            border: "none",
+            backgroundColor: "transparent",
+            textAlign: "left",
+            cursor: "pointer",
+            fontSize: "14px",
+            color: "#10B981",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            transition: "background-color 0.2s",
+            fontWeight: "500",
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = "#f3f4f6";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = "transparent";
+          }}
+        >
+          <span style={{ fontSize: "16px" }}>🛍️</span>
+          Add Products
+        </button>
+      )}
+
+      {/* Create Order Button - Only show when authenticated */}
+      {isAuthenticated && (
+        <button
+          onClick={() => {
+            onCreateOrderClick();
+            onClose();
+          }}
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            border: "none",
+            backgroundColor: "transparent",
+            textAlign: "left",
+            cursor: "pointer",
+            fontSize: "14px",
+            color: "#3B82F6",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            transition: "background-color 0.2s",
+            fontWeight: "500",
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = "#f3f4f6";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = "transparent";
+          }}
+        >
+          <span style={{ fontSize: "16px" }}>📝</span>
+          Create Order
+        </button>
+      )}
+
+      {/* Orders Button - Only show when authenticated */}
+      {isAuthenticated && (
+        <button
+          onClick={() => {
+            onOrdersClick();
+            onClose();
+          }}
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            border: "none",
+            backgroundColor: "transparent",
+            textAlign: "left",
+            cursor: "pointer",
+            fontSize: "14px",
+            color: "#8B5CF6",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            transition: "background-color 0.2s",
+            fontWeight: "500",
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = "#f3f4f6";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = "transparent";
+          }}
+        >
+          <span style={{ fontSize: "16px" }}>📋</span>
+          Orders
+        </button>
+      )}
 
       {/* Divider */}
       <div

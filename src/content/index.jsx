@@ -9,6 +9,7 @@ import InjectedSidebarContent from "./components/InjectedSidebarContent";
 import DefaultSidebar from "./components/DefaultSidebar";
 import ChatSidebar from "./components/ChatSidebar";
 import OrderFormSidebar from "./components/OrderFormSidebar";
+import AddProductSidebar from "./components/AddProductSidebar";
 import "./App.css"; // Your main CSS file
 
 import { requireAuth, useAuthState } from "./components/authMiddleware.jsx";
@@ -130,7 +131,7 @@ function getWhatsAppTheme() {
 let isSidebarOpen = true;
 let sidebarRoot = null; // Store the React root for the sidebar
 let mainAppContent = null; // Reference to the main WhatsApp content div that needs resizing
-let sidebarMode = "default"; // "default", "chat", or "orderForm"
+let sidebarMode = "default"; // "default", "chat", "orderForm", or "addProduct"
 let sidebarProps = {
   contact: {},
   catalog: [],
@@ -150,6 +151,15 @@ const switchSidebarMode = (mode) => {
   console.log("🔍 Before switch - sidebarMode:", sidebarMode);
   console.log("🔍 sidebarRoot exists:", !!sidebarRoot);
   console.log("🔍 isSidebarOpen:", isSidebarOpen);
+
+  // Clean up Add buttons when switching away from Add Product mode
+  if (sidebarMode === "addProduct" && mode !== "addProduct") {
+    console.log(
+      "🧹 Cleaning up Add buttons - switching away from Add Product mode"
+    );
+    const existingButtons = document.querySelectorAll(".my-extension-add-btn");
+    existingButtons.forEach((button) => button.remove());
+  }
 
   sidebarMode = mode;
   console.log(`🔄 Sidebar mode switched to: ${mode}`);
@@ -178,6 +188,9 @@ const renderSidebar = () => {
   } else if (sidebarMode === "orderForm") {
     console.log("🎨 Rendering Order Form Sidebar");
     sidebarRoot.render(<OrderFormSidebar {...sidebarProps} />);
+  } else if (sidebarMode === "addProduct") {
+    console.log("🎨 Rendering Add Product Sidebar");
+    sidebarRoot.render(<AddProductSidebar {...sidebarProps} />);
   }
 };
 
@@ -2994,3 +3007,85 @@ async function fetchProductsFromAPIForStore(storeId, callback) {
     productsLoading = false;
   }
 }
+
+// Function to add product to catalog
+const addProductToCatalog = async (product) => {
+  try {
+    console.log("[ADD_PRODUCT] Adding product to catalog:", product);
+
+    // Get current catalog
+    const currentCatalog = window.whatsapofyProducts?.catalog || [];
+
+    // Add new product to catalog
+    const updatedCatalog = [...currentCatalog, product];
+
+    // Update global state
+    window.whatsapofyProducts.catalog = updatedCatalog;
+
+    // Notify all listeners
+    if (window.whatsapofyProducts?.listeners) {
+      window.whatsapofyProducts.listeners.forEach((listener) => {
+        try {
+          listener(updatedCatalog);
+        } catch (error) {
+          console.error("[ADD_PRODUCT] Error in catalog listener:", error);
+        }
+      });
+    }
+
+    // Update products cache
+    productsCache = updatedCatalog;
+
+    // Notify products listeners
+    productsListeners.forEach((listener) => {
+      try {
+        listener(updatedCatalog);
+      } catch (error) {
+        console.error("[ADD_PRODUCT] Error in products listener:", error);
+      }
+    });
+
+    console.log("[ADD_PRODUCT] ✅ Product added to catalog successfully");
+    return true;
+  } catch (error) {
+    console.error("[ADD_PRODUCT] Error adding product to catalog:", error);
+    return false;
+  }
+};
+
+// Global function to switch sidebar mode
+window.switchSidebarMode = switchSidebarMode;
+
+// Global function to open Add Product sidebar
+window.openAddProductSidebar = function () {
+  console.log("🛍️ Opening Add Product sidebar...");
+
+  // Check if user is logged in
+  const token = localStorage.getItem("whatsopify_token");
+  const isLoggedIn = token && token !== "null" && token !== '""';
+
+  if (!isLoggedIn) {
+    console.log("⚠️ Cannot open Add Product sidebar: User not logged in");
+    return;
+  }
+
+  // Check if store is selected
+  const storeSelected = window.requireStoreSelection();
+  if (!storeSelected) {
+    return; // Store selection modal will be shown
+  }
+
+  // Set sidebar props for Add Product
+  sidebarProps.onClose = () => {
+    switchSidebarMode("default");
+  };
+  sidebarProps.onProductAdd = addProductToCatalog;
+
+  // Switch to Add Product mode
+  switchSidebarMode("addProduct");
+
+  // Ensure sidebar is open
+  if (!isSidebarOpen) {
+    window.toggleWhatsappSidebar(true);
+  }
+};

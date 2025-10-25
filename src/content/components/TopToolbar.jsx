@@ -254,6 +254,81 @@ const TopToolbar = (props) => {
     setShowStoreSelectionModal(false);
   };
 
+  // Handler for Add Products
+  const handleAddProductsClick = () => {
+    if (!requireAuth(setShowLoginModal)) return;
+
+    // Check if store is selected before proceeding
+    if (typeof window.requireStoreSelection === "function") {
+      window.requireStoreSelection(() => {
+        // Open Add Product sidebar
+        if (typeof window.openAddProductSidebar === "function") {
+          window.openAddProductSidebar();
+        } else {
+          console.warn("openAddProductSidebar function not available");
+        }
+      });
+    }
+  };
+
+  // Handler for Create Order
+  const handleCreateOrderClick = () => {
+    if (!requireAuth(setShowLoginModal)) return;
+
+    // Check if store is selected before proceeding
+    if (typeof window.requireStoreSelection === "function") {
+      window.requireStoreSelection(() => {
+        // Get current contact info if in chat mode
+        const currentContact =
+          typeof window.getCurrentSidebarMode === "function" &&
+          window.getCurrentSidebarMode() === "chat" &&
+          window.sidebarProps?.contact
+            ? window.sidebarProps.contact
+            : { name: "", phone: "" };
+
+        // Switch to order form sidebar mode
+        if (typeof window.switchToOrderFormSidebar === "function") {
+          window.switchToOrderFormSidebar(currentContact);
+        }
+
+        // Ensure sidebar is open
+        if (typeof window.toggleWhatsappSidebar === "function") {
+          window.toggleWhatsappSidebar(true);
+        }
+      });
+    }
+  };
+
+  // Handler for Orders
+  const handleOrdersClick = () => {
+    if (!requireAuth(setShowLoginModal)) return;
+
+    // Check if store is selected before proceeding
+    if (typeof window.requireStoreSelection === "function") {
+      window.requireStoreSelection(() => {
+        // Switch to default sidebar mode to show orders
+        if (typeof window.switchSidebarMode === "function") {
+          window.switchSidebarMode("default");
+        }
+
+        // Ensure sidebar is open
+        if (typeof window.toggleWhatsappSidebar === "function") {
+          window.toggleWhatsappSidebar(true);
+        }
+      });
+    } else {
+      // If no store selection required, directly open default sidebar
+      if (typeof window.switchSidebarMode === "function") {
+        window.switchSidebarMode("default");
+      }
+
+      // Ensure sidebar is open
+      if (typeof window.toggleWhatsappSidebar === "function") {
+        window.toggleWhatsappSidebar(true);
+      }
+    }
+  };
+
   return (
     <div
       style={{
@@ -345,7 +420,7 @@ const TopToolbar = (props) => {
         >
           <FaBell size={20} />
         </button>
-        <button
+        {/* <button
           onClick={() => handleClick("CreateOrder")}
           style={{
             color: "#4a5568",
@@ -392,7 +467,7 @@ const TopToolbar = (props) => {
           }}
         >
           📋 Orders
-        </button>
+        </button> */}
 
         <div
           ref={threeDotsRef}
@@ -405,7 +480,7 @@ const TopToolbar = (props) => {
             position: "relative",
           }}
           onMouseEnter={(e) => {
-            e.target.style.backgroundColor = "#f3f4f6";
+            e.target.style.backgroundColor = "#10b981";
           }}
           onMouseLeave={(e) => {
             e.target.style.backgroundColor = "transparent";
@@ -468,6 +543,9 @@ const TopToolbar = (props) => {
           onLogoutClick={handleToolbarLogout}
           onLoginClick={() => setShowLoginModal(true)}
           onSwitchStoreClick={handleSwitchStoreClick}
+          onAddProductsClick={handleAddProductsClick}
+          onCreateOrderClick={handleCreateOrderClick}
+          onOrdersClick={handleOrdersClick}
         />
       )}
     </div>
