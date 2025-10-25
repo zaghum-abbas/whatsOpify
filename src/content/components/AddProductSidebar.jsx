@@ -1,8 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useTheme } from "../../hooks/useTheme";
-import { getToken } from "../../core/utils/helperFunctions";
+import {
+  downloadImageAsFile,
+  getToken,
+} from "../../core/utils/helperFunctions";
 
 const AddProductSidebar = ({ onClose, onProductAdd }) => {
+  const [imageStates, setImageStates] = useState({});
   const theme = useTheme();
   const [formData, setFormData] = useState({
     title: "",
@@ -45,6 +49,73 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
       ...prev,
       images: prev.images.filter((img) => img.id !== imageId),
     }));
+
+    // Clean up image state
+    setImageStates((prev) => {
+      const newStates = { ...prev };
+      delete newStates[imageId];
+      return newStates;
+    });
+  };
+
+  const processImageFromChat = async (responseData) => {
+    try {
+      const imageId = `chat_${Date.now()}_${Math.random()}`;
+
+      // Set loading state
+      setImageStates((prev) => ({
+        ...prev,
+        [imageId]: {
+          loading: true,
+          downloaded: false,
+          error: null,
+          preview: null,
+        },
+      }));
+
+      // Convert base64 to file using downloadImageAsFile
+      const imageFile = await downloadImageAsFile(
+        responseData,
+        `${Date.now()}.jpg`
+      );
+      const objectUrl = URL.createObjectURL(imageFile);
+
+      // Update state with preview
+      setImageStates((prev) => ({
+        ...prev,
+        [imageId]: {
+          loading: false,
+          downloaded: true,
+          error: null,
+          preview: objectUrl,
+        },
+      }));
+
+      // Add to form data
+      setFormData((prev) => ({
+        ...prev,
+        images: [
+          ...prev.images,
+          {
+            id: imageId,
+            url: objectUrl,
+          },
+        ],
+      }));
+
+      console.log("✅ Image processed from chat:", imageId);
+    } catch (error) {
+      console.error("❌ Error processing image from chat:", error);
+      setImageStates((prev) => ({
+        ...prev,
+        [imageId]: {
+          loading: false,
+          downloaded: false,
+          error: error.message,
+          preview: null,
+        },
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -68,37 +139,66 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
     setIsSubmitting(true);
 
     try {
-      // Create product object
       const newProduct = {
-        id: `product_${Date.now()}`,
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        price: formData.price ? parseFloat(formData.price) : 0,
-        images: formData.images.map((img) => ({
-          id: img.id,
-          url: img.url,
-          name: img.name,
-          file: img.file,
-        })),
+        title: formData.title,
+        category: "",
+        subCategory: "",
+        description: formData.description,
+        productType: "",
+        trackStockNull: false,
+        images: formData.images,
+        tags: [],
+        status: "active",
+        seo: {
+          title: "",
+          metaKeywords: "",
+          metaDescription: "",
+          productUrl: "",
+        },
+        shipping: {
+          isCost: false,
+          price: 0,
+          isLocationBased: false,
+          ShippingLocation: [
+            {
+              name: "",
+              price: 0,
+            },
+          ],
+        },
+        identifiers: {
+          globalTradeItemNumber: 0,
+          manufacturerNumber: 0,
+          brandName: "",
+          productUpc: 0,
+          custom: [
+            {
+              name: "",
+              value: "",
+            },
+          ],
+        },
+        options: [],
         variants: [
           {
-            id: `variant_${Date.now()}`,
-            title: "Default",
-            price: formData.price ? parseFloat(formData.price) : 0,
-            imageId: formData.images[0]?.id || null,
+            price: formData.price,
+            compareAtPrice: 0,
+            costPerItem: 0,
+            stock: {
+              available: 0,
+              inHand: 0,
+            },
+            sku: "",
+            weight: "1000",
+            unit: "g",
           },
         ],
-        status: "active",
-        createdAt: new Date().toISOString(),
-        source: "manual_add",
       };
 
-      // Add to catalog
       if (onProductAdd) {
         await onProductAdd(newProduct);
       }
 
-      // Reset form
       setFormData({
         title: "",
         description: "",
@@ -106,12 +206,10 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
         images: [],
       });
 
-      // Close sidebar
       if (onClose) {
         onClose();
       }
 
-      // Show success message
       showNotification("✅ Product added successfully!", "success");
     } catch (error) {
       console.error("Error adding product:", error);
@@ -264,11 +362,8 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
 
                     if (response.ok) {
                       console.log("✅ Uploaded:", data);
-
-                      setFormData((prev) => ({
-                        ...prev,
-                        images: [...prev.images, { id: Date.now(), url: data }],
-                      }));
+                      // Process the image using the new function
+                      await processImageFromChat(data);
                     } else {
                       console.error("❌ Upload failed:", data);
                     }
@@ -316,6 +411,17 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
       existingButtons.forEach((button) => button.remove());
     };
   }, [onClose]);
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(imageStates).forEach((state) => {
+        if (state.preview) {
+          URL.revokeObjectURL(state.preview);
+        }
+      });
+    };
+  }, [imageStates]);
 
   console.log("formData", formData);
 
@@ -528,52 +634,150 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
                 marginTop: "12px",
               }}
             >
-              {formData.images.map((image) => (
-                <div
-                  key={image.id}
-                  style={{
-                    position: "relative",
-                    aspectRatio: "1",
-                    borderRadius: "8px",
-                    overflow: "hidden",
-                    border: `1px solid ${
-                      theme === "dark" ? "#333" : "#e2e8f0"
-                    }`,
-                  }}
-                >
-                  <img
-                    src={image.url}
-                    alt={image.name}
+              {formData.images.map((image) => {
+                const imageState = imageStates[image.id] || {
+                  loading: false,
+                  downloaded: false,
+                  error: null,
+                  preview: image.url,
+                };
+
+                return (
+                  <div
+                    key={image.id}
                     style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(image.id)}
-                    style={{
-                      position: "absolute",
-                      top: "4px",
-                      right: "4px",
-                      background: "rgba(0, 0, 0, 0.7)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "50%",
-                      width: "20px",
-                      height: "20px",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      position: "relative",
+                      aspectRatio: "1",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      border: `1px solid ${
+                        image.source === "chat_upload"
+                          ? theme === "dark"
+                            ? "#10b981"
+                            : "#059669"
+                          : theme === "dark"
+                          ? "#333"
+                          : "#e2e8f0"
+                      }`,
+                      backgroundColor:
+                        image.source === "chat_upload"
+                          ? theme === "dark"
+                            ? "#1a2e1a"
+                            : "#f0fdf4"
+                          : "transparent",
                     }}
                   >
-                    ×
-                  </button>
-                </div>
-              ))}
+                    {/* Loading State */}
+                    {imageState.loading && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform: "translate(-50%, -50%)",
+                          fontSize: "24px",
+                          color: theme === "dark" ? "#ffffff" : "#000000",
+                        }}
+                      >
+                        ⏳
+                      </div>
+                    )}
+
+                    {/* Image Preview */}
+                    {imageState.preview && !imageState.loading && (
+                      <img
+                        src={imageState.preview}
+                        alt={image.name}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    )}
+
+                    {/* Error State */}
+                    {imageState.error && !imageState.loading && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "50%",
+                          left: "50%",
+                          transform: "translate(-50%, -50%)",
+                          fontSize: "24px",
+                          color: "#ff4444",
+                        }}
+                        title={imageState.error}
+                      >
+                        ❌
+                      </div>
+                    )}
+
+                    {/* Success Badge for Chat Uploads */}
+                    {image.source === "chat_upload" &&
+                      imageState.downloaded && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "4px",
+                            left: "4px",
+                            background: "rgba(16, 185, 129, 0.9)",
+                            color: "white",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            fontSize: "10px",
+                            fontWeight: "600",
+                          }}
+                        >
+                          ✓ Chat
+                        </div>
+                      )}
+
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      onClick={() => removeImage(image.id)}
+                      style={{
+                        position: "absolute",
+                        top: "4px",
+                        right: "4px",
+                        background: "rgba(239, 68, 68, 0.9)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "20px",
+                        height: "20px",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      ×
+                    </button>
+
+                    {/* Image Info for Chat Uploads */}
+                    {image.source === "chat_upload" && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          bottom: "0",
+                          left: "0",
+                          right: "0",
+                          background:
+                            "linear-gradient(transparent, rgba(0,0,0,0.7))",
+                          color: "white",
+                          padding: "8px 4px 4px",
+                          fontSize: "10px",
+                        }}
+                      >
+                        <div style={{ fontWeight: "600" }}>{image.name}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
