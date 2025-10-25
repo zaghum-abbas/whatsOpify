@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useTheme } from "../../hooks/useTheme";
+import { getToken } from "../../core/utils/helperFunctions";
 
 const AddProductSidebar = ({ onClose, onProductAdd }) => {
   const theme = useTheme();
@@ -25,7 +26,7 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
 
     if (imageFiles.length > 0) {
       const newImages = imageFiles.map((file) => ({
-        id: `img_${Date.now()}_${Math.random()}`,
+        id: `${Date.now()}`,
         file: file,
         url: URL.createObjectURL(file),
         name: file.name,
@@ -164,6 +165,19 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
 
     let observer = null;
 
+    // Helper: convert blob URL → base64
+    const blobToBase64 = async (blobUrl) => {
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result); // ✅ Keep full base64 string
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    };
+
     const addButtonsToExistingElements = () => {
       targetClassGroups.forEach((classGroup) => {
         const selector = `.${classGroup[0]}`;
@@ -176,26 +190,95 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
             classList.length === classGroup.length &&
             classGroup.every((cls) => classList.includes(cls))
           ) {
-            // Prevent duplicate button
             if (el.querySelector(".my-extension-add-btn")) return;
 
             const button = document.createElement("button");
             button.textContent = "Add";
             button.className = "my-extension-add-btn";
             button.style.cssText = `
-                background-color: #21c063;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 4px 8px;
-                font-size: 12px;
-                cursor: pointer;
-                margin: 5px 0 5px 5px;
-              `;
+              background-color: #21c063;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              padding: 4px 8px;
+              font-size: 12px;
+              cursor: pointer;
+              margin: 5px 0 5px 5px;
+            `;
 
-            button.addEventListener("click", (e) => {
+            button.addEventListener("click", async (e) => {
               e.stopPropagation();
               console.log("✅ Add button clicked for:", el);
+
+              // Get all valid blob images inside this chat container
+              const imgs = Array.from(el.querySelectorAll("img"))
+                .map((img) => img.src)
+                .filter((src) => src.startsWith("blob:"));
+
+              if (imgs.length === 0) {
+                console.log("⚠️ No valid blob images found in this chat.");
+                return;
+              }
+
+              console.log("🖼️ Found blob images:", imgs);
+
+              // Convert all blob URLs to base64
+              const base64Images = await Promise.all(
+                imgs.map(async (src) => {
+                  try {
+                    const base64 = await blobToBase64(src);
+                    return base64;
+                  } catch (err) {
+                    console.error("❌ Error converting to base64:", err);
+                    return null;
+                  }
+                })
+              );
+
+              // Build payloads
+              const payloads = base64Images.filter(Boolean).map((base64) => ({
+                image_base64: base64,
+                module: "product",
+              }));
+
+              console.log("🚀 Payload ready to send:", payloads);
+
+              // Example: Send to your backend (optional)
+              try {
+                // Loop through all base64 payloads
+                for (const payload of payloads) {
+                  try {
+                    const response = await fetch(
+                      "https://api.shopilam.com/api/v1/image/upload",
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${getToken()}`,
+                        },
+                        body: JSON.stringify(payload),
+                      }
+                    );
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                      console.log("✅ Uploaded:", data);
+
+                      setFormData((prev) => ({
+                        ...prev,
+                        images: [...prev.images, { id: Date.now(), url: data }],
+                      }));
+                    } else {
+                      console.error("❌ Upload failed:", data);
+                    }
+                  } catch (err) {
+                    console.error("❌ Error uploading image:", err);
+                  }
+                }
+              } catch (err) {
+                console.error("❌ Unexpected upload error:", err);
+              }
             });
 
             el.prepend(button);
@@ -220,9 +303,7 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
     observer.observe(document.body, { childList: true, subtree: true });
 
     return () => {
-      if (observer) {
-        observer.disconnect();
-      }
+      if (observer) observer.disconnect();
       removeAllAddButtons();
     };
   }, []);
@@ -235,6 +316,8 @@ const AddProductSidebar = ({ onClose, onProductAdd }) => {
       existingButtons.forEach((button) => button.remove());
     };
   }, [onClose]);
+
+  console.log("formData", formData);
 
   return (
     <div
