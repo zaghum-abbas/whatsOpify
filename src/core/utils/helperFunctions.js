@@ -36,41 +36,87 @@ export const sanitizePhone = (phone) => {
 };
 
 export const extractPhoneNumberFromDOM = () => {
-  const el = document.querySelector(
-    ".x10l6tqk.x13vifvy.xtijo5x.x1ey2m1c.x1o0tod.x1280gxy"
-  );
+  console.log("🔍 [PHONE] Starting phone number extraction...");
 
-  if (!el) {
-    console.warn("⚠️ No contact element found");
-    return null;
+  // Try multiple selectors to find the phone number element
+  const selectors = [
+    ".x10l6tqk.x13vifvy.xtijo5x.x1ey2m1c.x1o0tod.x1280gxy", // Original selector
+    'span[dir="ltr"]', // Phone numbers are often in LTR direction
+    'section[data-testid="contact-info"] span', // Contact info section
+    'div[role="button"] span[dir="ltr"]', // Sometimes in buttons
+  ];
+
+  let phoneNumber = null;
+
+  for (const selector of selectors) {
+    console.log(`🔍 [PHONE] Trying selector: ${selector}`);
+
+    if (selector.includes("[") || selector.startsWith(".")) {
+      // For class or attribute selectors, try querySelector
+      const el = document.querySelector(selector);
+      if (el) {
+        const extracted = extractPhoneFromElement(el);
+        if (extracted) {
+          phoneNumber = extracted;
+          console.log(`✅ [PHONE] Found phone with selector: ${selector}`);
+          break;
+        }
+      }
+    } else {
+      // For more complex selectors, try querySelectorAll
+      const elements = document.querySelectorAll(selector);
+      for (const el of elements) {
+        const extracted = extractPhoneFromElement(el);
+        if (extracted) {
+          phoneNumber = extracted;
+          console.log(`✅ [PHONE] Found phone in element: ${selector}`);
+          break;
+        }
+      }
+      if (phoneNumber) break;
+    }
   }
+
+  if (!phoneNumber) {
+    console.warn("⚠️ [PHONE] No phone number found with any selector");
+  }
+
+  return phoneNumber;
+};
+
+// Helper function to extract phone from an element
+function extractPhoneFromElement(el) {
+  if (!el) return null;
 
   let text = el.textContent || "";
-  console.log("🧾 Raw text:", text);
+  console.log("🧾 [PHONE] Raw text:", text);
 
-  text = text
+  // Clean the text
+  const cleanedText = text
     .replace(/\u200B/g, "") // zero-width spaces
     .replace(/\u00A0/g, " ") // non-breaking spaces
-    .replace(/[\s\-]+/g, "") // remove spaces, dashes
     .trim();
 
-  console.log("✨ Cleaned text:", text);
+  console.log("✨ [PHONE] Cleaned text:", cleanedText);
 
-  // Allow optional +92 / 92 / 0 and any spacing variations
-  const phoneRegex = /(\+\d{1,3}[-\s]?\d{2,5}[-\s]?\d{3,5}[-\s]?\d{3,5})/;
+  // Try different phone patterns
+  const phonePatterns = [
+    /\+\d{1,3}\s?\d{10,14}/, // International format: +92 3001234567
+    /\d{11,14}/, // Simple number: 923001234567 or 03001234567
+    /\+\d{1,3}[-\s]?\d{2,5}[-\s]?\d{3,5}[-\s]?\d{3,5}/, // With separators
+  ];
 
-  const match = text.match(phoneRegex);
-  console.log("🔍 match:", match);
-
-  if (match) {
-    let number = match[0];
-    console.log("📞 Found number:", number);
-    return number;
+  for (const pattern of phonePatterns) {
+    const match = cleanedText.match(pattern);
+    if (match) {
+      const number = match[0].replace(/[\s\-]/g, ""); // Remove spaces and dashes
+      console.log("📞 [PHONE] Found number:", number);
+      return number;
+    }
   }
 
-  console.warn("⚠️ No phone number found in text");
   return null;
-};
+}
 
 export const ensureArray = (value) => {
   if (value === null || value === undefined) return [];

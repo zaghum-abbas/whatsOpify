@@ -12,6 +12,7 @@ import {
   handleAuthStorage,
 } from "./authMiddleware.jsx";
 import { useTheme } from "../../hooks/useTheme.js";
+import { getActiveChatDetails } from "../index.jsx";
 
 const SELECTORS = {
   Inbox: 'button#all-filter[role="tab"]',
@@ -329,6 +330,50 @@ const TopToolbar = (props) => {
     }
   };
 
+  // Handler for Check States button
+  const handleCheckStatesClick = async () => {
+    if (!requireAuth(setShowLoginModal)) return;
+
+    console.log("📊 Check States button clicked");
+
+    try {
+      // Get active chat details
+      const contact = await getActiveChatDetails();
+
+      if (contact && (contact.name || contact.phone)) {
+        console.log("📊 Active chat details:", contact);
+
+        // Use switchToChatSidebar to properly set contact and switch mode
+        if (typeof window.switchToChatSidebar === "function") {
+          window.switchToChatSidebar(contact);
+        } else {
+          // Fallback: manually set contact and switch mode
+          if (window.sidebarProps) {
+            window.sidebarProps.contact = contact;
+            console.log("✅ Set sidebarProps.contact:", contact);
+          }
+
+          if (typeof window.switchSidebarMode === "function") {
+            window.switchSidebarMode("chat");
+          }
+        }
+
+        // Ensure sidebar is open
+        if (typeof window.toggleWhatsappSidebar === "function") {
+          window.toggleWhatsappSidebar(true);
+        }
+
+        console.log("✅ Chat sidebar opened with user states");
+      } else {
+        console.warn("⚠️ No active chat found or no contact details available");
+        alert("Please open a chat first to view user states");
+      }
+    } catch (error) {
+      console.error("❌ Error opening chat sidebar:", error);
+      alert("Failed to open chat sidebar. Please try again.");
+    }
+  };
+
   return (
     <div
       style={{
@@ -401,6 +446,36 @@ const TopToolbar = (props) => {
 
       {/* Right side: App name + icons + login/logout */}
       <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        <button
+          onClick={handleCheckStatesClick}
+          style={{
+            color: "#4a5568",
+            transition: "all 0.2s",
+            background: "transparent",
+            border: "1px solid #e2e8f0",
+            cursor: "pointer",
+            padding: "6px 12px",
+            borderRadius: "6px",
+            fontSize: "14px",
+            fontWeight: "500",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.color = "#2563EB";
+            e.target.style.backgroundColor = "#f0f9ff";
+            e.target.style.borderColor = "#2563EB";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.color = "#4a5568";
+            e.target.style.backgroundColor = "transparent";
+            e.target.style.borderColor = "#e2e8f0";
+          }}
+        >
+          📊 Check States
+        </button>
+
         <div
           style={{ fontSize: "1.125rem", fontWeight: "bold", color: "#10B981" }}
         >

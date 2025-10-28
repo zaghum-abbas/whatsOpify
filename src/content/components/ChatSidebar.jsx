@@ -727,11 +727,11 @@ const ChatSidebar = ({
 
   // Fetch user orders when contact phone number is available
   useEffect(() => {
+    console.log(
+      "[ORDERS] Contact phone detected, fetching orders:",
+      contact.phone
+    );
     if (contact?.phone) {
-      console.log(
-        "[ORDERS] Contact phone detected, fetching orders:",
-        contact.phone
-      );
       fetchUserOrders(contact.phone);
     } else {
       console.log("[ORDERS] No contact phone available");

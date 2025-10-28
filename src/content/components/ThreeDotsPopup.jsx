@@ -24,12 +24,16 @@ const ThreeDotsPopup = ({
     const savedStore = JSON.parse(
       localStorage.getItem("whatsopify_selected_store")
     );
-    const userInfo = JSON.parse(localStorage.getItem("whatsopify_user_info"));
+    const userInfo = JSON.parse(localStorage.getItem("whatsopify_token"));
+    console.log("userInfo", userInfo?.data);
     setUserDetails({
       userEmail: userInfo?.data?.user?.email,
       userSelectedStore: savedStore?.name || "",
     });
-  }, []);
+  }, [
+    localStorage.getItem("whatsopify_token"),
+    localStorage.getItem("whatsopify_selected_store"),
+  ]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -134,7 +138,7 @@ const ThreeDotsPopup = ({
           }
         `}
       </style>
-
+      {console.log("userDetails", userDetails)}
       {userDetails.userEmail && userDetails.userSelectedStore && (
         <div
           style={{ padding: "12px 16px", fontSize: "14px", color: "#374151" }}
@@ -145,7 +149,6 @@ const ThreeDotsPopup = ({
           <div>Store: {userDetails.userSelectedStore}</div>
         </div>
       )}
-
       <button
         onClick={() => handleMenuItemClick("billing")}
         style={{
@@ -172,7 +175,6 @@ const ThreeDotsPopup = ({
         <span style={{ fontSize: "16px" }}>💳</span>
         Billing
       </button>
-
       <button
         onClick={() => handleMenuItemClick("about")}
         style={{
@@ -199,7 +201,6 @@ const ThreeDotsPopup = ({
         <span style={{ fontSize: "16px" }}>ℹ️</span>
         About US
       </button>
-
       <button
         onClick={() => handleMenuItemClick("contact")}
         style={{
@@ -226,7 +227,6 @@ const ThreeDotsPopup = ({
         <span style={{ fontSize: "16px" }}>📞</span>
         Contact US
       </button>
-
       {/* Divider */}
       <div
         style={{
@@ -235,7 +235,6 @@ const ThreeDotsPopup = ({
           margin: "8px 0",
         }}
       />
-
       {/* Add Products Button - Only show when authenticated */}
       {isAuthenticated && (
         <button
@@ -269,7 +268,6 @@ const ThreeDotsPopup = ({
           Add Products
         </button>
       )}
-
       {/* Create Order Button - Only show when authenticated */}
       {isAuthenticated && (
         <button
@@ -303,7 +301,6 @@ const ThreeDotsPopup = ({
           Create Order
         </button>
       )}
-
       {/* Orders Button - Only show when authenticated */}
       {isAuthenticated && (
         <button
@@ -337,7 +334,6 @@ const ThreeDotsPopup = ({
           Orders
         </button>
       )}
-
       {/* Divider */}
       <div
         style={{
@@ -346,7 +342,6 @@ const ThreeDotsPopup = ({
           margin: "8px 0",
         }}
       />
-
       {/* Settings Button */}
       <button
         onClick={() => {
@@ -377,7 +372,6 @@ const ThreeDotsPopup = ({
         <span style={{ fontSize: "16px" }}>⚙️</span>
         Settings
       </button>
-
       {/* Switch Store Button - Only show when authenticated */}
       {isAuthenticated &&
         JSON.parse(localStorage.getItem("whatsopify_token")).data?.stores
@@ -413,7 +407,6 @@ const ThreeDotsPopup = ({
             Switch Store
           </button>
         )}
-
       {/* Login/Logout Button */}
       <button
         onClick={() => {

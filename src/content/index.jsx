@@ -199,7 +199,7 @@ console.log("🔍 sidebarMode:", sidebarMode);
 // Flag to prevent multiple simultaneous calls
 let isExtractingContact = false;
 
-const getActiveChatDetails = async () => {
+export const getActiveChatDetails = async () => {
   // Prevent multiple simultaneous calls
   if (isExtractingContact) {
     console.log("⚠️ Contact extraction already in progress, skipping...");
@@ -1753,11 +1753,6 @@ async function addImagesToChat(imageFiles) {
     console.error("[BULK_IMAGE] Error adding images to chat:", error);
     return false;
   }
-}
-
-// Legacy function for single image (kept for compatibility)
-async function addImageToChat(imageFile) {
-  return await addImagesToChat([imageFile]);
 }
 
 // Function to add message to current chat input (manual send)
