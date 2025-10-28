@@ -117,6 +117,26 @@ export const showProductImages = (product) => {
   return imageUrl;
 };
 
+export const getAllProductImages = (product) => {
+  if (!product?.images?.length) {
+    return undefined;
+  }
+  const images = ensureArray(product?.images);
+  const variantImageIds = product?.variants
+    ?.map((variant) => variant?.imageId)
+    ?.filter(Boolean);
+  const productImages = images?.filter(
+    (image) => image?.id && !variantImageIds?.includes(image?.id)
+  );
+  console.log("[PRODUCT] Product images:", productImages);
+
+  if (!productImages?.length) {
+    return undefined;
+  }
+
+  return productImages;
+};
+
 export const formatPhoneNumber = (number) => {
   // Remove all non-digits (just in case)
   const cleaned = number.replace(/\D/g, "");

@@ -232,7 +232,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       // Get store ID from request or use default
       const storeId = request.storeId;
-      const productsApiUrl = `https://api.shopilam.com/api/v1/products?limit=2&page=3&status=active&store=${storeId}`;
+      const productsApiUrl = `https://api.shopilam.com/api/v1/products?limit=3&page=1status=active&store=${storeId}`;
 
       const productsHeaders = {
         Authorization: `Bearer ${token}`,

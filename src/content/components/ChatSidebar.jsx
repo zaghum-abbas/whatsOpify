@@ -6,6 +6,7 @@ import {
   formatDate,
   formatPhoneNumber,
   formatPrice,
+  getAllProductImages,
   showProductImages,
   showVariantImages,
 } from "../../core/utils/helperFunctions";
@@ -857,8 +858,7 @@ const ChatSidebar = ({
         const productName =
           item.title?.replace(/[^a-zA-Z0-9]/g, "_") || "product";
 
-        // Process all images
-        for (let i = 0; i < item.images.length; i++) {
+        for (let i = 0; i < getAllProductImages(item).length; i++) {
           const image = item.images[i];
           if (!image?.url) continue;
 
@@ -930,7 +930,7 @@ Your order *#${orderId}* is out today to your city ${city} 🚚✨
 
 Please keep ${orderTotal} handy as your parcel  will be at your door step in 3-4 days. 
 
-🧾 Tracking: ${`https://shopilam.com/tracking/${order?.trackingNo}`}  
+🧾 Tracking: ${`https://shopilam.com/tracking/${order?.tracking?.tracking_no}`}  
  
 
 You can follow your parcel using the link above — it'll be with you soon! 😄  
@@ -1382,7 +1382,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                           // width: "100px",
                         }}
                       >
-                        {order?.trackingNo && (
+                        {order?.tracking?.tracking_no && (
                           <button
                             onClick={() => handleWhatsAppRedirect(order)}
                             disabled={updatingOrder === order?._id}
