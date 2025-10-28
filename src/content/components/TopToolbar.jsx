@@ -374,6 +374,51 @@ const TopToolbar = (props) => {
     }
   };
 
+  useEffect(() => {
+    let isButtonAdded = false;
+
+    const PARENT_CLASS = ".x78zum5.x1cy8zhl.x1y332i5.xggjnk3.x1yc453h";
+    const CHILD_CLASS = ".xuxw1ft.x6ikm8r.x10wlt62.xlyipyv.x78zum5";
+
+    const injectButton = () => {
+      if (isButtonAdded) return;
+
+      const parent = document.querySelector(PARENT_CLASS);
+      if (!parent) return;
+
+      const child = parent.querySelector(CHILD_CLASS);
+      if (!child) return;
+
+      if (child.querySelector("#my-profile-btn")) {
+        isButtonAdded = true;
+        return;
+      }
+
+      const btn = document.createElement("button");
+      btn.id = "my-profile-btn";
+      btn.innerText = "Profile";
+      btn.style.cssText =
+        "padding:6px 10px; border-radius:6px; background:#144D37; color:white; margin-left:8px; cursor:pointer;";
+
+      // ✅ Add Click Event Before Appending
+      btn.onclick = () => {
+        console.log("📌 Profile button clicked!");
+        handleCheckStatesClick(); // <-- Call your function here
+      };
+
+      child.appendChild(btn);
+      isButtonAdded = true;
+
+      console.log("✅ Profile button injected inside child");
+    };
+
+    const observer = new MutationObserver(injectButton);
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div
       style={{
@@ -446,36 +491,6 @@ const TopToolbar = (props) => {
 
       {/* Right side: App name + icons + login/logout */}
       <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-        <button
-          onClick={handleCheckStatesClick}
-          style={{
-            color: "#4a5568",
-            transition: "all 0.2s",
-            background: "transparent",
-            border: "1px solid #e2e8f0",
-            cursor: "pointer",
-            padding: "6px 12px",
-            borderRadius: "6px",
-            fontSize: "14px",
-            fontWeight: "500",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-          }}
-          onMouseEnter={(e) => {
-            e.target.style.color = "#2563EB";
-            e.target.style.backgroundColor = "#f0f9ff";
-            e.target.style.borderColor = "#2563EB";
-          }}
-          onMouseLeave={(e) => {
-            e.target.style.color = "#4a5568";
-            e.target.style.backgroundColor = "transparent";
-            e.target.style.borderColor = "#e2e8f0";
-          }}
-        >
-          📊 Check States
-        </button>
-
         <div
           style={{ fontSize: "1.125rem", fontWeight: "bold", color: "#10B981" }}
         >
