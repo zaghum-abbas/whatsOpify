@@ -128,9 +128,9 @@ const AddProductSidebar = ({ onClose }) => {
           preview: null,
         },
       }));
-
+      console.log("responseData", responseData);
       const imageFile = await downloadImageAsFile(
-        responseData,
+        responseData.thumbnail_url,
         `${Date.now()}.jpg`
       );
       const objectUrl = URL.createObjectURL(imageFile);
@@ -152,7 +152,7 @@ const AddProductSidebar = ({ onClose }) => {
           ...prev.images,
           {
             id: imageId,
-            url: responseData,
+            responseData,
           },
         ],
       }));

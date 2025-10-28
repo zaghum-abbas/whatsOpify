@@ -3038,3 +3038,15 @@ window.openAddProductSidebar = function () {
     window.toggleWhatsappSidebar(true);
   }
 };
+
+// Global function to remove all "Add" buttons from chat
+window.removeAllAddButtons = function () {
+  console.log("🗑️ Removing all Add buttons...");
+
+  const existingButtons = document.querySelectorAll(".my-extension-add-btn");
+  existingButtons.forEach((button) => {
+    button.remove();
+  });
+
+  console.log(`✅ Removed ${existingButtons.length} Add buttons`);
+};

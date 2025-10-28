@@ -223,9 +223,18 @@ const TopToolbar = (props) => {
       document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
     });
     setIsAuthenticated(false);
+
+    // Close sidebar
     if (typeof window.toggleWhatsappSidebar === "function") {
       window.toggleWhatsappSidebar(false);
     }
+
+    // Remove all "Add" buttons from chat
+    if (typeof window.removeAllAddButtons === "function") {
+      window.removeAllAddButtons();
+    }
+
+    console.log("✅ Logged out and cleaned up Add buttons");
   };
 
   const handleLoginSuccess = (token) => {
