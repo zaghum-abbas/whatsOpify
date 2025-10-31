@@ -1522,9 +1522,228 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                             fontFamily: "monospace",
                             fontSize: "12px",
                             alignContent: "center",
+                            position: "relative",
+                            cursor: "pointer",
+                          }}
+                          onMouseEnter={(e) => {
+                            const tooltip =
+                              e.currentTarget.querySelector(".order-tooltip");
+                            if (tooltip) {
+                              // Set fixed positioning first to escape table context
+                              tooltip.style.position = "fixed";
+                              tooltip.style.display = "block";
+
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
+
+                              tooltip.style.left = `${rect.left}px`;
+                              tooltip.style.top = `${rect.top}px`;
+
+                              setTimeout(() => {
+                                const tooltipRect =
+                                  tooltip.getBoundingClientRect();
+                                const gap = 10;
+
+                                if (tooltipRect.left < gap) {
+                                  tooltip.style.transform = "translateX(0)";
+                                  tooltip.style.marginLeft = `${gap}px`;
+                                  tooltip.style.left = `${rect.right + gap}px`;
+                                  tooltip.style.top = `${rect.top}px`;
+                                } else {
+                                  tooltip.style.transform = "translateX(-100%)";
+                                  tooltip.style.marginLeft = "-10px";
+                                }
+
+                                if (
+                                  tooltipRect.bottom >
+                                  window.innerHeight - gap
+                                ) {
+                                  tooltip.style.top = `${
+                                    window.innerHeight -
+                                    tooltipRect.height -
+                                    gap
+                                  }px`;
+                                }
+                              }, 0);
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const tooltip =
+                              e.currentTarget.querySelector(".order-tooltip");
+                            if (tooltip) {
+                              tooltip.style.display = "none";
+                            }
                           }}
                         >
                           {order.name}
+                          <div
+                            className="order-tooltip"
+                            style={{
+                              display: "none",
+                              position: "fixed",
+                              background: theme === "dark" ? "#23272a" : "#fff",
+                              border: `1px solid ${
+                                theme === "dark" ? "#333" : "#e2e8f0"
+                              }`,
+                              borderRadius: "8px",
+                              padding: "12px",
+                              minWidth: "250px",
+                              maxWidth: "350px",
+                              boxShadow:
+                                "0 4px 12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)",
+                              zIndex: 99999,
+                              pointerEvents: "none",
+                              fontSize: "12px",
+                              color: theme === "dark" ? "white" : "#222",
+                              lineHeight: "1.6",
+                              whiteSpace: "normal",
+                              transform: "translateX(-100%)",
+                              marginLeft: "-10px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontWeight: "600",
+                                marginBottom: "8px",
+                                paddingBottom: "8px",
+                                borderBottom: `1px solid ${
+                                  theme === "dark" ? "#333" : "#e2e8f0"
+                                }`,
+                                fontSize: "13px",
+                              }}
+                            >
+                              Order #{order.name}
+                            </div>
+
+                            {order?.lineItems &&
+                              Array.isArray(order.lineItems) &&
+                              order.lineItems.length > 0 && (
+                                <div style={{ marginBottom: "8px" }}>
+                                  <div
+                                    style={{
+                                      fontWeight: "600",
+                                      marginBottom: "4px",
+                                      fontSize: "11px",
+                                      color: theme === "dark" ? "#aaa" : "#666",
+                                    }}
+                                  >
+                                    Items:
+                                  </div>
+                                  {order.lineItems.map((item, idx) => (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        marginBottom: "4px",
+                                        paddingLeft: "8px",
+                                      }}
+                                    >
+                                      • {item.name || "Unknown"} x
+                                      {item.quantity || 1}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: theme === "dark" ? "#aaa" : "#666",
+                                }}
+                              >
+                                Total:
+                              </span>
+                              <span style={{ fontWeight: "600" }}>
+                                Rs. {formatPrice(order.amount)}
+                              </span>
+                            </div>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: theme === "dark" ? "#aaa" : "#666",
+                                }}
+                              >
+                                Status:
+                              </span>
+                              <span
+                                style={{
+                                  fontWeight: "600",
+                                  color:
+                                    order.status?.toLowerCase() === "pending"
+                                      ? "#FFA500"
+                                      : order.status?.toLowerCase() === "open"
+                                      ? "#25D366"
+                                      : order.status?.toLowerCase() ===
+                                        "cancelled"
+                                      ? "#DC2626"
+                                      : theme === "dark"
+                                      ? "white"
+                                      : "#222",
+                                }}
+                              >
+                                {order?.status}
+                              </span>
+                            </div>
+
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                marginBottom: "4px",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  color: theme === "dark" ? "#aaa" : "#666",
+                                }}
+                              >
+                                Date:
+                              </span>
+                              <span>{formatDate(order?.createdAt)}</span>
+                            </div>
+
+                            {order?.tracking?.tracking_no && (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  marginTop: "8px",
+                                  paddingTop: "8px",
+                                  borderTop: `1px solid ${
+                                    theme === "dark" ? "#333" : "#e2e8f0"
+                                  }`,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    color: theme === "dark" ? "#aaa" : "#666",
+                                  }}
+                                >
+                                  Tracking:
+                                </span>
+                                <span
+                                  style={{
+                                    fontFamily: "monospace",
+                                    fontSize: "11px",
+                                  }}
+                                >
+                                  {order.tracking.tracking_no}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td
                           style={{
@@ -1595,7 +1814,6 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                             </button>
                           )}
 
-                          {/* If status is "pending", show Confirm, Resend, and Cancel buttons */}
                           {isPending && (
                             <>
                               <button
