@@ -374,7 +374,7 @@ const ThreeDotsPopup = ({
       </button>
       {/* Switch Store Button - Only show when authenticated */}
       {isAuthenticated &&
-        JSON.parse(localStorage.getItem("whatsopify_token")).data?.stores
+        JSON.parse(localStorage.getItem("whatsopify_token"))?.data?.stores
           ?.length > 1 && (
           <button
             onClick={() => {

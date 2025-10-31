@@ -898,20 +898,82 @@ const ChatSidebar = ({
     }
   };
   const [updatingOrder, setUpdatingOrder] = useState(null);
-  const handleWhatsAppRedirect = async (order) => {
+
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      console.log(`[ORDERS] Updating order ${orderId} status to ${newStatus}`);
+
+      const tokenData = localStorage.getItem("whatsopify_token");
+      if (!tokenData) {
+        throw new Error("No authentication token found");
+      }
+
+      const parsedToken = JSON.parse(tokenData);
+      const token = parsedToken?.data?.token || parsedToken?.token;
+
+      if (!token) {
+        throw new Error("Invalid authentication token");
+      }
+
+      // Get selected store ID
+      const selectedStore = localStorage.getItem("whatsopify_selected_store");
+      let storeId = "";
+      if (selectedStore) {
+        try {
+          const store = JSON.parse(selectedStore);
+          storeId = store._id;
+        } catch (err) {
+          console.warn("[ORDERS] Error parsing selected store:", err);
+        }
+      }
+
+      const response = await chrome.runtime.sendMessage({
+        action: "UPDATE_ORDER_STATUS",
+        token: token,
+        orderId: orderId,
+        newStatus: newStatus,
+        storeId: storeId,
+      });
+
+      console.log(`[ORDERS] Update status response:`, response);
+
+      if (response.success) {
+        console.log(
+          `[ORDERS] ✅ Order ${orderId} status updated to ${newStatus}`
+        );
+        return true;
+      } else {
+        throw new Error(response.error || "Failed to update order status");
+      }
+    } catch (err) {
+      console.error(`[ORDERS] ❌ Error updating order status:`, err);
+      throw err;
+    }
+  };
+
+  const handleWhatsAppRedirect = async (order, status) => {
+    console.log("Order Status", status, order);
     const data = localStorage.getItem("whatsopify_token");
     const store = JSON.parse(data)?.data?.stores;
     const phoneNumber = userOrders?.userInfo?.phone;
+    const customerName = userOrders?.userInfo?.name;
     const city = userOrders?.userInfo?.address?.city;
+    const orderDateTime = formatDate(order?.createdAt);
     const orderId = order?.name;
-    const storeName = store?.find((s) => s._id === order?.storeId)?.name;
+    const storeName = store?.find((s) => s._id === order?.storeId)?.name ?? "";
     const orderTotal = formatPrice(order?.amount);
     console.log("store", storeName, store);
 
     try {
-      setUpdatingOrder(order?._id);
+      setUpdatingOrder(order?.orderId);
+      if (status !== "resend" || status !== "tracking") {
+        await updateOrderStatus(order?.orderId, status);
+      }
+      if (contact?.phone) {
+        fetchUserOrders(contact.phone);
+      }
     } catch (updateError) {
-      setError(`Failed to update order status: ${updateError.message}`);
+      setOrdersError(`Failed to update order status: ${updateError.message}`);
       return;
     } finally {
       setUpdatingOrder(null);
@@ -922,18 +984,70 @@ const ChatSidebar = ({
         .replace(/^\+92/, "92")
         .replace(/^0/, "92");
       if (cleanedNumber) {
-        const message = `🎉 *Great News!* 🎉  
+        const message =
+          status === "pending"
+            ? `👋 Hello ${customerName},
+we've just received your order #${orderId} at ${storeName} 🛍️ placed at ${orderDateTime}, for ${city}
 
-Your order *#${orderId}* is out today to your city ${city} 🚚✨  
+🛒 𝐎𝐫𝐝𝐞𝐫 𝐃𝐞𝐭𝐚𝐢𝐥𝐬
+ ${order?.lineItems
+   ?.map((item) => `${item.name} - ${item.quantity}`)
+   .join("\n")}
 
 
+💰 ${orderTotal}
 
-Please keep ${orderTotal} handy as your parcel  will be at your door step in 3-4 days. 
+Please reply: ✅ YES to confirm your order, or
+❌ NO if you'd like to cancel or make any changes.
 
-🧾 Tracking: ${`https://shopilam.com/tracking/${order?.tracking?.tracking_no}`}  
- 
+Thanks for shopping with ${storeName} 💚
+— 𝐓𝐞𝐚𝐦 ${storeName}`
+            : status === "resend"
+            ? `⏰ Reminder for your order #${orderId}
+👋 Hello ${customerName},
 
-You can follow your parcel using the link above — it'll be with you soon! 😄  
+We're still waiting for your confirmation for your order placed at ${storeName} 🛍️ on ${orderDateTime}, for ${city}.
+
+🧾 𝐎𝐫𝐝𝐞𝐫 𝐃𝐞𝐭𝐚𝐢𝐥𝐬
+ ${order?.lineItems
+   ?.map((item) => `${item.name} - ${item.quantity}`)
+   .join("\n")}
+💰 ${orderTotal}
+
+Please reply:
+✅ YES to confirm your order, or
+❌ NO if you'd like to cancel or make any changes.
+
+If we don't hear back soon, the order may be auto-cancelled to free up stock.
+
+💚 Thank you for shopping with ${storeName}!
+— 𝐓𝐞𝐚𝐦 ${storeName}`
+            : status === "confirm"
+            ? `🎉 Thank you for confirmation,  ${customerName},
+
+Our team will start processing it soon 🚚
+You'll receive updates once it's packed and dispatched. 😊
+
+💚 Thank you for confirming your order with ${storeName}!
+— 𝐓𝐞𝐚𝐦 ${storeName}`
+            : status === "cancel"
+            ? `❌ Order Cancelled
+
+Your order #${orderId} at ${storeName} 🛍️ has been cancelled as per your request on ${orderDateTime}.
+
+We're sorry to see you cancel 😔 — if there's anything we can improve or if you'd like to place a new order, just reply here.
+
+💚 Thank you for considering ${storeName}!
+— 𝐓𝐞𝐚𝐦 ${storeName}`
+            : `🎉 *Great News!* 🎉
+
+Your order *#${orderId}* is out today to your city ${city} 🚚✨
+
+Please keep ${orderTotal} handy as your parcel  will be at your door step in 3-4 days.
+
+🧾 Tracking: ${`https://shopilam.com/tracking/${order?.tracking?.tracking_no}`}
+
+You can follow your parcel using the link above — it'll be with you soon! 😄
 
 💚 *Thanks for choosing us!*`;
 
@@ -1322,93 +1436,234 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                         fontWeight: "600",
                       }}
                     >
-                      Tracking
+                      Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ensureArray(userOrders?.orders)?.map((order) => (
-                    <tr
-                      key={order.id}
-                      style={{ borderBottom: "1px solid #f0f0f0" }}
-                    >
-                      <td
-                        style={{
-                          padding: "12px 8px",
-                          fontFamily: "monospace",
-                          fontSize: "12px",
-                          alignContent: "center",
-                        }}
+                  {ensureArray(userOrders?.orders)?.map((order) => {
+                    const orderStatus = order?.status?.toLowerCase();
+                    const isOpen = orderStatus === "open";
+                    const isPending = orderStatus === "pending";
+
+                    return (
+                      <tr
+                        key={order.id}
+                        style={{ borderBottom: "1px solid #f0f0f0" }}
                       >
-                        {order.name}
-                      </td>
-                      <td
-                        style={{
-                          padding: "12px 8px",
-                          fontSize: "12px",
-                          alignContent: "center",
-                        }}
-                      >
-                        {formatPrice(order.amount)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "12px 8px",
-                          alignContent: "center",
-                        }}
-                      >
-                        <div style={{ fontWeight: "500" }}>
-                          {formatDate(order?.createdAt)}
-                        </div>
-                      </td>
-                      <td
-                        style={{
-                          padding: "12px 8px",
-                          fontSize: "12px",
-                          alignContent: "center",
-                        }}
-                      >
-                        {order?.status}
-                      </td>
-                      <td
-                        style={{
-                          padding: "12px 8px",
-                          textAlign: "center",
-                          display: "flex",
-                          gap: "10px",
-                          alignItems: "center",
-                          alignContent: "center",
-                          height: "100%",
-                          // width: "100px",
-                        }}
-                      >
-                        {order?.tracking?.tracking_no && (
-                          <button
-                            onClick={() => handleWhatsAppRedirect(order)}
-                            disabled={updatingOrder === order?._id}
-                            style={{
-                              padding: "6px 12px",
-                              backgroundColor: "#25D366",
-                              color: "white",
-                              border: "none",
-                              borderRadius: "4px",
-                              cursor:
-                                updatingOrder === order?._id
-                                  ? "not-allowed"
-                                  : "pointer",
-                              fontSize: "12px",
-                              fontWeight: "500",
-                              opacity: updatingOrder === order?._id ? 0.6 : 1,
-                            }}
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            fontFamily: "monospace",
+                            fontSize: "12px",
+                            alignContent: "center",
+                          }}
+                        >
+                          {order.name}
+                        </td>
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            fontSize: "12px",
+                            alignContent: "center",
+                          }}
+                        >
+                          {formatPrice(order.amount)}
+                        </td>
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            alignContent: "center",
+                          }}
+                        >
+                          <div style={{ fontWeight: "500" }}>
+                            {formatDate(order?.createdAt)}
+                          </div>
+                        </td>
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            fontSize: "12px",
+                            alignContent: "center",
+                          }}
+                        >
+                          {order?.status}
+                        </td>
+                        <td
+                          style={{
+                            padding: "12px 8px",
+                            textAlign: "center",
+                            display: "flex",
+                            gap: "10px",
+                            alignItems: "center",
+                            alignContent: "center",
+                            height: "100%",
+                            // flexWrap: "wrap",
+                          }}
+                        >
+                          {/* If status is "open", show Send button */}
+                          {isOpen && (
+                            <button
+                              onClick={() =>
+                                handleWhatsAppRedirect(order, "pending")
+                              }
+                              disabled={updatingOrder === order?.orderId}
+                              style={{
+                                padding: "6px 12px",
+                                backgroundColor: "#25D366",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "4px",
+                                cursor:
+                                  updatingOrder === order?.orderId
+                                    ? "not-allowed"
+                                    : "pointer",
+                                fontSize: "12px",
+                                fontWeight: "500",
+                                opacity:
+                                  updatingOrder === order?.orderId ? 0.6 : 1,
+                              }}
+                            >
+                              {updatingOrder === order?.orderId
+                                ? "Updating..."
+                                : "Send"}
+                            </button>
+                          )}
+
+                          {/* If status is "pending", show Confirm, Resend, and Cancel buttons */}
+                          {isPending && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleWhatsAppRedirect(order, "confirm")
+                                }
+                                disabled={updatingOrder === order?.orderId}
+                                style={{
+                                  padding: "6px 12px",
+                                  backgroundColor: "#25D366",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "4px",
+                                  cursor:
+                                    updatingOrder === order?.orderId
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: "500",
+                                  opacity:
+                                    updatingOrder === order?.orderId ? 0.6 : 1,
+                                }}
+                              >
+                                {updatingOrder === order?.orderId
+                                  ? "Updating..."
+                                  : "Confirm"}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleWhatsAppRedirect(order, "resend")
+                                }
+                                disabled={updatingOrder === order?.orderId}
+                                style={{
+                                  padding: "6px 12px",
+                                  backgroundColor: "#FFA500",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "4px",
+                                  cursor:
+                                    updatingOrder === order?.orderId
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: "500",
+                                  opacity:
+                                    updatingOrder === order?.orderId ? 0.6 : 1,
+                                }}
+                              >
+                                {updatingOrder === order?.orderId
+                                  ? "Updating..."
+                                  : "Resend"}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleWhatsAppRedirect(order, "cancel")
+                                }
+                                disabled={updatingOrder === order?.orderId}
+                                style={{
+                                  padding: "6px 12px",
+                                  backgroundColor: "#DC2626",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "4px",
+                                  cursor:
+                                    updatingOrder === order?.orderId
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: "500",
+                                  opacity:
+                                    updatingOrder === order?.orderId ? 0.6 : 1,
+                                }}
+                              >
+                                {updatingOrder === order?.orderId
+                                  ? "Updating..."
+                                  : "Cancel"}
+                              </button>
+                            </>
+                          )}
+
+                          {/* If order has tracking and status is not open/pending, show Tracking button */}
+                          {!isOpen &&
+                            !isPending &&
+                            order?.tracking?.tracking_no && (
+                              <button
+                                onClick={() =>
+                                  handleWhatsAppRedirect(order, "tracking")
+                                }
+                                disabled={updatingOrder === order?.orderId}
+                                style={{
+                                  padding: "6px 12px",
+                                  backgroundColor: "#25D366",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "4px",
+                                  cursor:
+                                    updatingOrder === order?.orderId
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: "500",
+                                  opacity:
+                                    updatingOrder === order?.orderId ? 0.6 : 1,
+                                }}
+                              >
+                                {updatingOrder === order?.orderId
+                                  ? "Updating..."
+                                  : "Tracking"}
+                              </button>
+                            )}
+                          <a
+                            href={`https://shopilam.com/orders/${order?.orderId}`}
+                            target="_blank"
                           >
-                            {updatingOrder === order?._id
-                              ? "Updating..."
-                              : "Tracking"}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                            <button
+                              style={{
+                                padding: "6px 12px",
+                                backgroundColor: "#FFA500",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "4px",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                                fontWeight: "500",
+                              }}
+                            >
+                              Detail
+                            </button>
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

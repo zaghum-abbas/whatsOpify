@@ -145,16 +145,11 @@ const OrdersSection = ({ whatsappTheme }) => {
 
       // Get selected store ID
       const selectedStore = localStorage.getItem("whatsopify_selected_store");
-      let storeId = "default";
+      let storeId = "";
       if (selectedStore) {
         try {
           const store = JSON.parse(selectedStore);
-          storeId =
-            store._id ||
-            store.id ||
-            store.storeId ||
-            store.store_id ||
-            "default";
+          storeId = store._id;
         } catch (err) {
           console.warn("[ORDERS] Error parsing selected store:", err);
         }

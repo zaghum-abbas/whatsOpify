@@ -265,7 +265,7 @@ const AddProductSidebar = ({ onClose }) => {
               "Content-Type": "application/json",
               Authorization: `Bearer ${getToken()}`,
             },
-            body: JSON.stringify(newProduct),
+            body: JSON.stringify([newProduct]),
           }
         );
         const data = await response.json();
