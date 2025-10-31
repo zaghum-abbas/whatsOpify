@@ -205,22 +205,70 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            position: "relative",
           }}
         >
           {item.images && item.images.length > 0 ? (
-            <img
-              src={imageState.preview}
-              alt={item.title}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-              onError={(e) => {
-                e.target.style.display = "none";
-                e.target.nextSibling.style.display = "flex";
-              }}
-            />
+            <>
+              {imageState.loading ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "100%",
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    background: theme === "dark" ? "#23272a" : "#f8f9fa",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "20px",
+                      height: "20px",
+                      border: `2px solid ${
+                        theme === "dark" ? "#333" : "#e2e8f0"
+                      }`,
+                      borderTop: `2px solid ${
+                        theme === "dark" ? "#25d366" : "#25d366"
+                      }`,
+                      borderRadius: "50%",
+                      animation: "spin 1s linear infinite",
+                    }}
+                  />
+                </div>
+              ) : imageState.preview ? (
+                <img
+                  src={imageState.preview}
+                  alt={item.title}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                    e.target.nextSibling.style.display = "flex";
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "100%",
+                    fontSize: "1.2em",
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
+                >
+                  🛒
+                </div>
+              )}
+            </>
           ) : (
             <div
               style={{
@@ -415,11 +463,24 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
                             justifyContent: "center",
                             width: "100%",
                             height: "100%",
-                            fontSize: "0.8em",
-                            color: theme === "dark" ? "white" : "#222",
+                            background:
+                              theme === "dark" ? "#23272a" : "#f8f9fa",
                           }}
                         >
-                          ⏳
+                          <div
+                            style={{
+                              width: "16px",
+                              height: "16px",
+                              border: `2px solid ${
+                                theme === "dark" ? "#333" : "#e2e8f0"
+                              }`,
+                              borderTop: `2px solid ${
+                                theme === "dark" ? "#25d366" : "#25d366"
+                              }`,
+                              borderRadius: "50%",
+                              animation: "spin 1s linear infinite",
+                            }}
+                          />
                         </div>
                       );
                     } else if (variantImageState.preview) {
