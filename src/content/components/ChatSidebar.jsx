@@ -579,7 +579,11 @@ const ChatSidebar = ({
   const [isSearching, setIsSearching] = useState(false);
 
   // User orders state
-  const [userOrders, setUserOrders] = useState([]);
+  const [userOrders, setUserOrders] = useState({
+    orders: [],
+    userInfo: {},
+    userStatus: {},
+  });
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [ordersError, setOrdersError] = useState(null);
 
@@ -1715,7 +1719,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
         </button>
       </section> */}
 
-      <CustomerSupportMessages />
+      <CustomerSupportMessages userOrders={userOrders} />
       {/* Notes Section */}
       <section style={{ marginBottom: "10px" }}>
         {/* <h2

@@ -91,25 +91,18 @@ function extractPhoneFromElement(el) {
   let text = el.textContent || "";
   console.log("🧾 [PHONE] Raw text:", text);
 
-  // Clean the text
-  const cleanedText = text
-    .replace(/\u200B/g, "") // zero-width spaces
-    .replace(/\u00A0/g, " ") // non-breaking spaces
-    .trim();
-
+  const cleanedText = text.replace(/\u200B/g, "").replace(/\u00A0/g, " ");
   console.log("✨ [PHONE] Cleaned text:", cleanedText);
-
-  // Try different phone patterns
   const phonePatterns = [
-    /\+\d{1,3}\s?\d{10,14}/, // International format: +92 3001234567
-    /\d{11,14}/, // Simple number: 923001234567 or 03001234567
-    /\+\d{1,3}[-\s]?\d{2,5}[-\s]?\d{3,5}[-\s]?\d{3,5}/, // With separators
+    /\+\d{1,3}\s?\d{10,14}/,
+    /\d{11,14}/,
+    /\+\d{1,3}[-\s]?\d{2,5}[-\s]?\d{3,5}[-\s]?\d{3,5}/,
   ];
 
   for (const pattern of phonePatterns) {
     const match = cleanedText.match(pattern);
     if (match) {
-      const number = match[0].replace(/[\s\-]/g, ""); // Remove spaces and dashes
+      const number = match[0].replace(/[\s\-]/g, "");
       console.log("📞 [PHONE] Found number:", number);
       return number;
     }
@@ -184,19 +177,15 @@ export const getAllProductImages = (product) => {
 };
 
 export const formatPhoneNumber = (number) => {
-  // Remove all non-digits (just in case)
   const cleaned = number.replace(/\D/g, "");
 
-  // If starts with +92 or 92, replace it with 0
   if (cleaned.startsWith("92")) {
     return "0" + cleaned.slice(2);
   }
 
-  // Otherwise, return as-is
   return cleaned;
 };
 
-// Function to download image from URL and convert to File object
 export const downloadImageAsFile = async (imageUrl, filename) => {
   try {
     console.log("[IMAGE] Downloading image from:", imageUrl);
@@ -251,4 +240,11 @@ export const downloadImageAsFile = async (imageUrl, filename) => {
     console.error("[IMAGE] Error downloading image:", error);
     return null;
   }
+};
+
+export const getLatestOrder = (orders) => {
+  if (!orders?.length) return null;
+  return orders?.sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  )[0];
 };
