@@ -972,7 +972,7 @@ const InjectedSidebarContent = ({
               style={{
                 width: "100%",
                 padding: "10px 12px",
-                paddingRight: isSearching ? "40px" : "12px",
+                paddingRight: search || isSearching ? "40px" : "12px",
                 borderRadius: "6px",
                 border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
                 fontSize: "0.95rem",
@@ -981,6 +981,41 @@ const InjectedSidebarContent = ({
                 color: theme === "dark" ? "white" : "#222",
               }}
             />
+            {search && !isSearching && (
+              <button
+                onClick={() => {
+                  setSearch("");
+                  setIsSearching(false);
+                  setFilteredCatalog(catalog);
+                }}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: theme === "dark" ? "#ccc" : "#666",
+                  fontSize: "18px",
+                  lineHeight: "1",
+                  padding: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.color = theme === "dark" ? "#fff" : "#000";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.color = theme === "dark" ? "#ccc" : "#666";
+                }}
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
             {isSearching && (
               <div
                 style={{
