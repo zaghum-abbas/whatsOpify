@@ -159,8 +159,8 @@ const CreateCustomTabModal = ({ onClose, onCreate, existingTabs }) => {
         </button>
 
         <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.875rem', color: '#666' }}>
-          <img src="https://www.cooby.co/favicon.ico" alt="Whatsopify Logo" style={{ height: '20px', verticalAlign: 'middle', marginRight: '5px' }} />
-          Whatsopify
+          <img src="https://www.cooby.co/favicon.ico" alt="Whatshopify Logo" style={{ height: '20px', verticalAlign: 'middle', marginRight: '5px' }} />
+          Whatshopify
           <span style={{ marginLeft: '1rem', marginRight: '1rem' }}>|</span>
           Any questions? <a href="#" style={{ color: '#2563EB', textDecoration: 'none' }}>Contact support</a>
         </div>

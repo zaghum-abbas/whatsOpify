@@ -19,12 +19,12 @@ export const formatPrice = (value) => {
 
 export const getToken = () => {
   try {
-    const raw = localStorage.getItem("whatsopify_token");
+    const raw = localStorage.getItem("whatshopify_token");
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed?.data?.token || parsed?.token || null;
   } catch (err) {
-    console.warn("[TOKEN] Failed to parse whatsopify_token:", err);
+    console.warn("[TOKEN] Failed to parse whatshopify_token:", err);
     return false;
   }
 };

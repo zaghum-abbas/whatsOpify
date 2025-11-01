@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-export const TOKEN_KEY = "whatsopify_token";
+export const TOKEN_KEY = "whatshopify_token";
 
 // Middleware for protected actions
 export function requireAuth(setShowLoginModal) {
@@ -66,14 +66,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   // const logout = () => {
-  //   const keysToRemove = [TOKEN_KEY, "whatsopify_selected_store"];
+  //   const keysToRemove = [TOKEN_KEY, "whatshopify_selected_store"];
   //   keysToRemove.forEach((key) => localStorage.removeItem(key));
   //   setIsAuthenticated(false);
   // };
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem("whatsopify_selected_store");
+    localStorage.removeItem("whatshopify_selected_store");
 
     ["session"].forEach((cookieName) => {
       document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;

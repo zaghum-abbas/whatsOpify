@@ -327,10 +327,10 @@ class BackgroundManager {
    */
   async getToken() {
     return new Promise((resolve) => {
-      chrome.storage.local.get(["whatsopify_token"], (result) => {
+      chrome.storage.local.get(["whatshopify_token"], (result) => {
         try {
-          if (result.whatsopify_token) {
-            const tokenData = JSON.parse(result.whatsopify_token);
+          if (result.whatshopify_token) {
+            const tokenData = JSON.parse(result.whatshopify_token);
             const token = tokenData.data?.token || tokenData.token;
             resolve(token);
           } else {

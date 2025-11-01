@@ -171,7 +171,7 @@ function handleUnauthorizedResponse() {
   );
 
   // Clear the token from storage
-  chrome.storage.local.remove(["whatsopify_token"], () => {
+  chrome.storage.local.remove(["whatshopify_token"], () => {
     console.log("[BG] Token cleared from storage");
   });
 
@@ -183,12 +183,12 @@ function handleUnauthorizedResponse() {
           target: { tabId: tab.id },
           func: () => {
             // Clear token from localStorage
-            localStorage.removeItem("whatsopify_token");
-            localStorage.removeItem("whatsopify_selected_store");
+            localStorage.removeItem("whatshopify_token");
+            localStorage.removeItem("whatshopify_selected_store");
 
             // Dispatch a custom event to notify content scripts
             window.dispatchEvent(
-              new CustomEvent("whatsopify-unauthorized", {
+              new CustomEvent("whatshopify-unauthorized", {
                 detail: {
                   message: "Authentication expired. Please log in again.",
                 },

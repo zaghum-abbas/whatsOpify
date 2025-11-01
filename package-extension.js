@@ -10,7 +10,7 @@ async function packageExtension() {
 
   const distDir = path.join(__dirname, "dist");
   const packageDir = path.join(__dirname, "package");
-  const zipPath = path.join(__dirname, "whatsopify-extension.zip");
+  const zipPath = path.join(__dirname, "Whatshopify-extension.zip");
 
   // Clean and create package directory
   await fs.remove(packageDir);

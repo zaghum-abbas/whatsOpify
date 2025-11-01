@@ -2,7 +2,7 @@
 export const fetchProducts = async () => {
   try {
     // Get token from localStorage
-    const tokenData = JSON.parse(localStorage.getItem("whatsopify_token"));
+    const tokenData = JSON.parse(localStorage.getItem("whatshopify_token"));
 
     console.log("@tokenData", tokenData);
 

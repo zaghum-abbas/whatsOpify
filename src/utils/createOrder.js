@@ -3,16 +3,16 @@ export const createOrder = async (orderData) => {
   try {
     console.log("📦 Order payload:", JSON.stringify(orderData, null, 2));
 
-    const whatsopifyTokenRaw = localStorage.getItem('whatsopify_token'); 
+    const whatshopifyTokenRaw = localStorage.getItem('whatshopify_token'); 
     
-    if (!whatsopifyTokenRaw) {
+    if (!whatshopifyTokenRaw) {
       console.error("❌ No auth token found in localStorage - please login first.");
       throw new Error("No auth token found - please login first.");
     }
 
     let tokenObj;
     try {
-      tokenObj = JSON.parse(whatsopifyTokenRaw);
+      tokenObj = JSON.parse(whatshopifyTokenRaw);
     } catch (parseError) {
       console.error("❌ Failed to parse token from localStorage:", parseError);
       throw new Error("Invalid token format in localStorage.");

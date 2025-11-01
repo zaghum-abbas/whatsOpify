@@ -29,7 +29,7 @@ import './ChatListEnhancer.css';
 // }
 
 // function injectStarIcon(chatNode, starredChats) {
-//   if (chatNode.querySelector('.whatsopify-star-btn')) return;
+//   if (chatNode.querySelector('.whatshopify-star-btn')) return;
 
 //   const nameSpan = chatNode.querySelector('span[title][dir="auto"]');
 //   if (!nameSpan) return;
@@ -38,7 +38,7 @@ import './ChatListEnhancer.css';
 //   const isStarred = starredChats?.includes(chatName);
 
 //   const starBtn = document.createElement('button');
-//   starBtn.className = 'whatsopify-star-btn';
+//   starBtn.className = 'whatshopify-star-btn';
 //   starBtn.innerHTML = getStarSvg(isStarred);
 //   starBtn.title = 'Add to Favorites';
 //   starBtn.dataset.filled = isStarred;
@@ -65,15 +65,15 @@ import './ChatListEnhancer.css';
 // }
 
 // function injectIcons(chatNode) {
-//   if (chatNode.querySelector('.whatsopify-action-buttons')) return;
+//   if (chatNode.querySelector('.whatshopify-action-buttons')) return;
 
 //   const iconContainer = document.createElement('div');
-//   iconContainer.className = 'whatsopify-action-buttons';
+//   iconContainer.className = 'whatshopify-action-buttons';
 //   iconContainer.style.setProperty('--icon-count', icons.length);
 
 //   icons.forEach(({ label, svg, color }) => {
 //     const btn = document.createElement('button');
-//     btn.className = 'whatsopify-action-btn';
+//     btn.className = 'whatshopify-action-btn';
 //     btn.innerHTML = svg;
 //     btn.title = label;
 //     btn.style.color = color;

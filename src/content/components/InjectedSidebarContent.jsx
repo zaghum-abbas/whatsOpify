@@ -614,8 +614,8 @@ const InjectedSidebarContent = ({
         action: "SEARCH_PRODUCTS",
         token: getToken(),
         searchTerm: searchTerm,
-        storeId: localStorage.getItem("whatsopify_selected_store")
-          ? JSON.parse(localStorage.getItem("whatsopify_selected_store"))?._id
+        storeId: localStorage.getItem("whatshopify_selected_store")
+          ? JSON.parse(localStorage.getItem("whatshopify_selected_store"))?._id
           : null,
       });
 

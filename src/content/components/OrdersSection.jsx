@@ -45,7 +45,7 @@ const OrdersSection = ({ whatsappTheme }) => {
       setError(null);
 
       const selectedStore = JSON.parse(
-        localStorage.getItem("whatsopify_selected_store")
+        localStorage.getItem("whatshopify_selected_store")
       );
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_ORDERS",
@@ -131,7 +131,7 @@ const OrdersSection = ({ whatsappTheme }) => {
     try {
       console.log(`[ORDERS] Updating order ${orderId} status to ${newStatus}`);
 
-      const tokenData = localStorage.getItem("whatsopify_token");
+      const tokenData = localStorage.getItem("whatshopify_token");
       if (!tokenData) {
         throw new Error("No authentication token found");
       }
@@ -144,7 +144,7 @@ const OrdersSection = ({ whatsappTheme }) => {
       }
 
       // Get selected store ID
-      const selectedStore = localStorage.getItem("whatsopify_selected_store");
+      const selectedStore = localStorage.getItem("whatshopify_selected_store");
       let storeId = "";
       if (selectedStore) {
         try {
@@ -181,7 +181,7 @@ const OrdersSection = ({ whatsappTheme }) => {
 
   const handleWhatsAppRedirect = async (order, status) => {
     console.log("status", status);
-    const data = localStorage.getItem("whatsopify_token");
+    const data = localStorage.getItem("whatshopify_token");
     const store = JSON.parse(data)?.data?.stores;
     const phoneNumber = order?.shipmentDetails?.addresses[0]?.phone;
     const customerName = order?.shipmentDetails?.addresses[0]?.name;

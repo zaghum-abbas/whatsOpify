@@ -1,5 +1,5 @@
 /* Star Button */
-.whatsopify-star-btn {
+.whatshopify-star-btn {
   background: transparent;
   border: none;
   padding: 0 4px;
@@ -12,22 +12,22 @@
   vertical-align: middle;
 }
 
-.whatsopify-star-btn:hover {
+.whatshopify-star-btn:hover {
   color: #ffc107;
 }
 
-.whatsopify-star-btn svg {
+.whatshopify-star-btn svg {
   width: 16px;
   height: 16px;
   display: block;
   pointer-events: none; /* ensures only button receives the click */
 }
-.whatsopify-star-btn svg {
+.whatshopify-star-btn svg {
   pointer-events: none; /* ensures only button receives the click */
 }
 
 /* Action Buttons Container */
-.whatsopify-actions-container {
+.whatshopify-actions-container {
   display: none;
   position: absolute;
   top: 8px;
@@ -40,12 +40,12 @@
   z-index: 100;
 }
 
-[role="listitem"]:hover .whatsopify-actions-container {
+[role="listitem"]:hover .whatshopify-actions-container {
   display: flex;
 }
 
 /* Action Buttons */
-.whatsopify-action-btn {
+.whatshopify-action-btn {
   background: none;
   border: none;
   padding: 4px;
@@ -60,12 +60,12 @@
   height: 24px;
 }
 
-.whatsopify-action-btn:hover {
+.whatshopify-action-btn:hover {
   background: rgba(0, 0, 0, 0.05);
   color: var(--color, inherit);
 }
 
-.whatsopify-action-btn svg {
+.whatshopify-action-btn svg {
   width: 16px;
   height: 16px;
   display: block;

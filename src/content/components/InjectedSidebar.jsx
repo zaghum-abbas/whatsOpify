@@ -325,10 +325,10 @@ waitForElement("body", (bodyElement) => {
 // Inject ChatListEnhancer
 // ... (Your existing ChatListEnhancer injection code remains the same) ...
 waitForElement("body", (bodyElement) => {
-  if (document.getElementById("whatsopify-chat-enhancer-root")) return;
+  if (document.getElementById("whatshopify-chat-enhancer-root")) return;
 
   const enhancerContainer = document.createElement("div");
-  enhancerContainer.id = "whatsopify-chat-enhancer-root";
+  enhancerContainer.id = "whatshopify-chat-enhancer-root";
   bodyElement.appendChild(enhancerContainer);
 
   const root = createRoot(enhancerContainer);

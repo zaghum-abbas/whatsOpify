@@ -278,8 +278,8 @@ const ModalForm = ({ onClose, theme }) => {
         searchTerm: searchTerm,
         page: page,
         limit: productsPerPage,
-        storeId: localStorage.getItem("whatsopify_selected_store")
-          ? JSON.parse(localStorage.getItem("whatsopify_selected_store"))?._id
+        storeId: localStorage.getItem("whatshopify_selected_store")
+          ? JSON.parse(localStorage.getItem("whatshopify_selected_store"))?._id
           : null,
       });
 

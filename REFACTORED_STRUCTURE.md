@@ -199,7 +199,7 @@ const order = await apiService.createOrder(orderData);
 
    ```javascript
    // Old
-   const token = localStorage.getItem("whatsopify_token");
+   const token = localStorage.getItem("whatshopify_token");
 
    // New
    import { useAuth } from "../hooks/useAuth.js";

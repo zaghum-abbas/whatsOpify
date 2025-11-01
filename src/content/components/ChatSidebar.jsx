@@ -631,6 +631,7 @@ const ChatSidebar = ({
   catalog = [],
   notes = "",
   onNotesChange,
+  onTagsChange,
 }) => {
   const theme = useTheme();
 
@@ -638,6 +639,8 @@ const ChatSidebar = ({
   const [search, setSearch] = useState("");
   const [filteredCatalog, setFilteredCatalog] = useState(catalog);
   const [isSearching, setIsSearching] = useState(false);
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState([]);
 
   // User orders state
   const [userOrders, setUserOrders] = useState({
@@ -666,13 +669,14 @@ const ChatSidebar = ({
 
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_USER_ORDERS",
-        token: localStorage.getItem("whatsopify_token")
-          ? JSON.parse(localStorage.getItem("whatsopify_token"))?.data?.token ||
-            JSON.parse(localStorage.getItem("whatsopify_token"))?.token
+        token: localStorage.getItem("whatshopify_token")
+          ? JSON.parse(localStorage.getItem("whatshopify_token"))?.data
+              ?.token ||
+            JSON.parse(localStorage.getItem("whatshopify_token"))?.token
           : null,
         phone: formatPhoneNumber(phoneNumber),
-        storeId: localStorage.getItem("whatsopify_selected_store")
-          ? JSON.parse(localStorage.getItem("whatsopify_selected_store"))?._id
+        storeId: localStorage.getItem("whatshopify_selected_store")
+          ? JSON.parse(localStorage.getItem("whatshopify_selected_store"))?._id
           : null,
       });
 
@@ -715,13 +719,14 @@ const ChatSidebar = ({
 
       const response = await chrome.runtime.sendMessage({
         action: "SEARCH_PRODUCTS",
-        token: localStorage.getItem("whatsopify_token")
-          ? JSON.parse(localStorage.getItem("whatsopify_token"))?.data?.token ||
-            JSON.parse(localStorage.getItem("whatsopify_token"))?.token
+        token: localStorage.getItem("whatshopify_token")
+          ? JSON.parse(localStorage.getItem("whatshopify_token"))?.data
+              ?.token ||
+            JSON.parse(localStorage.getItem("whatshopify_token"))?.token
           : null,
         searchTerm: searchTerm,
-        storeId: localStorage.getItem("whatsopify_selected_store")
-          ? JSON.parse(localStorage.getItem("whatsopify_selected_store"))?._id
+        storeId: localStorage.getItem("whatshopify_selected_store")
+          ? JSON.parse(localStorage.getItem("whatshopify_selected_store"))?._id
           : null,
       });
 
@@ -848,9 +853,10 @@ const ChatSidebar = ({
 
       const response = await chrome.runtime.sendMessage({
         action: "FETCH_PRODUCTS",
-        token: localStorage.getItem("whatsopify_token")
-          ? JSON.parse(localStorage.getItem("whatsopify_token"))?.data?.token ||
-            JSON.parse(localStorage.getItem("whatsopify_token"))?.token
+        token: localStorage.getItem("whatshopify_token")
+          ? JSON.parse(localStorage.getItem("whatshopify_token"))?.data
+              ?.token ||
+            JSON.parse(localStorage.getItem("whatshopify_token"))?.token
           : null,
         storeId: storeId,
       });
@@ -968,7 +974,7 @@ const ChatSidebar = ({
     try {
       console.log(`[ORDERS] Updating order ${orderId} status to ${newStatus}`);
 
-      const tokenData = localStorage.getItem("whatsopify_token");
+      const tokenData = localStorage.getItem("whatshopify_token");
       if (!tokenData) {
         throw new Error("No authentication token found");
       }
@@ -981,7 +987,7 @@ const ChatSidebar = ({
       }
 
       // Get selected store ID
-      const selectedStore = localStorage.getItem("whatsopify_selected_store");
+      const selectedStore = localStorage.getItem("whatshopify_selected_store");
       let storeId = "";
       if (selectedStore) {
         try {
@@ -1018,7 +1024,7 @@ const ChatSidebar = ({
 
   const handleWhatsAppRedirect = async (order, status) => {
     console.log("Order Status", status, order);
-    const data = localStorage.getItem("whatsopify_token");
+    const data = localStorage.getItem("whatshopify_token");
     const store = JSON.parse(data)?.data?.stores;
     const phoneNumber = userOrders?.userInfo?.phone;
     const customerName = userOrders?.userInfo?.name;
@@ -1135,6 +1141,19 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
     } else {
       console.warn("[ORDERS] No phone number found for order:", order);
     }
+  };
+
+  const handleAddTag = () => {
+    if (tagInput.trim()) {
+      const newTags = [...(tags || []), tagInput.trim()];
+      setTags(newTags);
+      setTagInput("");
+    }
+  };
+
+  const handleRemoveTag = (index) => {
+    const newTags = tags.filter((_, i) => i !== index);
+    setTags(newTags);
   };
 
   return (
@@ -2037,6 +2056,162 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
             value={notes || ""}
             onChange={(e) => onNotesChange && onNotesChange(e.target.value)}
           />
+        </div>
+      </section>
+      {/* Tags Section */}
+      <section style={{ marginBottom: "10px" }}>
+        <div
+          style={{
+            background: theme === "dark" ? "#23272a" : "#fff",
+            borderRadius: "10px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+            padding: "16px",
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            color: theme === "dark" ? "white" : "#222",
+          }}
+        >
+          <h2
+            style={{
+              margin: "0 0 12px 0",
+              fontSize: "1.1rem",
+              fontWeight: "600",
+              color: theme === "dark" ? "white" : "#222",
+            }}
+          >
+            Tags
+          </h2>
+
+          {/* Input and Add Button */}
+          <div
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginBottom: "12px",
+            }}
+          >
+            <input
+              type="text"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === "Enter" && tagInput.trim()) {
+                  handleAddTag();
+                }
+              }}
+              placeholder="Add a tag"
+              style={{
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: "6px",
+                border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+                fontSize: "0.95rem",
+                backgroundColor: theme === "dark" ? "#23272a" : "#fff",
+                color: theme === "dark" ? "white" : "#222",
+                boxSizing: "border-box",
+              }}
+            />
+            <button
+              onClick={handleAddTag}
+              disabled={!tagInput.trim()}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: tagInput.trim()
+                  ? theme === "dark"
+                    ? "#25d366"
+                    : "#25d366"
+                  : theme === "dark"
+                  ? "#333"
+                  : "#e2e8f0",
+                color: tagInput.trim()
+                  ? "white"
+                  : theme === "dark"
+                  ? "#666"
+                  : "#999",
+                border: "none",
+                borderRadius: "6px",
+                cursor: tagInput.trim() ? "pointer" : "not-allowed",
+                fontSize: "0.95rem",
+                fontWeight: "500",
+                transition: "all 0.2s",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Add
+            </button>
+          </div>
+
+          {/* Tags Display */}
+          {tags && tags.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "8px",
+              }}
+            >
+              {tags.map((tag, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "6px 10px",
+                    backgroundColor: theme === "dark" ? "#1a1a1a" : "#f5f5f5",
+                    borderRadius: "16px",
+                    fontSize: "0.875rem",
+                    border: `1px solid ${
+                      theme === "dark" ? "#333" : "#e2e8f0"
+                    }`,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "12px",
+                      color: theme === "dark" ? "#999" : "#666",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    🏷️
+                  </span>
+                  <span
+                    style={{
+                      color: theme === "dark" ? "white" : "#222",
+                      fontWeight: "400",
+                    }}
+                  >
+                    {tag}
+                  </span>
+                  <button
+                    onClick={() => handleRemoveTag(index)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "0",
+                      margin: "0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: theme === "dark" ? "#999" : "#666",
+                      fontSize: "14px",
+                      lineHeight: "1",
+                      transition: "color 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.color = theme === "dark" ? "#fff" : "#000";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.color = theme === "dark" ? "#999" : "#666";
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
       {/* Catalog Section */}

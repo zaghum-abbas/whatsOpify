@@ -18,7 +18,7 @@ const CustomerSupportMessages = ({ userOrders }) => {
 
   const selectedStore = useMemo(() => {
     try {
-      const store = localStorage.getItem("whatsopify_selected_store");
+      const store = localStorage.getItem("Whatshopify_selected_store");
       return store ? JSON.parse(store) : null;
     } catch (error) {
       console.error("Error parsing selected store:", error);
@@ -143,7 +143,7 @@ We’ll notify you as soon as it’s shipped and share the tracking link for eas
             label: "Payment Received",
             message: `💰 Payment Received! 🎉
 
-We’ve successfully received your payment for order #${userOrders?.userInfo?.name} 💵
+We’ve successfully received your payment for order #${latestOrder?.name} 💵
 
 🧾 Amount: ${latestOrder?.prepaid_amount}
 📅 Received on: ${latestOrder?.paymentDate}
@@ -184,7 +184,7 @@ Your feedback means a lot — thank you for shopping with ${selectedStore?.name}
             label: "Exchange / Return Initiated",
             message: `🔁 Return / Exchange Request Received!
 
-Hi ${userOrders?.userInfo?.name}, we’ve received your request for a return/exchange of ${latestOrder?.products?.[0]?.name} from your order #${userOrders?.userInfo?.name}.
+Hi ${userOrders?.userInfo?.name}, we’ve received your request for a return/exchange of ${latestOrder?.products?.[0]?.name} from your order #${latestOrder?.name}.
 
 Our team will review it shortly and update you on the next steps.
 🕒 Please allow 24–48 hours for processing.
@@ -509,13 +509,13 @@ Could you please confirm if:
         {/* Tab Content */}
         <div
           style={{
-            padding: "16px",
+            padding: "8px",
             // minHeight: "200px",
             maxHeight: "300px",
             overflowY: "auto",
             display: "flex",
             flexWrap: "wrap",
-            gap: "8px",
+            gap: "4px",
           }}
         >
           {supportTemplates[activeTab]?.messages.map((msg, i) => (
@@ -527,17 +527,22 @@ Could you please confirm if:
                 background: "transparent",
                 border: `1px solid ${theme === "dark" ? "#333" : "#e9edef"}`,
                 borderRadius: "6px",
-                padding: "10px 12px",
+                padding: "6px",
                 textAlign: "left",
                 cursor: isLoadingContact ? "not-allowed" : "pointer",
                 color: theme === "dark" ? "white" : "black",
-                fontSize: "0.9rem",
+                fontSize: "14px",
+                fontWeight: "400px",
                 transition: "all 0.2s",
                 // marginBottom: "8px",
+                maxWidth: "200px",
+                textOverflow: "ellipsis",
+                overflow: "hidden",
+                whiteSpace: "nowrap",
                 opacity: isLoadingContact ? 0.7 : 1,
               }}
             >
-              <strong>{msg.label}</strong>
+              {msg.label}
               {/* <div
                 style={{
                   fontSize: "0.8rem",

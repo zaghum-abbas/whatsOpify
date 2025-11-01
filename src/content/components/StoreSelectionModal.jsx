@@ -26,7 +26,7 @@ const StoreSelectionModal = ({ isOpen, onStoreSelect, onClose }) => {
 
           // ✅ Check for store saved in localStorage
           const savedStore = JSON.parse(
-            localStorage.getItem("whatsopify_selected_store")
+            localStorage.getItem("whatshopify_selected_store")
           );
 
           console.log("savedStore", savedStore);
@@ -67,7 +67,7 @@ const StoreSelectionModal = ({ isOpen, onStoreSelect, onClose }) => {
   const handleConfirmSelection = (store, storeId) => {
     if (store && storeId) {
       // Save selected store to localStorage
-      localStorage.setItem("whatsopify_selected_store", JSON.stringify(store));
+      localStorage.setItem("whatshopify_selected_store", JSON.stringify(store));
 
       // Update global store ID
       window.whatsapofyProducts.storeId = storeId;

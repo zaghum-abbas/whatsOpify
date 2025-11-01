@@ -15,11 +15,11 @@ export const API_CONFIG = {
 
 // Storage Keys
 export const STORAGE_KEYS = {
-  TOKEN: "whatsopify_token",
-  PRODUCTS_CACHE: "whatsopify_products_cache",
-  STORES_CACHE: "whatsopify_stores_cache",
-  USER_INFO_CACHE: "whatsopify_user_info_cache",
-  SETTINGS: "whatsopify_settings",
+  TOKEN: "whatshopify_token",
+  PRODUCTS_CACHE: "whatshopify_products_cache",
+  STORES_CACHE: "whatshopify_stores_cache",
+  USER_INFO_CACHE: "whatshopify_user_info_cache",
+  SETTINGS: "whatshopify_settings",
 };
 
 // UI Constants

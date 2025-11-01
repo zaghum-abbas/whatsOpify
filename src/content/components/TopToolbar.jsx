@@ -217,7 +217,7 @@ const TopToolbar = (props) => {
   };
 
   const handleToolbarLogout = () => {
-    const keysToRemove = [TOKEN_KEY, "whatsopify_selected_store"];
+    const keysToRemove = [TOKEN_KEY, "Whatshopify_selected_store"];
     keysToRemove.forEach((key) => localStorage.removeItem(key));
     ["session"].forEach((cookieName) => {
       document.cookie = `${cookieName}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
@@ -503,7 +503,7 @@ const TopToolbar = (props) => {
         <div
           style={{ fontSize: "1.125rem", fontWeight: "bold", color: "#10B981" }}
         >
-          Whatsopify
+          Whatshopify
         </div>
         <button
           onClick={() => handleClick("Notifications")}

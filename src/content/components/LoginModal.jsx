@@ -36,10 +36,10 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
       if (response.ok) {
         const responseData = await response.json();
-        localStorage.setItem("whatsopify_token", JSON.stringify(responseData));
+        localStorage.setItem("whatshopify_token", JSON.stringify(responseData));
         window.dispatchEvent(
           new StorageEvent("storage", {
-            key: "whatsopify_token",
+            key: "whatshopify_token",
             newValue: responseData,
           })
         );
@@ -58,7 +58,7 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
 
             // Save selected store to localStorage
             localStorage.setItem(
-              "whatsopify_selected_store",
+              "whatshopify_selected_store",
               JSON.stringify(singleStore)
             );
 
@@ -173,7 +173,7 @@ const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             marginBottom: "20px",
           }}
         >
-          <h2 style={{ margin: 0, color: "#333" }}>Login to Whatsopify</h2>
+          <h2 style={{ margin: 0, color: "#333" }}>Login to Whatshopify</h2>
           <button
             onClick={onClose}
             style={{

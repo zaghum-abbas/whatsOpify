@@ -26,7 +26,7 @@ console.log("🚀 Whatsapofy content script loaded at 12:30 PM PKT, 17/07/2025")
 
 // Utility function to get selected store ID
 function getSelectedStoreId() {
-  const selectedStore = localStorage.getItem("whatsopify_selected_store");
+  const selectedStore = localStorage.getItem("whatshopify_selected_store");
   if (selectedStore) {
     try {
       const store = JSON.parse(selectedStore);
@@ -290,39 +290,39 @@ async function fetchUserInfo() {
 
     let token = null;
     try {
-      const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
-      if (whatsopifyTokenRaw) {
-        const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
+      const whatshopifyTokenRaw = localStorage.getItem("whatshopify_token");
+      if (whatshopifyTokenRaw) {
+        const whatshopifyTokenObj = JSON.parse(whatshopifyTokenRaw);
 
         // Handle both old and new token structures
         if (
-          whatsopifyTokenObj &&
-          whatsopifyTokenObj.data &&
-          whatsopifyTokenObj.data.token
+          whatshopifyTokenObj &&
+          whatshopifyTokenObj.data &&
+          whatshopifyTokenObj.data.token
         ) {
           // New structure: { data: { token: "...", user: {...}, stores: [...] } }
-          token = whatsopifyTokenObj.data.token;
-          if (whatsopifyTokenObj.data.user) {
+          token = whatshopifyTokenObj.data.token;
+          if (whatshopifyTokenObj.data.user) {
             console.log(
               "[USER] Found user info in token data (new structure):",
-              whatsopifyTokenObj.data.user
+              whatshopifyTokenObj.data.user
             );
-            userInfoCache = whatsopifyTokenObj.data.user;
+            userInfoCache = whatshopifyTokenObj.data.user;
             window.whatsapofyUserInfo.userInfo = userInfoCache;
             userInfoLoading = false;
             userInfoListeners.forEach((fn) => fn(userInfoCache)); // Pass data to listeners
             userInfoListeners = []; // Clear listeners
             return;
           }
-        } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
+        } else if (whatshopifyTokenObj && whatshopifyTokenObj.token) {
           // Old structure: { token: "...", user: {...}, stores: [...] }
-          token = whatsopifyTokenObj.token;
-          if (whatsopifyTokenObj.user) {
+          token = whatshopifyTokenObj.token;
+          if (whatshopifyTokenObj.user) {
             console.log(
               "[USER] Found user info in token data (old structure):",
-              whatsopifyTokenObj.user
+              whatshopifyTokenObj.user
             );
-            userInfoCache = whatsopifyTokenObj.user;
+            userInfoCache = whatshopifyTokenObj.user;
             window.whatsapofyUserInfo.userInfo = userInfoCache;
             userInfoLoading = false;
             userInfoListeners.forEach((fn) => fn(userInfoCache)); // Pass data to listeners
@@ -407,7 +407,7 @@ async function fetchStoresForUser() {
 
     // First check if stores are available in localStorage (from login response)
     try {
-      const tokenData = localStorage.getItem("whatsopify_token");
+      const tokenData = localStorage.getItem("whatshopify_token");
       if (tokenData) {
         const parsed = JSON.parse(tokenData);
 
@@ -458,17 +458,17 @@ async function fetchStoresForUser() {
     // Get token for API call
     let token = null;
     try {
-      const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
-      if (whatsopifyTokenRaw) {
-        const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
+      const whatshopifyTokenRaw = localStorage.getItem("whatshopify_token");
+      if (whatshopifyTokenRaw) {
+        const whatshopifyTokenObj = JSON.parse(whatshopifyTokenRaw);
         if (
-          whatsopifyTokenObj &&
-          whatsopifyTokenObj.data &&
-          whatsopifyTokenObj.data.token
+          whatshopifyTokenObj &&
+          whatshopifyTokenObj.data &&
+          whatshopifyTokenObj.data.token
         ) {
-          token = whatsopifyTokenObj.data.token;
-        } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
-          token = whatsopifyTokenObj.token;
+          token = whatshopifyTokenObj.data.token;
+        } else if (whatshopifyTokenObj && whatshopifyTokenObj.token) {
+          token = whatshopifyTokenObj.token;
         }
       }
     } catch (err) {
@@ -1040,7 +1040,7 @@ function observeActiveChat() {
 
 window.toggleWhatsappSidebar = async (open) => {
   // Check if user is logged in
-  const token = localStorage.getItem("whatsopify_token");
+  const token = localStorage.getItem("whatshopify_token");
   const isLoggedIn = token && token !== "null" && token !== '""';
 
   // If trying to open sidebar and user is not logged in, don't open
@@ -1174,7 +1174,7 @@ window.toggleWhatsappSidebar = async (open) => {
 
 // --- Listen for login/logout/account switch and refresh sidebar ---
 window.addEventListener("storage", (event) => {
-  if (event.key === "whatsopify_token") {
+  if (event.key === "whatshopify_token") {
     const newValue = event.newValue;
     if (!newValue || newValue === "null" || newValue === '""') {
       // Logout: close sidebar and clear caches
@@ -1287,8 +1287,8 @@ function injectTopToolbarIntoWhatsAppBody() {
       // whatsappMainBodyContainer.style.paddingTop = TOOLBAR_HEIGHT;
 
       // Initialize sidebar state - don't open automatically, wait for store selection
-      const token = localStorage.getItem("whatsopify_token");
-      const selectedStore = localStorage.getItem("whatsopify_selected_store");
+      const token = localStorage.getItem("whatshopify_token");
+      const selectedStore = localStorage.getItem("whatshopify_selected_store");
       const isLoggedIn = token && token !== "null" && token !== '""';
       const hasSelectedStore =
         selectedStore && selectedStore !== "null" && selectedStore !== '""';
@@ -1382,13 +1382,13 @@ function injectChatHeaderHover() {
 // Inject ChatListEnhancer (floating element, needs 'body' as parent)
 function injectChatListEnhancer() {
   waitForElement("body", (bodyElement) => {
-    if (document.getElementById("whatsopify-chat-enhancer-root")) {
+    if (document.getElementById("whatshopify-chat-enhancer-root")) {
       console.log("⚠️ ChatListEnhancer already injected. Skipping injection.");
       return;
     }
 
     const enhancerContainer = document.createElement("div");
-    enhancerContainer.id = "whatsopify-chat-enhancer-root";
+    enhancerContainer.id = "whatshopify-chat-enhancer-root";
     // This element is intended to float, so appending to body is fine
     bodyElement.appendChild(enhancerContainer);
 
@@ -2157,7 +2157,7 @@ window.testProductsFetch = function () {
 
 window.testNewProductsAPI = function () {
   console.log("[PRODUCTS] 🧪 Testing new products API endpoint...");
-  const token = localStorage.getItem("whatsopify_token");
+  const token = localStorage.getItem("whatshopify_token");
   if (!token) {
     console.error("[PRODUCTS] No token found");
     return;
@@ -2297,27 +2297,27 @@ window.debugTokenIssue = function () {
   console.log("[DEBUG] 🔑 Token debugging:");
 
   // Check localStorage
-  const whatsopifyTokenRaw = localStorage.getItem("whatsopify_token");
-  console.log("[DEBUG] Raw token from localStorage:", whatsopifyTokenRaw);
+  const whatshopifyTokenRaw = localStorage.getItem("whatshopify_token");
+  console.log("[DEBUG] Raw token from localStorage:", whatshopifyTokenRaw);
 
-  if (whatsopifyTokenRaw) {
+  if (whatshopifyTokenRaw) {
     try {
-      const whatsopifyTokenObj = JSON.parse(whatsopifyTokenRaw);
-      console.log("[DEBUG] Parsed token object:", whatsopifyTokenObj);
+      const whatshopifyTokenObj = JSON.parse(whatshopifyTokenRaw);
+      console.log("[DEBUG] Parsed token object:", whatshopifyTokenObj);
 
       let token = null;
       if (
-        whatsopifyTokenObj &&
-        whatsopifyTokenObj.data &&
-        whatsopifyTokenObj.data.token
+        whatshopifyTokenObj &&
+        whatshopifyTokenObj.data &&
+        whatshopifyTokenObj.data.token
       ) {
-        token = whatsopifyTokenObj.data.token;
+        token = whatshopifyTokenObj.data.token;
         console.log(
           "[DEBUG] Token from new structure:",
           token ? token.substring(0, 20) + "..." : "undefined"
         );
-      } else if (whatsopifyTokenObj && whatsopifyTokenObj.token) {
-        token = whatsopifyTokenObj.token;
+      } else if (whatshopifyTokenObj && whatshopifyTokenObj.token) {
+        token = whatshopifyTokenObj.token;
         console.log(
           "[DEBUG] Token from old structure:",
           token ? token.substring(0, 20) + "..." : "undefined"
@@ -2549,16 +2549,16 @@ Object.assign(window.whatsapofyProducts, {
 // Auto-send WhatsApp message functionality using chrome.storage.local
 let autoSendAttempted = false; // Flag to prevent multiple sends
 
-window.whatsopifyAutoSendCheck = () => {
+window.whatshopifyAutoSendCheck = () => {
   chrome.storage.local.get(
     [
-      "whatsopify_auto_send",
-      "whatsopify_auto_message",
-      "whatsopify_auto_phone",
-      "whatsopify_auto_timestamp",
+      "whatshopify_auto_send",
+      "whatshopify_auto_message",
+      "whatshopify_auto_phone",
+      "whatshopify_auto_timestamp",
     ],
     (result) => {
-      if (result.whatsopify_auto_send === true && !autoSendAttempted) {
+      if (result.whatshopify_auto_send === true && !autoSendAttempted) {
         console.log("[CONTENT] Auto-send flag detected on page load...");
 
         const autoSendWhatsAppMessage = () => {
@@ -2569,8 +2569,8 @@ window.whatsopifyAutoSendCheck = () => {
               return;
             }
 
-            const autoMessage = result.whatsopify_auto_message;
-            const timestamp = result.whatsopify_auto_timestamp;
+            const autoMessage = result.whatshopify_auto_message;
+            const timestamp = result.whatshopify_auto_timestamp;
 
             if (!autoMessage) return;
 
@@ -2580,10 +2580,10 @@ window.whatsopifyAutoSendCheck = () => {
             if (now - requestTime > 30000) {
               // Clear old request
               chrome.storage.local.remove([
-                "whatsopify_auto_send",
-                "whatsopify_auto_message",
-                "whatsopify_auto_phone",
-                "whatsopify_auto_timestamp",
+                "whatshopify_auto_send",
+                "whatshopify_auto_message",
+                "whatshopify_auto_phone",
+                "whatshopify_auto_timestamp",
               ]);
               return;
             }
@@ -2667,10 +2667,10 @@ window.whatsopifyAutoSendCheck = () => {
 
               // Clear the auto-send flags
               chrome.storage.local.remove([
-                "whatsopify_auto_send",
-                "whatsopify_auto_message",
-                "whatsopify_auto_phone",
-                "whatsopify_auto_timestamp",
+                "whatshopify_auto_send",
+                "whatshopify_auto_message",
+                "whatshopify_auto_phone",
+                "whatshopify_auto_timestamp",
               ]);
 
               console.log("[CONTENT] ✅ Auto-send completed");
@@ -2697,7 +2697,7 @@ window.whatsopifyAutoSendCheck = () => {
 };
 
 // Call auto-send check on page load
-window.whatsopifyAutoSendCheck();
+window.whatshopifyAutoSendCheck();
 
 // Also set up a MutationObserver to detect when WhatsApp interface is ready
 const observer = new MutationObserver((mutations) => {
@@ -2728,7 +2728,7 @@ const observer = new MutationObserver((mutations) => {
         console.log(
           "[CONTENT] WhatsApp interface elements detected, checking for auto-send..."
         );
-        setTimeout(() => window.whatsopifyAutoSendCheck(), 1000);
+        setTimeout(() => window.whatshopifyAutoSendCheck(), 1000);
       }
     }
   });
@@ -2741,7 +2741,7 @@ observer.observe(document.body, {
 });
 
 // --- Listen for 401 unauthorized events from background script ---
-window.addEventListener("whatsopify-unauthorized", (event) => {
+window.addEventListener("whatshopify-unauthorized", (event) => {
   console.log("[CONTENT] Received unauthorized event:", event.detail);
 
   // Clear all caches
@@ -2813,7 +2813,7 @@ window.showAuthExpiredNotification = showAuthExpiredNotification;
 
 // Global function to check if store is selected and show modal if not
 window.requireStoreSelection = function (callback) {
-  const selectedStore = localStorage.getItem("whatsopify_selected_store");
+  const selectedStore = localStorage.getItem("whatshopify_selected_store");
   const hasSelectedStore =
     selectedStore && selectedStore !== "null" && selectedStore !== '""';
 
@@ -2837,7 +2837,7 @@ window.refreshOrders = function (callback) {
   console.log("[ORDERS] Global refresh orders called");
 
   // Get selected store ID
-  const selectedStore = localStorage.getItem("whatsopify_selected_store");
+  const selectedStore = localStorage.getItem("whatshopify_selected_store");
   let storeId = "default";
   if (selectedStore) {
     try {
@@ -2915,7 +2915,7 @@ async function fetchProductsFromAPIForStore(storeId, callback) {
   try {
     console.log(`[PRODUCTS] Fetching products for store: ${storeId}`);
 
-    const token = localStorage.getItem("whatsopify_token");
+    const token = localStorage.getItem("whatshopify_token");
     if (!token) {
       throw new Error("No authentication token found");
     }
@@ -3011,7 +3011,7 @@ window.openAddProductSidebar = function () {
   console.log("🛍️ Opening Add Product sidebar...");
 
   // Check if user is logged in
-  const token = localStorage.getItem("whatsopify_token");
+  const token = localStorage.getItem("whatshopify_token");
   const isLoggedIn = token && token !== "null" && token !== '""';
 
   if (!isLoggedIn) {

@@ -22,17 +22,17 @@ const ThreeDotsPopup = ({
 
   useEffect(() => {
     const savedStore = JSON.parse(
-      localStorage.getItem("whatsopify_selected_store")
+      localStorage.getItem("whatshopify_selected_store")
     );
-    const userInfo = JSON.parse(localStorage.getItem("whatsopify_token"));
+    const userInfo = JSON.parse(localStorage.getItem("whatshopify_token"));
     console.log("userInfo", userInfo?.data);
     setUserDetails({
       userEmail: userInfo?.data?.user?.email,
       userSelectedStore: savedStore?.name || "",
     });
   }, [
-    localStorage.getItem("whatsopify_token"),
-    localStorage.getItem("whatsopify_selected_store"),
+    localStorage.getItem("whatshopify_token"),
+    localStorage.getItem("whatshopify_selected_store"),
   ]);
 
   useEffect(() => {
@@ -374,7 +374,7 @@ const ThreeDotsPopup = ({
       </button>
       {/* Switch Store Button - Only show when authenticated */}
       {isAuthenticated &&
-        JSON.parse(localStorage.getItem("whatsopify_token"))?.data?.stores
+        JSON.parse(localStorage.getItem("whatshopify_token"))?.data?.stores
           ?.length > 1 && (
           <button
             onClick={() => {
