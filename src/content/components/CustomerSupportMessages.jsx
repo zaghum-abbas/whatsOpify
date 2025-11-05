@@ -18,13 +18,15 @@ const CustomerSupportMessages = ({ userOrders }) => {
 
   const selectedStore = useMemo(() => {
     try {
-      const store = localStorage.getItem("Whatshopify_selected_store");
+      const store = localStorage.getItem("whatshopify_selected_store");
       return store ? JSON.parse(store) : null;
     } catch (error) {
       console.error("Error parsing selected store:", error);
       return null;
     }
-  }, []); // Only parse once, or you can add a dependency if store changes frequently
+  }, [localStorage.getItem("whatshopify_selected_store")]); // Only parse once, or you can add a dependency if store changes frequently
+
+  console.log("🧾 selectedStore", selectedStore);
 
   const [contactName, setContactName] = useState("");
   const [isLoadingContact, setIsLoadingContact] = useState(true);

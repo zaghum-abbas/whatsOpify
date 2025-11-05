@@ -1032,13 +1032,13 @@ const ChatSidebar = ({
     const orderDateTime = formatDate(order?.createdAt);
     const orderId = order?.name;
     const storeName = store?.find((s) => s._id === order?.storeId)?.name ?? "";
-    const orderTotal = formatPrice(order?.amount);
+    const orderTotal = formatPrice(order?.pricing?.currentTotalPrice);
     console.log("store", storeName, store);
 
     try {
-      setUpdatingOrder(order?.orderId);
+      setUpdatingOrder(order?._id);
       if (status !== "resend" || status !== "tracking") {
-        await updateOrderStatus(order?.orderId, status);
+        await updateOrderStatus(order?._id, status);
       }
       if (contact?.phone) {
         fetchUserOrders(contact.phone);
@@ -1678,7 +1678,8 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                 Total:
                               </span>
                               <span style={{ fontWeight: "600" }}>
-                                Rs. {formatPrice(order.amount)}
+                                Rs.{" "}
+                                {formatPrice(order?.pricing?.currentTotalPrice)}
                               </span>
                             </div>
 
@@ -1771,7 +1772,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                             alignContent: "center",
                           }}
                         >
-                          {formatPrice(order.amount)}
+                          {formatPrice(order?.pricing?.currentTotalPrice)}
                         </td>
                         <td
                           style={{
@@ -1810,7 +1811,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                               onClick={() =>
                                 handleWhatsAppRedirect(order, "pending")
                               }
-                              disabled={updatingOrder === order?.orderId}
+                              disabled={updatingOrder === order?._id}
                               style={{
                                 padding: "6px 12px",
                                 backgroundColor: "#25D366",
@@ -1818,16 +1819,15 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                 border: "none",
                                 borderRadius: "4px",
                                 cursor:
-                                  updatingOrder === order?.orderId
+                                  updatingOrder === order?._id
                                     ? "not-allowed"
                                     : "pointer",
                                 fontSize: "12px",
                                 fontWeight: "500",
-                                opacity:
-                                  updatingOrder === order?.orderId ? 0.6 : 1,
+                                opacity: updatingOrder === order?._id ? 0.6 : 1,
                               }}
                             >
-                              {updatingOrder === order?.orderId
+                              {updatingOrder === order?._id
                                 ? "Updating..."
                                 : "Send"}
                             </button>
@@ -1839,7 +1839,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                 onClick={() =>
                                   handleWhatsAppRedirect(order, "confirm")
                                 }
-                                disabled={updatingOrder === order?.orderId}
+                                disabled={updatingOrder === order?._id}
                                 style={{
                                   padding: "6px 12px",
                                   backgroundColor: "#25D366",
@@ -1847,16 +1847,16 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                   border: "none",
                                   borderRadius: "4px",
                                   cursor:
-                                    updatingOrder === order?.orderId
+                                    updatingOrder === order?._id
                                       ? "not-allowed"
                                       : "pointer",
                                   fontSize: "12px",
                                   fontWeight: "500",
                                   opacity:
-                                    updatingOrder === order?.orderId ? 0.6 : 1,
+                                    updatingOrder === order?._id ? 0.6 : 1,
                                 }}
                               >
-                                {updatingOrder === order?.orderId
+                                {updatingOrder === order?._id
                                   ? "Updating..."
                                   : "Confirm"}
                               </button>
@@ -1864,7 +1864,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                 onClick={() =>
                                   handleWhatsAppRedirect(order, "resend")
                                 }
-                                disabled={updatingOrder === order?.orderId}
+                                disabled={updatingOrder === order?._id}
                                 style={{
                                   padding: "6px 12px",
                                   backgroundColor: "#FFA500",
@@ -1872,16 +1872,16 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                   border: "none",
                                   borderRadius: "4px",
                                   cursor:
-                                    updatingOrder === order?.orderId
+                                    updatingOrder === order?._id
                                       ? "not-allowed"
                                       : "pointer",
                                   fontSize: "12px",
                                   fontWeight: "500",
                                   opacity:
-                                    updatingOrder === order?.orderId ? 0.6 : 1,
+                                    updatingOrder === order?._id ? 0.6 : 1,
                                 }}
                               >
-                                {updatingOrder === order?.orderId
+                                {updatingOrder === order?._id
                                   ? "Updating..."
                                   : "Resend"}
                               </button>
@@ -1889,7 +1889,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                 onClick={() =>
                                   handleWhatsAppRedirect(order, "cancel")
                                 }
-                                disabled={updatingOrder === order?.orderId}
+                                disabled={updatingOrder === order?._id}
                                 style={{
                                   padding: "6px 12px",
                                   backgroundColor: "#DC2626",
@@ -1897,16 +1897,16 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                   border: "none",
                                   borderRadius: "4px",
                                   cursor:
-                                    updatingOrder === order?.orderId
+                                    updatingOrder === order?._id
                                       ? "not-allowed"
                                       : "pointer",
                                   fontSize: "12px",
                                   fontWeight: "500",
                                   opacity:
-                                    updatingOrder === order?.orderId ? 0.6 : 1,
+                                    updatingOrder === order?._id ? 0.6 : 1,
                                 }}
                               >
-                                {updatingOrder === order?.orderId
+                                {updatingOrder === order?._id
                                   ? "Updating..."
                                   : "Cancel"}
                               </button>
@@ -1921,7 +1921,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                 onClick={() =>
                                   handleWhatsAppRedirect(order, "tracking")
                                 }
-                                disabled={updatingOrder === order?.orderId}
+                                disabled={updatingOrder === order?._id}
                                 style={{
                                   padding: "6px 12px",
                                   backgroundColor: "#25D366",
@@ -1929,22 +1929,22 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                                   border: "none",
                                   borderRadius: "4px",
                                   cursor:
-                                    updatingOrder === order?.orderId
+                                    updatingOrder === order?._id
                                       ? "not-allowed"
                                       : "pointer",
                                   fontSize: "12px",
                                   fontWeight: "500",
                                   opacity:
-                                    updatingOrder === order?.orderId ? 0.6 : 1,
+                                    updatingOrder === order?._id ? 0.6 : 1,
                                 }}
                               >
-                                {updatingOrder === order?.orderId
+                                {updatingOrder === order?._id
                                   ? "Updating..."
                                   : "Tracking"}
                               </button>
                             )}
                           <a
-                            href={`https://shopilam.com/orders/${order?.orderId}`}
+                            href={`https://shopilam.com/orders/${order?._id}`}
                             target="_blank"
                           >
                             <button

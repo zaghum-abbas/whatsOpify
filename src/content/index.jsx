@@ -145,6 +145,13 @@ let sidebarProps = {
 };
 let lastActiveChatId = null;
 
+// Ensure default mode on page load/reload
+// Reset sidebar mode to default when script loads (page reload)
+console.log("🔄 Page loaded - ensuring sidebar will open in default mode");
+sidebarMode = "default";
+sidebarProps.contact = { name: "", phone: "", about: "" };
+isSidebarOpen = true; // Ensure sidebar is marked as open on page load
+
 // Function to switch sidebar mode
 const switchSidebarMode = (mode) => {
   console.log("🚀 switchSidebarMode called with:", mode);
@@ -1060,10 +1067,29 @@ window.toggleWhatsappSidebar = async (open) => {
   isSidebarOpen = typeof open === "boolean" ? open : !isSidebarOpen;
   console.log(`Toggling sidebar: ${isSidebarOpen ? "Open" : "Closed"}`);
 
+  // If mainAppContent is not ready, wait for it with retry logic
   if (!mainAppContent) {
-    console.error(
-      "Main WhatsApp content container not found yet for sidebar adjustment!"
+    console.warn(
+      "⚠️ Main WhatsApp content container not found yet, waiting for it..."
     );
+    // Retry up to 10 times with 200ms delay
+    let retryCount = 0;
+    const maxRetries = 10;
+    const checkMainAppContent = setInterval(() => {
+      retryCount++;
+      if (mainAppContent || retryCount >= maxRetries) {
+        clearInterval(checkMainAppContent);
+        if (!mainAppContent) {
+          console.error(
+            "❌ Main WhatsApp content container still not found after retries!"
+          );
+          return;
+        }
+        // Retry the toggle operation now that mainAppContent is ready
+        console.log("✅ Main app content found, retrying sidebar toggle");
+        window.toggleWhatsappSidebar(open);
+      }
+    }, 200);
     return;
   }
 
@@ -1072,18 +1098,11 @@ window.toggleWhatsappSidebar = async (open) => {
   if (isSidebarOpen) {
     // Open sidebar
     const renderSidebarWithData = async () => {
-      // Only initialize to default mode if sidebar is being opened for the first time
-      // Don't reset mode if it's already set (e.g., to "chat")
-      if (!sidebarRoot) {
-        console.log("🆕 First time opening sidebar - setting to default mode");
-        sidebarMode = "default";
-        sidebarProps.contact = { name: "", phone: "", about: "" };
-      } else {
-        console.log(
-          "♻️ Sidebar already initialized - keeping current mode:",
-          sidebarMode
-        );
-      }
+      // ALWAYS ensure default mode on page load/reload
+      // Force default mode every time sidebar is opened (especially on page reload)
+      console.log("🆕 Opening sidebar - forcing default mode on page load");
+      sidebarMode = "default";
+      sidebarProps.contact = { name: "", phone: "", about: "" };
 
       // Fetch user info, stores, and products for initial render
       getUserInfo((userInfo) => {
@@ -1099,8 +1118,8 @@ window.toggleWhatsappSidebar = async (open) => {
               renderSidebar();
             };
             if (sidebarRoot) {
-              console.log("🎨 Initial sidebar render in default mode");
-              renderSidebar();
+              console.log("🎨 Rendering default sidebar on page load");
+              renderSidebar(); // Always call renderSidebar() on page load
             }
           });
         });
@@ -1131,12 +1150,58 @@ window.toggleWhatsappSidebar = async (open) => {
       sidebarRoot = createRoot(sidebarContainer);
       await renderSidebarWithData();
       observeActiveChat();
-      console.log("✅ Sidebar rendered in container.");
-    } else {
+
+      // Ensure sidebar is visible after creation
       sidebarContainer.style.display = "flex";
+      sidebarContainer.style.visibility = "visible";
+      sidebarContainer.style.opacity = "1";
+
+      console.log("✅ Sidebar rendered in container and made visible.");
+
+      // Double-check visibility after a short delay
+      setTimeout(() => {
+        if (sidebarContainer && sidebarContainer.style.display === "none") {
+          console.warn(
+            "⚠️ Sidebar was hidden after creation, forcing it to be visible"
+          );
+          sidebarContainer.style.display = "flex";
+          sidebarContainer.style.visibility = "visible";
+          sidebarContainer.style.opacity = "1";
+        }
+      }, 100);
+    } else {
+      // Sidebar container exists - ALWAYS re-render in default mode on page reload
+      // Ensure sidebar root exists
+      if (!sidebarRoot && sidebarContainer) {
+        sidebarRoot = createRoot(sidebarContainer);
+        console.log("🔄 Created new sidebar root");
+      }
+
+      // ALWAYS force default mode and re-render on page load
+      console.log("🔄 Page reload detected - forcing default sidebar render");
+      sidebarMode = "default";
+      sidebarProps.contact = { name: "", phone: "", about: "" };
+
+      // Always call renderSidebarWithData to ensure renderSidebar() is called
+      renderSidebarWithData();
+
+      // Force sidebar to be visible
+      sidebarContainer.style.display = "flex";
+      sidebarContainer.style.visibility = "visible";
+      sidebarContainer.style.opacity = "1";
       console.log(
-        "✅ Sidebar container shown (not re-rendering to preserve mode)."
+        "✅ Sidebar container shown and re-rendered in default mode."
       );
+
+      // Double-check that sidebar is visible after a short delay
+      setTimeout(() => {
+        if (sidebarContainer && sidebarContainer.style.display === "none") {
+          console.warn("⚠️ Sidebar was hidden, forcing it to be visible");
+          sidebarContainer.style.display = "flex";
+          sidebarContainer.style.visibility = "visible";
+          sidebarContainer.style.opacity = "1";
+        }
+      }, 100);
     }
 
     mainAppContent.style.marginRight = SIDEBAR_WIDTH;
@@ -1294,10 +1359,54 @@ function injectTopToolbarIntoWhatsAppBody() {
         selectedStore && selectedStore !== "null" && selectedStore !== '""';
 
       if (isLoggedIn && hasSelectedStore) {
-        window.toggleWhatsappSidebar(true);
-        console.log(
-          "✅ User is logged in and has selected store - opening sidebar"
-        );
+        // Ensure sidebar opens in default mode on page load
+        sidebarMode = "default";
+        sidebarProps.contact = { name: "", phone: "", about: "" };
+        isSidebarOpen = true; // Explicitly set to open
+
+        // Switch to default sidebar mode first
+        if (typeof window.switchToDefaultSidebar === "function") {
+          window.switchToDefaultSidebar();
+          console.log("✅ Switched to default sidebar mode on page load");
+        }
+
+        // Then open the sidebar with a small delay to ensure DOM is ready
+        setTimeout(() => {
+          window.toggleWhatsappSidebar(true);
+          console.log(
+            "✅ User is logged in and has selected store - opening sidebar in default mode"
+          );
+
+          // Set up a watcher to ensure sidebar stays visible
+          let visibilityCheckCount = 0;
+          const maxVisibilityChecks = 20; // Check for 2 seconds (20 * 100ms)
+          const visibilityWatcher = setInterval(() => {
+            visibilityCheckCount++;
+            const sidebarContainer = document.getElementById(
+              "whatsapp-sidebar-root"
+            );
+            if (sidebarContainer) {
+              const isHidden =
+                sidebarContainer.style.display === "none" ||
+                sidebarContainer.style.visibility === "hidden" ||
+                sidebarContainer.style.opacity === "0";
+
+              if (isHidden && isSidebarOpen) {
+                console.warn(
+                  "⚠️ Sidebar was hidden but should be open, forcing visibility"
+                );
+                sidebarContainer.style.display = "flex";
+                sidebarContainer.style.visibility = "visible";
+                sidebarContainer.style.opacity = "1";
+              }
+            }
+
+            if (visibilityCheckCount >= maxVisibilityChecks) {
+              clearInterval(visibilityWatcher);
+              console.log("✅ Sidebar visibility watcher completed");
+            }
+          }, 100);
+        }, 100);
       } else {
         console.log(
           "ℹ️ Sidebar will remain closed until user logs in and selects a store"
@@ -1559,6 +1668,62 @@ function setupMainContentMarginObserver() {
 
   console.log("👆 Click listener for chat detection setup complete");
 }
+
+// Global sidebar visibility watcher - ensures sidebar stays open on page load
+let sidebarVisibilityWatcher = null;
+
+function startSidebarVisibilityWatcher() {
+  // Clear any existing watcher
+  if (sidebarVisibilityWatcher) {
+    clearInterval(sidebarVisibilityWatcher);
+  }
+
+  // Check if user is logged in and has store selected
+  const token = localStorage.getItem("whatshopify_token");
+  const selectedStore = localStorage.getItem("whatshopify_selected_store");
+  const isLoggedIn = token && token !== "null" && token !== '""';
+  const hasSelectedStore =
+    selectedStore && selectedStore !== "null" && selectedStore !== '""';
+
+  if (!isLoggedIn || !hasSelectedStore) {
+    return; // Don't start watcher if user not logged in
+  }
+
+  console.log("👁️ Starting sidebar visibility watcher...");
+
+  sidebarVisibilityWatcher = setInterval(() => {
+    const sidebarContainer = document.getElementById("whatsapp-sidebar-root");
+
+    // Only enforce visibility if sidebar should be open
+    if (isSidebarOpen && sidebarContainer) {
+      const isHidden =
+        sidebarContainer.style.display === "none" ||
+        sidebarContainer.style.visibility === "hidden" ||
+        sidebarContainer.style.opacity === "0";
+
+      if (isHidden) {
+        console.warn(
+          "⚠️ Sidebar visibility watcher detected hidden sidebar, forcing visibility"
+        );
+        sidebarContainer.style.display = "flex";
+        sidebarContainer.style.visibility = "visible";
+        sidebarContainer.style.opacity = "1";
+
+        // Also ensure default mode
+        if (sidebarRoot && sidebarMode !== "default") {
+          sidebarMode = "default";
+          sidebarProps.contact = { name: "", phone: "", about: "" };
+          renderSidebar();
+        }
+      }
+    }
+  }, 500); // Check every 500ms
+}
+
+// Start watcher after a short delay to allow initialization
+setTimeout(() => {
+  startSidebarVisibilityWatcher();
+}, 1000);
 
 // Call all injection functions
 injectTopToolbarIntoWhatsAppBody();

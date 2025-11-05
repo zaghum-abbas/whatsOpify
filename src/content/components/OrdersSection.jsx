@@ -1,25 +1,35 @@
-// src/components/OrdersSection.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   formatDate,
   formatPrice,
   getToken,
   sanitizePhone,
 } from "../../core/utils/helperFunctions";
+import { FaSync, FaSpinner } from "react-icons/fa";
 
 const OrdersSection = ({ whatsappTheme }) => {
   const [activeTab, setActiveTab] = useState("new");
   const [orders, setOrders] = useState({
     new: [],
     pending: [],
+    returned: [],
     length: {
       new: 0,
       pending: 0,
+      returned: 0,
     },
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [updatingOrder, setUpdatingOrder] = useState(null);
+  const [isSendingAll, setIsSendingAll] = useState(false);
+  const [sendProgress, setSendProgress] = useState({
+    current: 0,
+    total: 0,
+    currentOrder: null,
+  });
+  const shouldStopRef = useRef(false);
+  const sidebarWatcherRef = useRef(null);
 
   // Debug function to test orders API
   const testOrdersAPI = async (status = "open") => {
@@ -77,22 +87,25 @@ const OrdersSection = ({ whatsappTheme }) => {
       try {
         console.log("[ORDERS] Loading orders...");
         if (getToken()) {
-          const [newOrders, pendingOrders] = await Promise.all([
+          const [newOrders, pendingOrders, returnedOrders] = await Promise.all([
             fetchOrders("open"),
             fetchOrders("pending"),
+            fetchOrders("returned"),
           ]);
 
           setOrders({
             new: newOrders.data,
             pending: pendingOrders.data,
+            returned: returnedOrders.data,
             length: {
               new: newOrders.len,
               pending: pendingOrders.len,
+              returned: returnedOrders.len,
             },
           });
 
           console.log(
-            `[ORDERS] ✅ Loaded ${newOrders.len} new and ${pendingOrders.len} pending orders`
+            `[ORDERS] ✅ Loaded ${newOrders.len} new, ${pendingOrders.len} pending, and ${returnedOrders.len} returned orders`
           );
         }
       } catch (err) {
@@ -100,9 +113,11 @@ const OrdersSection = ({ whatsappTheme }) => {
         setOrders({
           new: [],
           pending: [],
+          returned: [],
           length: {
             new: 0,
             pending: 0,
+            returned: 0,
           },
         });
 
@@ -110,8 +125,172 @@ const OrdersSection = ({ whatsappTheme }) => {
       }
     };
 
-    // initial load
-    loadOrders();
+    // Check if we need to continue "Send All" process after reload - DO THIS IMMEDIATELY
+    const sendAllState = localStorage.getItem("whatshopify_send_all_state");
+    if (sendAllState) {
+      try {
+        const state = JSON.parse(sendAllState);
+        if (state.isActive && !state.shouldStop) {
+          console.log("[ORDERS] Resuming Send All process after reload...");
+
+          // Set flag to keep sidebar open
+          localStorage.setItem("whatshopify_keep_sidebar_open", "true");
+
+          // Restore progress state
+          setSendProgress({
+            current: state.totalSent || 0,
+            total: state.initialCount || 0,
+            currentOrder: null,
+          });
+          setIsSendingAll(true);
+
+          // Function to open sidebar with retries - MORE AGGRESSIVE
+          const openSidebarWithRetry = (attempt = 0, maxAttempts = 10) => {
+            console.log(
+              `[ORDERS] Attempting to open sidebar (attempt ${
+                attempt + 1
+              }/${maxAttempts})...`
+            );
+
+            // Check if functions are available
+            const hasToggle =
+              typeof window.toggleWhatsappSidebar === "function";
+            const hasSwitch =
+              typeof window.switchToDefaultSidebar === "function";
+            const hasShow = typeof window.showOrdersSection === "function";
+
+            if (hasToggle && hasSwitch && hasShow) {
+              console.log(
+                "[ORDERS] All sidebar functions available, opening sidebar..."
+              );
+
+              // Open sidebar
+              window.toggleWhatsappSidebar(true);
+
+              // Switch to default sidebar mode (which contains orders)
+              window.switchToDefaultSidebar();
+
+              // Open orders section in sidebar
+              window.showOrdersSection();
+
+              // Verify sidebar is open by checking DOM
+              setTimeout(() => {
+                const sidebarRoot = document.getElementById(
+                  "whatsapp-sidebar-root"
+                );
+                const sidebarVisible =
+                  sidebarRoot &&
+                  sidebarRoot.offsetParent !== null &&
+                  window.getComputedStyle(sidebarRoot).display !== "none";
+
+                if (sidebarVisible) {
+                  console.log("[ORDERS] ✅ Sidebar opened successfully");
+
+                  // Set up watcher to keep sidebar open
+                  if (sidebarWatcherRef.current) {
+                    clearInterval(sidebarWatcherRef.current);
+                  }
+                  sidebarWatcherRef.current = setInterval(() => {
+                    const sidebarRoot = document.getElementById(
+                      "whatsapp-sidebar-root"
+                    );
+                    const sidebarVisible =
+                      sidebarRoot &&
+                      sidebarRoot.offsetParent !== null &&
+                      window.getComputedStyle(sidebarRoot).display !== "none";
+
+                    if (
+                      !sidebarVisible &&
+                      typeof window.toggleWhatsappSidebar === "function"
+                    ) {
+                      console.log("[ORDERS] Sidebar was closed, reopening...");
+                      window.toggleWhatsappSidebar(true);
+                      window.switchToDefaultSidebar();
+                      window.showOrdersSection();
+                    }
+
+                    // Check if we should stop watching
+                    const currentState = localStorage.getItem(
+                      "whatshopify_send_all_state"
+                    );
+                    if (!currentState) {
+                      if (sidebarWatcherRef.current) {
+                        clearInterval(sidebarWatcherRef.current);
+                        sidebarWatcherRef.current = null;
+                      }
+                      localStorage.removeItem("whatshopify_keep_sidebar_open");
+                    }
+                  }, 500);
+
+                  // Wait for orders to load before continuing
+                  loadOrders().then(() => {
+                    // Continue sending after a delay to ensure everything is loaded
+                    setTimeout(() => {
+                      continueSendAll(state);
+                    }, 1500);
+                  });
+                } else {
+                  console.warn(
+                    "[ORDERS] ⚠️ Sidebar root not found or not visible, retrying..."
+                  );
+                  if (attempt < maxAttempts - 1) {
+                    setTimeout(
+                      () => openSidebarWithRetry(attempt + 1, maxAttempts),
+                      300
+                    );
+                  } else {
+                    console.error(
+                      "[ORDERS] ❌ Failed to open sidebar after all attempts"
+                    );
+                    // Still try to continue
+                    loadOrders().then(() => {
+                      setTimeout(() => continueSendAll(state), 2000);
+                    });
+                  }
+                }
+              }, 300);
+            } else {
+              console.warn(
+                `[ORDERS] ⚠️ Sidebar functions not ready yet. Toggle: ${hasToggle}, Switch: ${hasSwitch}, Show: ${hasShow}`
+              );
+              if (attempt < maxAttempts - 1) {
+                setTimeout(
+                  () => openSidebarWithRetry(attempt + 1, maxAttempts),
+                  300
+                );
+              } else {
+                console.error(
+                  "[ORDERS] ❌ Sidebar functions not available after all attempts"
+                );
+                // Try anyway with what we have
+                if (hasToggle) window.toggleWhatsappSidebar(true);
+                if (hasSwitch) window.switchToDefaultSidebar();
+                if (hasShow) window.showOrdersSection();
+                loadOrders().then(() => {
+                  setTimeout(() => continueSendAll(state), 2000);
+                });
+              }
+            }
+          };
+
+          // Start opening sidebar IMMEDIATELY - don't wait for loadOrders
+          setTimeout(() => {
+            openSidebarWithRetry();
+          }, 100);
+        } else {
+          // Clear stale state
+          localStorage.removeItem("whatshopify_send_all_state");
+          localStorage.removeItem("whatshopify_keep_sidebar_open");
+        }
+      } catch (err) {
+        console.error("[ORDERS] Error parsing send all state:", err);
+        localStorage.removeItem("whatshopify_send_all_state");
+        localStorage.removeItem("whatshopify_keep_sidebar_open");
+      }
+    } else {
+      // Normal load - no send all in progress
+      loadOrders();
+    }
 
     // handle store change
     const handleStoreChange = () => {
@@ -124,6 +303,11 @@ const OrdersSection = ({ whatsappTheme }) => {
     // cleanup on unmount
     return () => {
       window.removeEventListener("storeChanged", handleStoreChange);
+      // Clean up sidebar watcher
+      if (sidebarWatcherRef.current) {
+        clearInterval(sidebarWatcherRef.current);
+        sidebarWatcherRef.current = null;
+      }
     };
   }, []); // 👈 single effect for both mount + store change
 
@@ -179,6 +363,408 @@ const OrdersSection = ({ whatsappTheme }) => {
     }
   };
 
+  const continueSendAll = async (state) => {
+    console.log("[ORDERS] Continuing Send All process...", state);
+
+    // Check if we should stop FIRST - before doing anything
+    const currentState = localStorage.getItem("whatshopify_send_all_state");
+    if (currentState) {
+      try {
+        const parsedState = JSON.parse(currentState);
+        if (parsedState.shouldStop) {
+          console.log("[ORDERS] Send All was stopped - aborting immediately");
+          localStorage.removeItem("whatshopify_send_all_state");
+          localStorage.removeItem("whatshopify_keep_sidebar_open");
+          setIsSendingAll(false);
+          setSendProgress({ current: 0, total: 0, currentOrder: null });
+          return;
+        }
+      } catch (err) {
+        console.error("[ORDERS] Error parsing state:", err);
+      }
+    }
+
+    // Also check the ref
+    if (shouldStopRef.current) {
+      console.log("[ORDERS] Stop ref is set - aborting immediately");
+      localStorage.removeItem("whatshopify_send_all_state");
+      localStorage.removeItem("whatshopify_keep_sidebar_open");
+      setIsSendingAll(false);
+      setSendProgress({ current: 0, total: 0, currentOrder: null });
+      return;
+    }
+
+    // Only set these if we're not stopping
+    setIsSendingAll(true);
+    // DON'T reset shouldStopRef here - it might already be set to true!
+
+    let totalSent = state.totalSent || 0;
+    let initialCount = state.initialCount || 0;
+
+    // Fetch fresh orders to ensure we have latest data
+    let currentNewOrders = [];
+    try {
+      const newOrdersResult = await fetchOrders("open");
+      currentNewOrders = newOrdersResult.data || [];
+
+      // Update state with fresh orders
+      setOrders((prev) => ({
+        ...prev,
+        new: currentNewOrders,
+        length: {
+          ...prev.length,
+          new: newOrdersResult.len || 0,
+        },
+      }));
+    } catch (err) {
+      console.error("[ORDERS] Error fetching fresh orders:", err);
+      // Fallback to current state
+      currentNewOrders = orders.new;
+    }
+
+    if (currentNewOrders.length === 0) {
+      console.log("[ORDERS] ✅ All new orders have been sent!");
+      localStorage.removeItem("whatshopify_send_all_state");
+      localStorage.removeItem("whatshopify_keep_sidebar_open");
+      setIsSendingAll(false);
+      setSendProgress({ current: 0, total: 0, currentOrder: null });
+      return;
+    }
+
+    // Get the first order
+    const order = currentNewOrders[0];
+
+    if (!order) {
+      localStorage.removeItem("whatshopify_send_all_state");
+      localStorage.removeItem("whatshopify_keep_sidebar_open");
+      setIsSendingAll(false);
+      setSendProgress({ current: 0, total: 0, currentOrder: null });
+      return;
+    }
+
+    // Check if user clicked Stop BEFORE sending message
+    if (shouldStopRef.current) {
+      console.log("[ORDERS] Stop requested before sending message, aborting");
+      localStorage.removeItem("whatshopify_send_all_state");
+      localStorage.removeItem("whatshopify_keep_sidebar_open");
+      setIsSendingAll(false);
+      setSendProgress({ current: 0, total: 0, currentOrder: null });
+      return;
+    }
+
+    // Double check localStorage stop flag before sending
+    const checkState = localStorage.getItem("whatshopify_send_all_state");
+    if (checkState) {
+      try {
+        const parsedCheckState = JSON.parse(checkState);
+        if (parsedCheckState.shouldStop) {
+          console.log(
+            "[ORDERS] Stop flag detected before sending message, aborting"
+          );
+          localStorage.removeItem("whatshopify_send_all_state");
+          localStorage.removeItem("whatshopify_keep_sidebar_open");
+          setIsSendingAll(false);
+          setSendProgress({ current: 0, total: 0, currentOrder: null });
+          return;
+        }
+      } catch (err) {
+        console.error("[ORDERS] Error parsing state before send:", err);
+      }
+    }
+
+    const progressState = {
+      current: totalSent + 1,
+      total: initialCount,
+      currentOrder: order.name,
+    };
+    setSendProgress(progressState);
+
+    try {
+      // Check one more time right before sending
+      if (shouldStopRef.current) {
+        console.log("[ORDERS] Stop requested right before sending, aborting");
+        localStorage.removeItem("whatshopify_send_all_state");
+        localStorage.removeItem("whatshopify_keep_sidebar_open");
+        setIsSendingAll(false);
+        setSendProgress({ current: 0, total: 0, currentOrder: null });
+        return;
+      }
+
+      // Send message for this order
+      await handleWhatsAppRedirect(order, "pending");
+
+      // Check again after sending (in case stop was clicked during send)
+      if (shouldStopRef.current) {
+        console.log("[ORDERS] Stop requested after sending message, aborting");
+        localStorage.removeItem("whatshopify_send_all_state");
+        localStorage.removeItem("whatshopify_keep_sidebar_open");
+        setIsSendingAll(false);
+        setSendProgress({ current: 0, total: 0, currentOrder: null });
+        return;
+      }
+
+      totalSent++;
+
+      // Save state to localStorage before reload
+      const nextState = {
+        isActive: true,
+        shouldStop: false,
+        totalSent: totalSent,
+        initialCount: initialCount,
+      };
+      localStorage.setItem(
+        "whatshopify_send_all_state",
+        JSON.stringify(nextState)
+      );
+
+      // Wait a bit for message to be sent - but check for stop periodically
+      let waitTime = 0;
+      const checkInterval = 200; // Check every 200ms
+      const totalWait = 2000;
+
+      while (waitTime < totalWait) {
+        // Check if stop was clicked
+        if (shouldStopRef.current) {
+          console.log("[ORDERS] Stop requested during wait period, aborting");
+          localStorage.removeItem("whatshopify_send_all_state");
+          localStorage.removeItem("whatshopify_keep_sidebar_open");
+          setIsSendingAll(false);
+          setSendProgress({ current: 0, total: 0, currentOrder: null });
+          return;
+        }
+
+        // Check localStorage stop flag
+        const waitState = localStorage.getItem("whatshopify_send_all_state");
+        if (waitState) {
+          try {
+            const parsedWaitState = JSON.parse(waitState);
+            if (parsedWaitState.shouldStop) {
+              console.log("[ORDERS] Stop flag detected during wait, aborting");
+              localStorage.removeItem("whatshopify_send_all_state");
+              localStorage.removeItem("whatshopify_keep_sidebar_open");
+              setIsSendingAll(false);
+              setSendProgress({ current: 0, total: 0, currentOrder: null });
+              return;
+            }
+          } catch (err) {
+            // Continue if parsing fails
+          }
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, checkInterval));
+        waitTime += checkInterval;
+      }
+
+      // Check if user clicked Stop before reloading
+      if (shouldStopRef.current) {
+        console.log("[ORDERS] Stop requested, aborting reload");
+        localStorage.removeItem("whatshopify_send_all_state");
+        localStorage.removeItem("whatshopify_keep_sidebar_open");
+        setIsSendingAll(false);
+        setSendProgress({ current: 0, total: 0, currentOrder: null });
+        return;
+      }
+
+      // Double check localStorage stop flag
+      const currentState = localStorage.getItem("whatshopify_send_all_state");
+      if (currentState) {
+        try {
+          const parsedState = JSON.parse(currentState);
+          if (parsedState.shouldStop) {
+            console.log(
+              "[ORDERS] Stop flag detected in localStorage, aborting reload"
+            );
+            localStorage.removeItem("whatshopify_send_all_state");
+            localStorage.removeItem("whatshopify_keep_sidebar_open");
+            setIsSendingAll(false);
+            setSendProgress({ current: 0, total: 0, currentOrder: null });
+            return;
+          }
+        } catch (err) {
+          console.error("[ORDERS] Error parsing state before reload:", err);
+        }
+      }
+
+      // Reload the page
+      console.log("[ORDERS] Reloading page to continue with next order...");
+      window.location.reload();
+    } catch (error) {
+      console.error(
+        `[ORDERS] Error sending message for order ${order.name}:`,
+        error
+      );
+
+      // Remove failed order and continue with next
+      try {
+        const [newOrdersResult] = await Promise.all([fetchOrders("open")]);
+
+        if (newOrdersResult.data && newOrdersResult.data.length > 0) {
+          // Check if user clicked Stop before reloading
+          if (shouldStopRef.current) {
+            console.log("[ORDERS] Stop requested after error, aborting reload");
+            localStorage.removeItem("whatshopify_send_all_state");
+            localStorage.removeItem("whatshopify_keep_sidebar_open");
+            setIsSendingAll(false);
+            setSendProgress({ current: 0, total: 0, currentOrder: null });
+            return;
+          }
+
+          // Save state and reload to continue with next order
+          const nextState = {
+            isActive: true,
+            shouldStop: false,
+            totalSent: totalSent,
+            initialCount: initialCount,
+          };
+          localStorage.setItem(
+            "whatshopify_send_all_state",
+            JSON.stringify(nextState)
+          );
+
+          // Wait but check for stop periodically
+          let errorWaitTime = 0;
+          const errorCheckInterval = 200;
+          const errorTotalWait = 1000;
+
+          while (errorWaitTime < errorTotalWait) {
+            if (shouldStopRef.current) {
+              console.log(
+                "[ORDERS] Stop requested during error wait, aborting"
+              );
+              localStorage.removeItem("whatshopify_send_all_state");
+              localStorage.removeItem("whatshopify_keep_sidebar_open");
+              setIsSendingAll(false);
+              setSendProgress({ current: 0, total: 0, currentOrder: null });
+              return;
+            }
+
+            const errorWaitState = localStorage.getItem(
+              "whatshopify_send_all_state"
+            );
+            if (errorWaitState) {
+              try {
+                const parsedErrorWaitState = JSON.parse(errorWaitState);
+                if (parsedErrorWaitState.shouldStop) {
+                  console.log(
+                    "[ORDERS] Stop flag detected during error wait, aborting"
+                  );
+                  localStorage.removeItem("whatshopify_send_all_state");
+                  localStorage.removeItem("whatshopify_keep_sidebar_open");
+                  setIsSendingAll(false);
+                  setSendProgress({ current: 0, total: 0, currentOrder: null });
+                  return;
+                }
+              } catch (err) {
+                // Continue if parsing fails
+              }
+            }
+
+            await new Promise((resolve) =>
+              setTimeout(resolve, errorCheckInterval)
+            );
+            errorWaitTime += errorCheckInterval;
+          }
+
+          // Final check before reload
+          if (shouldStopRef.current) {
+            console.log(
+              "[ORDERS] Stop requested before error reload, aborting"
+            );
+            localStorage.removeItem("whatshopify_send_all_state");
+            localStorage.removeItem("whatshopify_keep_sidebar_open");
+            setIsSendingAll(false);
+            setSendProgress({ current: 0, total: 0, currentOrder: null });
+            return;
+          }
+
+          window.location.reload();
+        } else {
+          // No more orders
+          localStorage.removeItem("whatshopify_send_all_state");
+          localStorage.removeItem("whatshopify_keep_sidebar_open");
+          setIsSendingAll(false);
+          setSendProgress({ current: 0, total: 0, currentOrder: null });
+        }
+      } catch (err) {
+        console.error("[ORDERS] Error refreshing orders after error:", err);
+        localStorage.removeItem("whatshopify_send_all_state");
+        localStorage.removeItem("whatshopify_keep_sidebar_open");
+        setIsSendingAll(false);
+        setSendProgress({ current: 0, total: 0, currentOrder: null });
+      }
+    }
+  };
+
+  const handleSendAll = async () => {
+    if (orders.new.length === 0) {
+      alert("No new orders to send!");
+      return;
+    }
+
+    setIsSendingAll(true);
+    shouldStopRef.current = false;
+
+    const initialCount = orders.new.length;
+
+    // Save initial state to localStorage
+    const initialState = {
+      isActive: true,
+      shouldStop: false,
+      totalSent: 0,
+      initialCount: initialCount,
+    };
+    localStorage.setItem(
+      "whatshopify_send_all_state",
+      JSON.stringify(initialState)
+    );
+
+    setSendProgress({
+      current: 0,
+      total: initialCount,
+      currentOrder: null,
+    });
+
+    // Start the process - send first message and reload
+    await continueSendAll(initialState);
+  };
+
+  const handleStopSending = () => {
+    console.log("[ORDERS] Stop button clicked - stopping send all process");
+
+    // Set stop flag immediately
+    shouldStopRef.current = true;
+
+    // Update UI immediately
+    setIsSendingAll(false);
+    setSendProgress({ current: 0, total: 0, currentOrder: null });
+
+    // Save stop state to localStorage IMMEDIATELY
+    const stopState = {
+      isActive: false,
+      shouldStop: true,
+      totalSent: 0,
+      initialCount: 0,
+    };
+    localStorage.setItem(
+      "whatshopify_send_all_state",
+      JSON.stringify(stopState)
+    );
+    localStorage.removeItem("whatshopify_keep_sidebar_open");
+
+    // Clear watcher interval if it exists
+    if (sidebarWatcherRef.current) {
+      clearInterval(sidebarWatcherRef.current);
+      sidebarWatcherRef.current = null;
+    }
+
+    // Clear localStorage after a short delay to ensure it's saved first
+    setTimeout(() => {
+      localStorage.removeItem("whatshopify_send_all_state");
+      localStorage.removeItem("whatshopify_keep_sidebar_open");
+      console.log("[ORDERS] ✅ Send all process stopped and cleaned up");
+    }, 500);
+  };
+
   const handleWhatsAppRedirect = async (order, status) => {
     console.log("status", status);
     const data = localStorage.getItem("whatshopify_token");
@@ -222,18 +808,18 @@ const OrdersSection = ({ whatsappTheme }) => {
         const message =
           status === "pending"
             ? `👋 Hello ${customerName},
-we’ve just received your order #${orderId} at ${storeName} 🛍️ placed at ${orderDateTime}, for ${city}
+we’ve just received your order #${orderId} at ${storeName} placed at ${orderDateTime}, for ${city}
 
-🛒 𝐎𝐫𝐝𝐞𝐫 𝐃𝐞𝐭𝐚𝐢𝐥𝐬
+𝐎𝐫𝐝𝐞𝐫 𝐃𝐞𝐭𝐚𝐢𝐥𝐬
  ${order?.lineItems
-   ?.map((item) => `${item.name} - ${item.quantity}`)
+   ?.map((item) => `‣ ${item.name} - ${item.quantity}`)
    .join("\n")}
 
 
-💰 ${orderTotal}
+𝙊𝙧𝙙𝙚𝙧 𝙏𝙤𝙩𝙖𝙡 : Rs. ${formatPrice(orderTotal)}
 
-Please reply: ✅ YES to confirm your order, or
-❌ NO if you’d like to cancel or make any changes.
+Please reply:
+✅ YES to confirm your order.
 
 Thanks for shopping with ${storeName} 💚
 — 𝐓𝐞𝐚𝐦 ${storeName}`
@@ -301,7 +887,149 @@ We’re sorry to see you cancel 😔 — if there’s anything we can improve or
   const currentOrders = orders[activeTab];
 
   return (
-    <div className="orders-section" style={{ padding: "16px" }}>
+    <div
+      className="orders-section"
+      style={{ padding: "16px", position: "relative" }}
+    >
+      {/* Send All Overlay */}
+      {isSendingAll && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 99999,
+            pointerEvents: "auto",
+          }}
+          onClick={(e) => {
+            // Prevent closing when clicking backdrop - only close on Stop button
+            e.stopPropagation();
+          }}
+          onMouseDown={(e) => {
+            // Prevent any default behavior
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <div
+            style={{
+              background: whatsappTheme === "dark" ? "#23272a" : "#fff",
+              borderRadius: "12px",
+              padding: "24px",
+              minWidth: "400px",
+              maxWidth: "500px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+              border: `1px solid ${
+                whatsappTheme === "dark" ? "#333" : "#e2e8f0"
+              }`,
+              pointerEvents: "auto",
+              position: "relative",
+              zIndex: 100000,
+            }}
+            onClick={(e) => {
+              // Stop propagation to prevent backdrop click
+              e.stopPropagation();
+            }}
+            onMouseDown={(e) => {
+              // Prevent any default behavior
+              e.stopPropagation();
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 16px 0",
+                fontSize: "18px",
+                fontWeight: "600",
+                color: whatsappTheme === "dark" ? "white" : "#222",
+              }}
+            >
+              Sending Messages
+            </h3>
+
+            <div
+              style={{
+                marginBottom: "16px",
+                color: whatsappTheme === "dark" ? "#ccc" : "#666",
+                fontSize: "14px",
+              }}
+            >
+              {sendProgress.currentOrder && (
+                <div style={{ marginBottom: "8px" }}>
+                  Sending to: <strong>{sendProgress.currentOrder}</strong>
+                </div>
+              )}
+              <div>
+                Progress: {sendProgress.current} of {sendProgress.total}
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div
+              style={{
+                width: "100%",
+                height: "8px",
+                backgroundColor: whatsappTheme === "dark" ? "#333" : "#e2e8f0",
+                borderRadius: "4px",
+                overflow: "hidden",
+                marginBottom: "20px",
+              }}
+            >
+              <div
+                style={{
+                  width: `${
+                    (sendProgress.current / sendProgress.total) * 100
+                  }%`,
+                  height: "100%",
+                  backgroundColor: "#25D366",
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("[ORDERS] Stop button clicked");
+                handleStopSending();
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              style={{
+                width: "100%",
+                padding: "12px",
+                backgroundColor: "#DC2626",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "600",
+                transition: "background-color 0.2s",
+                pointerEvents: "auto",
+                position: "relative",
+                zIndex: 100001,
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "#B91C1C";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "#DC2626";
+              }}
+            >
+              Stop
+            </button>
+          </div>
+        </div>
+      )}
       <div
         style={{
           display: "flex",
@@ -320,61 +1048,98 @@ We’re sorry to see you cancel 😔 — if there’s anything we can improve or
         >
           Orders Management
         </h2>
-        <button
-          onClick={async () => {
-            console.log("[ORDERS] Manual refresh triggered for both tabs");
-            setError(null);
-            try {
-              if (getToken()) {
-                console.log(
-                  "[ORDERS] Fetching fresh data for both new and pending orders..."
-                );
+        <div>
+          <button
+            onClick={handleSendAll}
+            disabled={loading || isSendingAll || orders.new.length === 0}
+            style={{
+              padding: "6px 12px",
+              backgroundColor:
+                loading || isSendingAll || orders.new.length === 0
+                  ? "#ccc"
+                  : "#25D366",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor:
+                loading || isSendingAll || orders.new.length === 0
+                  ? "not-allowed"
+                  : "pointer",
+              fontSize: "12px",
+              fontWeight: "500",
+              marginRight: "10px",
+            }}
+          >
+            {isSendingAll ? (
+              <>
+                <FaSpinner
+                  className="animate-spin"
+                  style={{ marginRight: "4px" }}
+                />
+                Sending...
+              </>
+            ) : (
+              `Send All (${orders.new.length})`
+            )}
+          </button>
+          <button
+            onClick={async () => {
+              console.log("[ORDERS] Manual refresh triggered for both tabs");
+              setError(null);
+              try {
+                if (getToken()) {
+                  const [newOrders, pendingOrders, returnedOrders] =
+                    await Promise.all([
+                      fetchOrders("open"), // Map "new" tab to "open" status
+                      fetchOrders("pending"), // Map "pending" tab to "pending" status
+                      fetchOrders("returned"), // Map "returned" tab to "returned" status
+                    ]);
 
-                const [newOrders, pendingOrders] = await Promise.all([
-                  fetchOrders("open"), // Map "new" tab to "open" status
-                  fetchOrders("pending"), // Map "pending" tab to "pending" status
-                ]);
-
-                setOrders({
-                  new: newOrders.data,
-                  pending: pendingOrders.data,
-                  length: {
-                    new: newOrders.len,
-                    pending: pendingOrders.len,
-                  },
-                });
-              } else {
-                console.log(
-                  "[ORDERS] Manual refresh: not authenticated, clearing both tabs"
-                );
-                setOrders({
-                  new: [],
-                  pending: [],
-                  length: {
-                    new: 0,
-                    pending: 0,
-                  },
-                });
+                  setOrders({
+                    new: newOrders.data,
+                    pending: pendingOrders.data,
+                    returned: returnedOrders.data,
+                    length: {
+                      new: newOrders.len,
+                      pending: pendingOrders.len,
+                      returned: returnedOrders.len,
+                    },
+                  });
+                } else {
+                  console.log(
+                    "[ORDERS] Manual refresh: not authenticated, clearing all tabs"
+                  );
+                  setOrders({
+                    new: [],
+                    pending: [],
+                    returned: [],
+                    length: {
+                      new: 0,
+                      pending: 0,
+                      returned: 0,
+                    },
+                  });
+                }
+              } catch (err) {
+                console.error("[ORDERS] Manual refresh failed:", err);
+                setError(err.message);
               }
-            } catch (err) {
-              console.error("[ORDERS] Manual refresh failed:", err);
-              setError(err.message);
-            }
-          }}
-          disabled={loading}
-          style={{
-            padding: "6px 12px",
-            backgroundColor: loading ? "#ccc" : "#25D366",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: loading ? "not-allowed" : "pointer",
-            fontSize: "12px",
-            fontWeight: "500",
-          }}
-        >
-          {loading ? "Loading..." : "Refresh"}
-        </button>
+            }}
+            disabled={loading}
+            style={{
+              padding: "6px 12px",
+              backgroundColor: loading ? "#ccc" : "#25D366",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontSize: "12px",
+              fontWeight: "500",
+            }}
+          >
+            {loading ? <FaSpinner className="animate-spin" /> : <FaSync />}
+          </button>
+        </div>
       </div>
 
       {loading && (
@@ -444,7 +1209,7 @@ We’re sorry to see you cancel 😔 — if there’s anything we can improve or
             transition: "all 0.3s ease",
           }}
         >
-          New Orders ({orders.length.new})
+          New ({orders.length.new})
         </button>
         <button
           onClick={() => setActiveTab("pending")}
@@ -461,7 +1226,24 @@ We’re sorry to see you cancel 😔 — if there’s anything we can improve or
             transition: "all 0.3s ease",
           }}
         >
-          Pending Orders ({orders.length.pending})
+          Pending ({orders.length.pending})
+        </button>
+        <button
+          onClick={() => setActiveTab("returned")}
+          style={{
+            padding: "8px 16px",
+            border: "none",
+            background: activeTab === "returned" ? "#DC2626" : "transparent",
+            color: activeTab === "returned" ? "white" : "#666",
+            cursor: "pointer",
+            borderBottom:
+              activeTab === "returned"
+                ? "2px solid #DC2626"
+                : "2px solid transparent",
+            transition: "all 0.3s ease",
+          }}
+        >
+          Returned ({orders.length.returned})
         </button>
       </div>
 

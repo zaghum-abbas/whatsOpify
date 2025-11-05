@@ -222,7 +222,7 @@ const DefaultSidebar = ({
       )} */}
       {/* Orders Section - Always visible */}
       <section style={{ marginBottom: "28px" }}>
-        <h2
+        {/* <h2
           style={{
             marginBottom: "12px",
             fontSize: "1.1rem",
@@ -231,7 +231,7 @@ const DefaultSidebar = ({
           }}
         >
           Orders
-        </h2>
+        </h2> */}
         <div
           style={{
             // background: theme.card,
