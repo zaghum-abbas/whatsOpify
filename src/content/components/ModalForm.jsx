@@ -1,20 +1,60 @@
 import React, { useState, useEffect } from "react";
 import { createOrder } from "../../utils/createOrder.js";
 import { useDebounce } from "../../hooks/useDebounce";
-import { formatPrice, getToken } from "../../core/utils/helperFunctions";
+import {
+  formatPrice,
+  getToken,
+  formatPhoneNumber,
+  formatImageUrl,
+} from "../../core/utils/helperFunctions";
 import { IoMdTrash } from "react-icons/io";
 
 const ModalForm = ({ onClose, theme }) => {
   const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    productName: "",
-    variantId: "",
-    address: "",
-    city: "",
-    email: "",
-    quantity: 1,
+    productId: "",
+    lineItems: [],
+    shipperInfo: {
+      labelStoreName: "",
+      phoneNumber: "",
+      locationName: "",
+      city: "",
+      returnAddress: "",
+      address: "",
+      country: "Pakistan",
+    },
+    tags: [],
     paymentMethod: "COD",
+    shipmentDetails: {
+      email: "",
+      addresses: [
+        {
+          name: "",
+          phone: formatPhoneNumber(""),
+          city: { city: "" },
+          address1: "",
+          address2: "",
+          company: "",
+          country: "Pakistan",
+        },
+      ],
+    },
+    financialStatus: "pending",
+    status: "open",
+    pricing: {
+      subTotal: 0,
+      currentTotalPrice: 0,
+      paid: 0,
+      shipping: 0,
+      taxPercentage: 0,
+      taxValue: 0,
+      paymentProof: "",
+      extra: [
+        {
+          key: "",
+          value: 0,
+        },
+      ],
+    },
   });
 
   const [errors, setErrors] = useState({});
@@ -47,6 +87,34 @@ const ModalForm = ({ onClose, theme }) => {
   const [modalTotalPages, setModalTotalPages] = useState(1);
   const [modalTotalProducts, setModalTotalProducts] = useState(0);
   const [selectedItems, setSelectedItems] = useState([]);
+
+  // State for cart totals
+  const [cartTotals, setCartTotals] = useState({
+    subtotal: 0,
+    shipping: 0,
+    orderTax: 0,
+    extraCharges: 0,
+    discount: 0,
+    paidAlready: 0,
+  });
+
+  // State for uploaded payment proof image
+  const [paymentProofImage, setPaymentProofImage] = useState(null);
+  const [paymentProofImageUrl, setPaymentProofImageUrl] = useState("");
+  const [isUploadingPaymentProof, setIsUploadingPaymentProof] = useState(false);
+
+  // Calculate totals whenever selectedItems change
+  useEffect(() => {
+    const subtotal = selectedItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+
+    setCartTotals((prev) => ({
+      ...prev,
+      subtotal,
+    }));
+  }, [selectedItems]);
 
   // Effect to extract contact info from WhatsApp UI and load global data (products, user info)
   useEffect(() => {
@@ -171,14 +239,9 @@ const ModalForm = ({ onClose, theme }) => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.phone.trim()) newErrors.phone = "Phone is required";
-    if (!formData.productName.trim())
-      newErrors.productName = "Product is required";
     if (!formData.variantId.trim()) newErrors.variantId = "Variant is required";
-    if (!formData.address1.trim())
-      newErrors.address1 = "Address Line 1 is required";
+    if (!formData.address.trim()) newErrors.address = "Address is required";
     if (!formData.city.trim()) newErrors.city = "City is required";
-    if (!formData.province.trim()) newErrors.province = "Province is required";
-    if (!formData.zip.trim()) newErrors.zip = "Zip Code is required";
     if (!formData.email.trim()) newErrors.email = "Email is required";
     if (formData.quantity < 1)
       newErrors.quantity = "Quantity must be at least 1";
@@ -194,6 +257,14 @@ const ModalForm = ({ onClose, theme }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Reset paidAlready and payment proof image when switching from prepaid to COD
+    if (name === "paymentMethod" && value === "COD") {
+      setCartTotals((prev) => ({ ...prev, paidAlready: 0 }));
+      setPaymentProofImage(null);
+      setPaymentProofImageUrl("");
+    }
+
     // Clear error for the changed field if it exists
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
@@ -465,34 +536,76 @@ const ModalForm = ({ onClose, theme }) => {
     setIsSending(true); // Set sending state to true
 
     try {
-      // Get the current store ID from the global whatsapofyProducts object
-      const currentStoreId = window.whatsapofyProducts?.storeId;
-      if (!currentStoreId) {
-        throw new Error(
-          "Store ID not available. Please ensure you are logged in and a store is selected/active."
-        );
+      // Validate that at least one item is selected
+      if (selectedItems.length === 0) {
+        setSubmissionError("Please select at least one product.");
+        setIsSending(false);
+        return;
       }
 
-      // Extract relevant details from selectedVariant and selectedProduct, providing fallbacks
-      const itemSku = selectedVariant?.sku || "";
-      const itemPrice = parseFloat(selectedVariant?.price) || 0;
-      const itemImage =
-        selectedVariant?.image ||
-        "https://placehold.co/50x50/cccccc/000000?text=Product";
-      const itemVendor = selectedProduct?.vendor || "";
-      const itemWeight = selectedVariant?.weight || 0;
-      const itemProductId = selectedProduct?._id || selectedProduct?.id || "";
-      // Prioritize variant name, then product name, then form product name
-      const itemVariantName =
-        selectedVariant?.name || selectedProduct?.name || formData.productName;
+      // Get store ID
+      let storeId = window.whatsapofyProducts?.storeId;
+      if (!storeId) {
+        const selectedStore = localStorage.getItem(
+          "whatshopify_selected_store"
+        );
+        if (selectedStore) {
+          try {
+            const store = JSON.parse(selectedStore);
+            if (store?._id) {
+              storeId = store._id;
+            }
+          } catch (parseError) {
+            console.error("Error parsing selected store:", parseError);
+          }
+        }
+        if (!storeId) {
+          throw new Error(
+            "Store ID not available. Please ensure you are logged in and a store is selected."
+          );
+        }
+      }
 
-      const quantity = Number(formData.quantity);
-      const subTotal = itemPrice * quantity;
-      const shippingCost = 500; // Fixed shipping cost from API response example
-      const totalCOD = subTotal + shippingCost; // Assuming no tax/discount for simplicity for COD
+      // Calculate totals
+      const taxValue = (cartTotals.subtotal * cartTotals.orderTax) / 100;
+      const totalOrder =
+        cartTotals.subtotal +
+        cartTotals.shipping +
+        taxValue +
+        cartTotals.extraCharges -
+        cartTotals.discount;
 
-      // Determine shipperInfo from userInfo or defaults, ensuring empty strings for optional fields
-      const shipperInfoPayload = {
+      // Build extra charges array
+      const extraChargesArray = [];
+      if (cartTotals.extraCharges > 0) {
+        extraChargesArray.push({
+          key: "Extra Charges",
+          value: cartTotals.extraCharges,
+        });
+      } else {
+        // Keep the structure with empty key if no extra charges
+        extraChargesArray.push({
+          key: "",
+          value: 0,
+        });
+      }
+
+      // Get productId from first selected item
+      const productId =
+        selectedItems[0]?.product?._id || selectedItems[0]?.product?.id || "";
+
+      // Validate productId
+      if (productId === "") {
+        setSubmissionError("Please select a product!");
+        setIsSending(false);
+        return;
+      }
+
+      // Build shipperInfo from userInfo
+      const shipperInfoWithExtras = {
+        _id: userInfo?._id || "",
+        accountId: userInfo?.shopilamSurvey?.accountId || "",
+        default: userInfo?.default || false,
         labelStoreName: userInfo?.name || "",
         phoneNumber: formData.phone || "",
         locationName: userInfo?.location || "",
@@ -502,120 +615,148 @@ const ModalForm = ({ onClose, theme }) => {
         country: userInfo?.country || "Pakistan",
       };
 
-      const orderPayload = {
-        storeId: currentStoreId,
-        shopify_id: 0, // Changed from null to 0 as per API schema example
-        channelId: "67db243cd0d009db10be8378", // Fixed channel ID from API response example
-        customerId: "67db243cd0d009db10be8378", // Consider making this dynamic based on actual customer ID
-        productId: itemProductId,
-        shipperInfo: shipperInfoPayload,
-        name: `Order for ${formData.name} - ${formData.productName}`, // This will be our identifier
-        lineItems: [
-          {
-            variantId: formData.variantId,
-            sku: itemSku,
-            quantity: quantity,
-            name: itemVariantName,
-            price: itemPrice,
-            image: itemImage,
-            vendor: itemVendor,
-            weight: itemWeight,
-          },
-        ],
-        financialStatus: "pending",
-        deliveryStatus: "", // Changed from null to empty string as per API schema
-        fulfillmentStatus: "confirm",
+      // Extract _id, accountId, and default from shipperInfo and exclude them
+      const {
+        _id,
+        accountId,
+        default: isDefault,
+        ...shipperInfoData
+      } = shipperInfoWithExtras;
+
+      // Build lineItems from selectedItems (similar to the provided logic)
+      const lineItems = selectedItems.map((item) => {
+        const variant = item.variant;
+        const product = item.product;
+
+        // Get image URL - prioritize variant image, then product image
+        let imageUrl = "";
+        if (variant?.image) {
+          imageUrl = variant.image;
+        } else if (product?.images && product.images.length > 0) {
+          imageUrl = formatImageUrl(
+            product.images[0]?.url || product.images[0] || ""
+          );
+        } else if (product?.image) {
+          imageUrl = product.image;
+        } else {
+          imageUrl = "https://placehold.co/50x50/cccccc/000000?text=Product";
+        }
+
+        return {
+          variantId: variant?.id || variant?.variantId || "",
+          sku: variant?.sku || item.sku || "",
+          quantity: item.quantity || 1,
+          name:
+            variant?.title ||
+            variant?.name ||
+            item.name ||
+            product?.title ||
+            "",
+          price: parseFloat(variant?.price || item.price || 0),
+          image: formatImageUrl(imageUrl),
+          vendor: product?.vendor || "",
+          weight: variant?.weight || 0,
+        };
+      });
+
+      // Build initial payload
+      let payload = {
+        storeId: storeId,
+        productId: productId,
+        lineItems: lineItems,
+        shipperInfo: shipperInfoData,
         tags: [],
-        pricing: {
-          subTotal: subTotal,
-          currentTotalPrice: totalCOD,
-          paid: 0,
-          balance: 0,
-          shipping: 500,
-          taxPercentage: 0,
-          taxValue: 0,
-          extra: [],
-          discount: null, // Keep as null if discount is optional, or provide default object if mandatory
-          paymentProof: "", // Changed from null to empty string as per API schema
-          totalCOD: totalCOD,
-        },
-        resellerOrder: {
-          // Changed from null to object with required ID and default values
-          accountId:
-            userInfo?.shopilamSurvey?.accountId || "688a4ecae75a76af0b439d13", // Use actual accountId from userInfo or a dummy
-          profit: 0,
-          paidAlready: 0,
-          paymentProof: "",
-          totalCOD: 0,
-          payoutStatus: "pending",
-          status: "processing",
-        },
+        paymentMethod: formData.paymentMethod || "COD",
         shipmentDetails: {
-          shipmentType: "Normal",
-          email: formData.email,
+          email: formData.email || "",
           addresses: [
             {
-              company: formData.company || "",
-              address1: formData.address1,
+              name: formData.name || "",
+              phone: formatPhoneNumber(formData.phone || ""),
+              city: { city: formData.city || "" },
+              address1: formData.address || formData.address1 || "",
               address2: formData.address2 || "",
-              city: {
-                city: formData.city,
-                typo: formData.city.toLowerCase().replace(/\s/g, ""), // Simple typo generation
-              },
-              province: formData.province,
-              country: "Pakistan", // Fixed country for now
-              zip: formData.zip,
-              phone: formData.phone,
-              name: formData.name,
+              company: formData.company || "",
+              country: "Pakistan",
             },
           ],
         },
-        tracking: {
-          tracking_no: "", // Required by API, even if empty initially
-          events: [],
-          courier: "5eb7cf5a86d9755df3a6c593", // Changed from null to a dummy PydanticObjectId as per API schema
+        financialStatus: "pending",
+        status: "open",
+        pricing: {
+          subTotal: Number(cartTotals.subtotal),
+          currentTotalPrice: Number(totalOrder),
+          paid:
+            formData.paymentMethod === "prepaid" ? cartTotals.paidAlready : 0,
+          shipping: Number(cartTotals.shipping),
+          taxPercentage: cartTotals.orderTax,
+          taxValue: Number(taxValue),
+          paymentProof: paymentProofImageUrl || "",
+          extra: extraChargesArray,
         },
-        currency: "PKR",
-        status: "open", // Changed from "reselling" to "open" as per API schema example
       };
 
-      console.log("📤 Sending order:", orderPayload);
-      const { success, data, error } = await createOrder(orderPayload);
+      // If payment method is COD, set paid to 0 and paymentProof to empty string
+      if (payload.paymentMethod === "COD") {
+        payload = {
+          ...payload,
+          pricing: {
+            ...payload.pricing,
+            paid: 0,
+            paymentProof: "",
+          },
+        };
+      } else {
+        // For prepaid, ensure we use the uploaded URL, not base64
+        payload = {
+          ...payload,
+          pricing: {
+            ...payload.pricing,
+            paymentProof: paymentProofImageUrl || "",
+          },
+        };
+      }
 
-      // Modified success check:
-      // Check for response.success (from background.js) or if the API's message indicates success.
-      const isActuallySuccessful =
-        success || (data && data.message === "Order created successfully");
+      // Ensure paymentProof is set (fallback to empty string)
+      const updatedValues = {
+        ...payload,
+        pricing: {
+          ...payload.pricing,
+          paymentProof: payload.pricing.paymentProof || "",
+        },
+      };
 
-      if (isActuallySuccessful) {
-        // Use the 'name' from the orderPayload as the identifier for the message
-        const orderIdentifier = orderPayload.name;
+      console.log(
+        "📤 Sending order (values after modification):",
+        updatedValues
+      );
 
+      const response = await fetch("https://api.shopilam.com/api/v1/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify(updatedValues),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
         console.log("📦 Order created:", data);
-        // Call the global function to send the message and potentially the product image
-        if (window.sendMessageToCurrentChat) {
-          await window.sendMessageToCurrentChat(
-            `✅ Order "${orderIdentifier}" confirmed!`,
-            selectedProduct
-          );
-        } else {
-          console.warn(
-            "⚠️ window.sendMessageToCurrentChat not available. Message not sent to chat."
-          );
-        }
+
+        alert(data.message);
+
         onClose(); // Close the modal on successful order creation
       } else {
         // Handle order creation failure
-        const errorMessage =
-          error ||
-          (data && data.detail) ||
-          "Order creation failed with an unknown error.";
-        console.error("Order creation failed:", errorMessage, data);
+        const errorMessage = (data && data.message) || "Order creation failed";
+        console.error("Order creation failed:", errorMessage);
         setSubmissionError(`Failed to create order: ${errorMessage}`);
       }
     } catch (error) {
       console.error("Order error:", error);
-      setSubmissionError(`Failed: ${error.message}`);
+      setSubmissionError(`Failed to create order: ${error.message}`);
     } finally {
       setIsSending(false); // Turn off sending state regardless of success or failure
     }
@@ -629,642 +770,1235 @@ const ModalForm = ({ onClose, theme }) => {
 
   console.log("modalProducts", modalProducts);
   return (
-    <form onSubmit={handleSubmit} style={inlineFormStyle}>
-      <div style={scrollableContentStyle}>
-        {isLoading ? (
-          <div style={loadingStyle}>
-            <div style={spinnerStyle}></div>
-            <p>Loading contact and product information...</p>
-          </div>
-        ) : (
-          <div style={sectionContainerStyle}>
-            <div style={sectionStyle}>
-              <div style={fieldGroupStyle}>
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Product*</label>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "10px",
-                      alignItems: "center",
-                    }}
-                  >
-                    <input
-                      type="text"
-                      value={
-                        selectedProduct
-                          ? selectedProduct.name || selectedProduct.title
-                          : ""
-                      }
-                      placeholder="Select Product"
-                      readOnly
+    <>
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
+      <form onSubmit={handleSubmit} style={inlineFormStyle}>
+        <div style={scrollableContentStyle}>
+          {isLoading ? (
+            <div style={loadingStyle}>
+              <div style={spinnerStyle}></div>
+              <p>Loading contact and product information...</p>
+            </div>
+          ) : (
+            <div style={sectionContainerStyle}>
+              <div style={sectionStyle}>
+                <div style={fieldGroupStyle}>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Product*</label>
+                    <div
                       style={{
-                        ...inputStyle,
-                        backgroundColor: "#f9f9f9",
-                        cursor: "pointer",
-                        flex: 1,
-                      }}
-                      onClick={() => setShowProductModal(true)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowProductModal(true)}
-                      style={{
-                        padding: "10px 20px",
-                        backgroundColor: theme === "dark" ? "#25D366" : "#ccc",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontWeight: "500",
-                        fontSize: "0.95rem",
-                        whiteSpace: "nowrap",
+                        display: "flex",
+                        gap: "10px",
+                        alignItems: "center",
                       }}
                     >
-                      Browse
-                    </button>
-                  </div>
-                  {errors.productName && (
-                    <span style={errorStyle}>{errors.productName}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {selectedItems.length > 0 && (
-              <div style={sectionStyle}>
-                <h3 style={sectionHeaderStyle}>Selected Items</h3>
-                <div style={fieldGroupStyle}>
-                  {selectedItems.map((item) => (
-                    <div key={item.id} style={selectedItemStyle}>
-                      {/* Avatar on the left */}
-                      <div style={selectedItemAvatarStyle}>
-                        {item.product.title
-                          ? item.product.title.charAt(0).toUpperCase()
-                          : "P"}
-                      </div>
-
-                      {/* Content on the right */}
-                      <div
+                      <input
+                        type="text"
+                        value={
+                          selectedProduct
+                            ? selectedProduct.name || selectedProduct.title
+                            : ""
+                        }
+                        placeholder="Select Product"
+                        readOnly
                         style={{
+                          ...inputStyle,
+                          backgroundColor: "#f9f9f9",
+                          cursor: "pointer",
                           flex: 1,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "8px",
+                        }}
+                        onClick={() => setShowProductModal(true)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowProductModal(true)}
+                        style={{
+                          padding: "10px 20px",
+                          backgroundColor:
+                            theme === "dark" ? "#25D366" : "#ccc",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontWeight: "500",
+                          fontSize: "0.95rem",
+                          whiteSpace: "nowrap",
                         }}
                       >
-                        {/* Product name */}
-                        <div style={selectedItemNameStyle}>{item.name}</div>
+                        Browse
+                      </button>
+                    </div>
+                    {errors.productName && (
+                      <span style={errorStyle}>{errors.productName}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-                        {/* Price and total row */}
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                          }}
-                        >
-                          <div style={selectedItemPriceStyle}>
-                            Rs. {formatPrice(item.price)} x {item.quantity}
-                          </div>
-                          <div style={selectedItemTotalStyle}>
-                            Rs. {formatPrice(item.price * item.quantity)}
-                          </div>
+              {selectedItems.length > 0 && (
+                <div style={sectionStyle}>
+                  <h3 style={sectionHeaderStyle}>Selected Items</h3>
+                  <div style={fieldGroupStyle}>
+                    {selectedItems.map((item) => (
+                      <div key={item.id} style={selectedItemStyle}>
+                        {/* Avatar on the left */}
+                        <div style={selectedItemAvatarStyle}>
+                          {item.product.title
+                            ? item.product.title.charAt(0).toUpperCase()
+                            : "P"}
                         </div>
 
-                        {/* Quantity controls and remove button row */}
+                        {/* Content on the right */}
                         <div
                           style={{
+                            flex: 1,
                             display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
+                            flexDirection: "column",
+                            gap: "8px",
                           }}
                         >
-                          <div style={quantityControlsStyle}>
+                          {/* Product name */}
+                          <div style={selectedItemNameStyle}>{item.name}</div>
+
+                          {/* Price and total row */}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <div style={selectedItemPriceStyle}>
+                              Rs. {formatPrice(item.price)} x {item.quantity}
+                            </div>
+                            <div style={selectedItemTotalStyle}>
+                              Rs. {formatPrice(item.price * item.quantity)}
+                            </div>
+                          </div>
+
+                          {/* Quantity controls and remove button row */}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <div style={quantityControlsStyle}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    item.id,
+                                    item.quantity - 1
+                                  )
+                                }
+                                style={quantityButtonStyle}
+                              >
+                                -
+                              </button>
+                              <span style={quantityDisplayStyle}>
+                                {item.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    item.id,
+                                    item.quantity + 1
+                                  )
+                                }
+                                style={quantityButtonStyle}
+                              >
+                                +
+                              </button>
+                            </div>
                             <button
                               type="button"
-                              onClick={() =>
-                                handleQuantityChange(item.id, item.quantity - 1)
-                              }
-                              style={quantityButtonStyle}
+                              onClick={() => handleRemoveItem(item.id)}
+                              style={removeButtonStyle}
                             >
-                              -
-                            </button>
-                            <span style={quantityDisplayStyle}>
-                              {item.quantity}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleQuantityChange(item.id, item.quantity + 1)
-                              }
-                              style={quantityButtonStyle}
-                            >
-                              +
+                              <IoMdTrash width={20} height={20} color="red" />
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(item.id)}
-                            style={removeButtonStyle}
-                          >
-                            <IoMdTrash width={20} height={20} color="red" />
-                          </button>
                         </div>
                       </div>
-                    </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Method Section */}
+              <div style={sectionStyle}>
+                <h3
+                  style={{
+                    ...sectionHeaderStyle,
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
+                >
+                  Payment Method*
+                </h3>
+
+                <div style={radioGroupStyle}>
+                  {paymentMethods.map((method) => (
+                    <label key={method.value} style={radioLabelStyle}>
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value={method.value}
+                        checked={formData.paymentMethod === method.value}
+                        onChange={handleChange}
+                        required
+                        style={radioInputStyle}
+                      />
+                      <span>{method.label}</span>
+                    </label>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* Payment Method Section */}
-            <div style={sectionStyle}>
-              <h3
-                style={{
-                  ...sectionHeaderStyle,
-                  color: theme === "dark" ? "white" : "#222",
-                }}
-              >
-                Payment Method*
-              </h3>
-
-              <div style={radioGroupStyle}>
-                {paymentMethods.map((method) => (
-                  <label key={method.value} style={radioLabelStyle}>
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value={method.value}
-                      checked={formData.paymentMethod === method.value}
-                      onChange={handleChange}
-                      required
-                      style={radioInputStyle}
-                    />
-                    <span>{method.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Shipping Information Section */}
-            <div style={sectionStyle}>
-              <h3
-                style={{
-                  ...sectionHeaderStyle,
-                  color: theme === "dark" ? "white" : "#222",
-                }}
-              >
-                Shipping Information
-              </h3>
-              <div style={fieldGroupStyle}>
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Name*</label>
-                  <input
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    style={{ ...inputStyle }}
-                  />
-                  {errors.name && <span style={errorStyle}>{errors.name}</span>}
-                </div>
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Phone Number*</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    style={inputStyle}
-                  />
-                  {errors.phone && (
-                    <span style={errorStyle}>{errors.phone}</span>
-                  )}
-                </div>
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    style={inputStyle}
-                  />
-                  {errors.email && (
-                    <span style={errorStyle}>{errors.email}</span>
-                  )}
-                </div>
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>City*</label>
-                  <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-                  {errors.city && <span style={errorStyle}>{errors.city}</span>}
-                </div>
-                <div style={fieldStyle}>
-                  <label style={labelStyle}>Address*</label>
-                  <textarea
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    required
-                    style={inputStyle}
-                  />
-                  {errors.address && (
-                    <span style={errorStyle}>{errors.address}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {submissionError && (
-          <div
-            style={{
-              ...errorStyle,
-              padding: "10px",
-              backgroundColor: "#ffebee",
-              borderRadius: "4px",
-              marginTop: "15px",
-            }}
-          >
-            ❌ {submissionError}
-          </div>
-        )}
-      </div>
-
-      {showProductModal && (
-        <div style={modalOverlayStyle}>
-          <div style={{ ...modalStyle, maxWidth: "500px", maxHeight: "80vh" }}>
-            <div style={modalHeaderStyle}>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: "1.5rem",
-                  color: "#333",
-                  fontWeight: "600",
-                }}
-              >
-                All Products
-              </h2>
-              <button onClick={handleModalClose} style={closeButtonStyle}>
-                ×
-              </button>
-            </div>
-
-            <div style={searchContainerStyle}>
-              <div style={searchInputWrapperStyle}>
-                <span style={searchIconStyle}>🔍</span>
-                <input
-                  type="text"
-                  placeholder="Search by any field..."
-                  value={modalSearchTerm}
-                  onChange={(e) => {
-                    setModalSearchTerm(e.target.value);
-                    setCurrentPage(1); // Reset to first page when searching
+              {/* Cart Totals Section */}
+              <div style={sectionStyle}>
+                <h3
+                  style={{
+                    ...sectionHeaderStyle,
+                    color: theme === "dark" ? "white" : "#222",
+                    marginBottom: "16px",
                   }}
-                  style={searchInputStyle}
-                />
-              </div>
-            </div>
+                >
+                  Cart Totals
+                </h3>
+                <div
+                  style={{
+                    borderTop: `1px solid ${
+                      theme === "dark" ? "#333" : "#e2e8f0"
+                    }`,
+                    paddingTop: "16px",
+                  }}
+                >
+                  {/* Subtotal */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: theme === "dark" ? "white" : "#222",
+                          fontSize: "0.95rem",
+                        }}
+                      >
+                        Subtotal
+                      </span>
+                      <span
+                        style={{
+                          color: theme === "dark" ? "#999" : "#666",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        ({selectedItems.length} items)
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      value={cartTotals.subtotal}
+                      readOnly
+                      style={{
+                        ...inputStyle,
+                        width: "120px",
+                        textAlign: "right",
+                        backgroundColor:
+                          theme === "dark" ? "#2a2a2a" : "#f5f5f5",
+                        color: theme === "dark" ? "white" : "#222",
+                      }}
+                    />
+                  </div>
 
-            <div style={productListStyle}>
-              {modalLoading ? (
-                <div style={loadingStyle}>
-                  <div style={spinnerStyle}></div>
-                  <p>Loading products...</p>
-                </div>
-              ) : (
-                modalProducts.map((item, index) => {
-                  const isSingleVariant = item?.variants?.length === 1;
-                  const totalStock = item?.variants?.reduce(
-                    (sum, variant) => sum + (variant?.stock?.available || 0),
-                    0
-                  );
+                  {/* Shipping */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: theme === "dark" ? "white" : "#222",
+                          fontSize: "0.95rem",
+                        }}
+                      >
+                        Shipping
+                      </span>
+                      <span
+                        style={{
+                          color: theme === "dark" ? "#999" : "#666",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        Flat Shipping
+                      </span>
+                    </div>
+                    <input
+                      type="number"
+                      value={cartTotals.shipping}
+                      onChange={(e) =>
+                        setCartTotals((prev) => ({
+                          ...prev,
+                          shipping: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      style={{
+                        ...inputStyle,
+                        width: "120px",
+                        textAlign: "right",
+                        backgroundColor: theme === "dark" ? "#1a1a1a" : "#fff",
+                        color: theme === "dark" ? "white" : "#222",
+                      }}
+                    />
+                  </div>
 
-                  return (
-                    <div key={item._id || index}>
-                      {/* Main Product Row */}
-                      <div style={productListItemStyle}>
-                        <div
+                  {/* Order Tax */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: theme === "dark" ? "white" : "#222",
+                        fontSize: "0.95rem",
+                      }}
+                    >
+                      Order Tax
+                    </span>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <input
+                        type="number"
+                        placeholder="%"
+                        value={cartTotals.orderTax}
+                        onChange={(e) =>
+                          setCartTotals((prev) => ({
+                            ...prev,
+                            orderTax: parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        style={{
+                          ...inputStyle,
+                          width: "80px",
+                          textAlign: "right",
+                          backgroundColor:
+                            theme === "dark" ? "#2a2a2a" : "#f5f5f5",
+                          color: theme === "dark" ? "white" : "#222",
+                        }}
+                      />
+                      <input
+                        type="number"
+                        value={
+                          (cartTotals.subtotal * cartTotals.orderTax) / 100 || 0
+                        }
+                        readOnly
+                        style={{
+                          ...inputStyle,
+                          width: "120px",
+                          textAlign: "right",
+                          backgroundColor:
+                            theme === "dark" ? "#2a2a2a" : "#f5f5f5",
+                          color: theme === "dark" ? "white" : "#222",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Extra Charges */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: theme === "dark" ? "white" : "#222",
+                        fontSize: "0.95rem",
+                      }}
+                    >
+                      Extra Charges
+                    </span>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <input
+                        type="text"
+                        placeholder="charges"
+                        style={{
+                          ...inputStyle,
+                          width: "120px",
+                          backgroundColor:
+                            theme === "dark" ? "#1a1a1a" : "#fff",
+                          color: theme === "dark" ? "white" : "#222",
+                        }}
+                      />
+                      <input
+                        type="number"
+                        value={cartTotals.extraCharges}
+                        onChange={(e) =>
+                          setCartTotals((prev) => ({
+                            ...prev,
+                            extraCharges: parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        style={{
+                          ...inputStyle,
+                          width: "120px",
+                          textAlign: "right",
+                          backgroundColor:
+                            theme === "dark" ? "#2a2a2a" : "#f5f5f5",
+                          color: theme === "dark" ? "white" : "#222",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Discount */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: theme === "dark" ? "white" : "#222",
+                        fontSize: "0.95rem",
+                      }}
+                    >
+                      Discount
+                    </span>
+                    <input
+                      type="number"
+                      value={cartTotals.discount}
+                      onChange={(e) =>
+                        setCartTotals((prev) => ({
+                          ...prev,
+                          discount: parseFloat(e.target.value) || 0,
+                        }))
+                      }
+                      style={{
+                        ...inputStyle,
+                        width: "120px",
+                        textAlign: "right",
+                        backgroundColor:
+                          theme === "dark" ? "#2a2a2a" : "#f5f5f5",
+                        color: theme === "dark" ? "white" : "#222",
+                      }}
+                    />
+                  </div>
+
+                  {/* Paid Already - Only show for Prepaid */}
+                  {formData.paymentMethod === "prepaid" && (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "12px",
+                        }}
+                      >
+                        <span
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "20px",
-                            // marginLeft: isSingleVariant ? "0" : "40px",
+                            color: theme === "dark" ? "white" : "#222",
+                            fontSize: "0.95rem",
                           }}
                         >
-                          {isSingleVariant && (
-                            <div style={checkboxStyle}>
-                              <input
-                                type="checkbox"
-                                checked={item?.variants?.[0]?.checked || false}
-                                disabled={
-                                  item?.variants?.[0]?.stock?.available === 0
-                                }
-                                onChange={(e) =>
-                                  handleCheck(e, item?.variants?.[0])
-                                }
-                                style={checkboxInputStyle}
-                              />
-                            </div>
-                          )}
-
-                          <div style={avatarStyle}>
-                            {item.title
-                              ? item.title.charAt(0).toUpperCase()
-                              : "P"}
-                          </div>
-
-                          <div style={productInfoStyle}>
-                            <div style={productNameStyle}>
-                              {item.title || ""}
-                            </div>
-                            <div style={productDescriptionStyle}>
-                              {item.category || ""}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div
+                          Paid Already
+                        </span>
+                        <input
+                          type="number"
+                          value={cartTotals.paidAlready}
+                          onChange={(e) =>
+                            setCartTotals((prev) => ({
+                              ...prev,
+                              paidAlready: parseFloat(e.target.value) || 0,
+                            }))
+                          }
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: "16px",
+                            ...inputStyle,
+                            width: "120px",
+                            textAlign: "right",
+                            backgroundColor:
+                              theme === "dark" ? "#2a2a2a" : "#f5f5f5",
+                            color: theme === "dark" ? "white" : "#222",
                           }}
-                        >
-                          <div style={availabilityStyle}>
-                            {item?.variants?.[0]?.stock?.available === 0 ? (
-                              <span>
-                                {item?.variants?.[0]?.stock?.available} out of
-                                stock
-                              </span>
-                            ) : (
-                              <span>
-                                {formatPrice(
-                                  item?.variants?.[0]?.stock?.available
-                                ) || ""}{" "}
-                                Available
-                              </span>
-                            )}
-                          </div>
-
-                          <div style={priceStyle}>
-                            Rs. {formatPrice(item?.variants?.[0]?.price) || 0}
-                          </div>
-                        </div>
+                        />
                       </div>
 
-                      {/* Variants Section */}
-                      {!isSingleVariant && (
+                      {/* Upload Image Section - Only show for Prepaid */}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          marginBottom: "16px",
+                        }}
+                      >
                         <div
+                          onClick={() => {
+                            if (isUploadingPaymentProof) return;
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = "image/*";
+                            input.onchange = async (e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                setIsUploadingPaymentProof(true);
+                                try {
+                                  // Convert file to base64
+                                  const base64 = await new Promise(
+                                    (resolve, reject) => {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () =>
+                                        resolve(reader.result);
+                                      reader.onerror = reject;
+                                      reader.readAsDataURL(file);
+                                    }
+                                  );
+
+                                  // Upload image to get URL
+                                  const uploadResponse = await fetch(
+                                    "https://api.shopilam.com/api/v1/image/upload",
+                                    {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                        Authorization: `Bearer ${getToken()}`,
+                                      },
+                                      body: JSON.stringify({
+                                        image_base64: base64,
+                                        module: "order", // Use "order" module for payment proof
+                                      }),
+                                    }
+                                  );
+
+                                  const uploadData =
+                                    await uploadResponse.json();
+
+                                  if (uploadResponse.ok && uploadData) {
+                                    // Store the preview (base64) for display
+                                    setPaymentProofImage(base64);
+                                    // Store the URL from API response
+                                    const imageUrl =
+                                      uploadData.url ||
+                                      uploadData.thumbnail_url ||
+                                      uploadData.image_url ||
+                                      "";
+                                    setPaymentProofImageUrl(imageUrl);
+                                    console.log(
+                                      "✅ Payment proof uploaded:",
+                                      imageUrl
+                                    );
+                                  } else {
+                                    throw new Error(
+                                      uploadData.message ||
+                                        "Failed to upload image"
+                                    );
+                                  }
+                                } catch (error) {
+                                  console.error(
+                                    "❌ Error uploading payment proof:",
+                                    error
+                                  );
+                                  setSubmissionError(
+                                    `Failed to upload payment proof: ${error.message}`
+                                  );
+                                  setPaymentProofImage(null);
+                                  setPaymentProofImageUrl("");
+                                } finally {
+                                  setIsUploadingPaymentProof(false);
+                                }
+                              }
+                            };
+                            input.click();
+                          }}
                           style={{
+                            width: "120px",
+                            height: "120px",
+                            border: `2px dashed ${
+                              theme === "dark" ? "#555" : "#ddd"
+                            }`,
+                            borderRadius: "50%",
                             display: "flex",
                             flexDirection: "column",
-                            gap: "12px",
-                            marginLeft: "48px",
-                            marginTop: "16px",
-                            paddingBottom: "16px",
-                            borderBottom: "2px solid #e0e0e0",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: isUploadingPaymentProof
+                              ? "wait"
+                              : "pointer",
+                            backgroundColor:
+                              theme === "dark" ? "#2a2a2a" : "#f9f9f9",
+                            transition: "all 0.2s",
+                            opacity: isUploadingPaymentProof ? 0.6 : 1,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor =
+                              theme === "dark" ? "#777" : "#999";
+                            e.currentTarget.style.backgroundColor =
+                              theme === "dark" ? "#333" : "#f0f0f0";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor =
+                              theme === "dark" ? "#555" : "#ddd";
+                            e.currentTarget.style.backgroundColor =
+                              theme === "dark" ? "#2a2a2a" : "#f9f9f9";
                           }}
                         >
-                          {item?.variants?.map((variant) => (
+                          {isUploadingPaymentProof ? (
                             <div
-                              key={variant?.id}
                               style={{
                                 display: "flex",
+                                flexDirection: "column",
                                 alignItems: "center",
-                                justifyContent: "space-between",
-                                margin: "8px 0",
+                                gap: "8px",
                               }}
                             >
                               <div
                                 style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "12px",
-                                  width: "400px",
+                                  width: "20px",
+                                  height: "20px",
+                                  border: "2px solid #ccc",
+                                  borderTop: "2px solid #00bfae",
+                                  borderRadius: "50%",
+                                  animation: "spin 1s linear infinite",
                                 }}
-                              >
-                                <div style={checkboxStyle}>
-                                  <input
-                                    type="checkbox"
-                                    checked={variant?.checked || false}
-                                    disabled={variant?.stock?.available === 0}
-                                    onChange={(e) => handleCheck(e, variant)}
-                                    style={checkboxInputStyle}
-                                  />
-                                </div>
-
-                                <div style={avatarStyle}>
-                                  {variant?.sku
-                                    ? variant.sku.charAt(0).toUpperCase()
-                                    : "V"}
-                                </div>
-
-                                <div style={productNameStyle}>
-                                  {variant?.sku || ""}
-                                </div>
-                              </div>
-
-                              <div
+                              />
+                              <span
                                 style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "flex-end",
-                                  gap: "24px",
-                                  width: "100%",
+                                  fontSize: "0.75rem",
+                                  color: theme === "dark" ? "#999" : "#666",
                                 }}
                               >
-                                <div style={availabilityStyle}>
-                                  {variant?.stock?.available === 0 ? (
-                                    <span>
-                                      {variant?.stock?.available} out of stock
-                                    </span>
-                                  ) : (
-                                    <span>
-                                      {formatPrice(variant?.stock?.available) ||
-                                        ""}{" "}
-                                      Available
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div style={priceStyle}>
-                                  Rs. {formatPrice(variant?.price) || ""}
-                                </div>
-                              </div>
+                                Uploading...
+                              </span>
                             </div>
-                          ))}
+                          ) : paymentProofImage ? (
+                            <img
+                              src={paymentProofImage}
+                              alt="Payment proof"
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                borderRadius: "50%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          ) : (
+                            <>
+                              <span
+                                style={{
+                                  fontSize: "24px",
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                ☁️
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "0.85rem",
+                                  color: theme === "dark" ? "#999" : "#666",
+                                }}
+                              >
+                                Upload image
+                              </span>
+                            </>
+                          )}
                         </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Total Order */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginTop: "16px",
+                      paddingTop: "16px",
+                      borderTop: `1px solid ${
+                        theme === "dark" ? "#333" : "#e2e8f0"
+                      }`,
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: theme === "dark" ? "white" : "#222",
+                        fontSize: "1rem",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Total Order
+                    </span>
+                    <span
+                      style={{
+                        color: theme === "dark" ? "white" : "#222",
+                        fontSize: "1rem",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Rs.{" "}
+                      {formatPrice(
+                        cartTotals.subtotal +
+                          cartTotals.shipping +
+                          (cartTotals.subtotal * cartTotals.orderTax) / 100 +
+                          cartTotals.extraCharges -
+                          cartTotals.discount
                       )}
-                    </div>
-                  );
-                })
-              )}
+                    </span>
+                  </div>
 
-              {!modalLoading && modalProducts.length === 0 && (
-                <div style={noProductsStyle}>
-                  <p>No products found</p>
+                  {/* Total COD */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: theme === "dark" ? "white" : "#222",
+                        fontSize: "1rem",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Total COD
+                    </span>
+                    <span
+                      style={{
+                        color: theme === "dark" ? "white" : "#222",
+                        fontSize: "1rem",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Rs.{" "}
+                      {formatPrice(
+                        cartTotals.subtotal +
+                          cartTotals.shipping +
+                          (cartTotals.subtotal * cartTotals.orderTax) / 100 +
+                          cartTotals.extraCharges -
+                          cartTotals.discount -
+                          (formData.paymentMethod === "prepaid"
+                            ? cartTotals.paidAlready
+                            : 0)
+                      )}
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
 
-            <div style={modalFooterStyle}>
-              <div style={paginationStyle}>
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  style={paginationButtonStyle}
+              {/* Shipping Information Section */}
+              <div style={sectionStyle}>
+                <h3
+                  style={{
+                    ...sectionHeaderStyle,
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
                 >
-                  &lt;&lt;
-                </button>
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(1, prev - 1))
-                  }
-                  disabled={currentPage === 1}
-                  style={paginationButtonStyle}
+                  Shipping Information
+                </h3>
+                <div style={fieldGroupStyle}>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Name*</label>
+                    <input
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                      style={{ ...inputStyle }}
+                    />
+                    {errors.name && (
+                      <span style={errorStyle}>{errors.name}</span>
+                    )}
+                  </div>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Phone Number*</label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      style={inputStyle}
+                    />
+                    {errors.phone && (
+                      <span style={errorStyle}>{errors.phone}</span>
+                    )}
+                  </div>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      style={inputStyle}
+                    />
+                    {errors.email && (
+                      <span style={errorStyle}>{errors.email}</span>
+                    )}
+                  </div>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>City*</label>
+                    <input
+                      type="text"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                      required
+                      style={inputStyle}
+                    />
+                    {errors.city && (
+                      <span style={errorStyle}>{errors.city}</span>
+                    )}
+                  </div>
+                  <div style={fieldStyle}>
+                    <label style={labelStyle}>Address*</label>
+                    <textarea
+                      type="text"
+                      name="address"
+                      value={formData.address}
+                      onChange={handleChange}
+                      required
+                      style={inputStyle}
+                    />
+                    {errors.address && (
+                      <span style={errorStyle}>{errors.address}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {submissionError && (
+            <div
+              style={{
+                ...errorStyle,
+                padding: "10px",
+                backgroundColor: "#ffebee",
+                borderRadius: "4px",
+                marginTop: "15px",
+              }}
+            >
+              ❌ {submissionError}
+            </div>
+          )}
+        </div>
+
+        {showProductModal && (
+          <div style={modalOverlayStyle}>
+            <div
+              style={{ ...modalStyle, maxWidth: "500px", maxHeight: "80vh" }}
+            >
+              <div style={modalHeaderStyle}>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: "1.5rem",
+                    color: "#333",
+                    fontWeight: "600",
+                  }}
                 >
-                  &lt;
-                </button>
-                <span style={paginationInfoStyle}>
-                  {currentPage} / {modalTotalPages}
-                </span>
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) =>
-                      Math.min(modalTotalPages, prev + 1)
-                    )
-                  }
-                  disabled={currentPage === modalTotalPages}
-                  style={paginationButtonStyle}
-                >
-                  &gt;
-                </button>
-                <button
-                  onClick={() => setCurrentPage(modalTotalPages)}
-                  disabled={currentPage === modalTotalPages}
-                  style={paginationButtonStyle}
-                >
-                  &gt;&gt;
+                  All Products
+                </h2>
+                <button onClick={handleModalClose} style={closeButtonStyle}>
+                  ×
                 </button>
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItemstems: "center",
-                  justifyContent: "space-between",
-                  width: "100%",
-                }}
-              >
-                <div style={selectionSummaryStyle}>
-                  {selectedProducts.length} /{" "}
-                  {modalProducts.reduce((acc, item) => {
-                    const variantsLength = item?.variants?.length || 0;
-                    return acc + (variantsLength > 1 ? variantsLength : 1);
-                  }, 0)}{" "}
-                  products selected
+              <div style={searchContainerStyle}>
+                <div style={searchInputWrapperStyle}>
+                  <span style={searchIconStyle}>🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Search by any field..."
+                    value={modalSearchTerm}
+                    onChange={(e) => {
+                      setModalSearchTerm(e.target.value);
+                      setCurrentPage(1); // Reset to first page when searching
+                    }}
+                    style={searchInputStyle}
+                  />
                 </div>
+              </div>
 
-                <div style={actionButtonsStyle}>
-                  <button onClick={handleModalClose} style={cancelButtonStyle}>
-                    Cancel
+              <div style={productListStyle}>
+                {modalLoading ? (
+                  <div style={loadingStyle}>
+                    <div style={spinnerStyle}></div>
+                    <p>Loading products...</p>
+                  </div>
+                ) : (
+                  modalProducts.map((item, index) => {
+                    const isSingleVariant = item?.variants?.length === 1;
+                    const totalStock = item?.variants?.reduce(
+                      (sum, variant) => sum + (variant?.stock?.available || 0),
+                      0
+                    );
+
+                    return (
+                      <div key={item._id || index}>
+                        {/* Main Product Row */}
+                        <div style={productListItemStyle}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "20px",
+                              // marginLeft: isSingleVariant ? "0" : "40px",
+                            }}
+                          >
+                            {isSingleVariant && (
+                              <div style={checkboxStyle}>
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    item?.variants?.[0]?.checked || false
+                                  }
+                                  disabled={
+                                    item?.variants?.[0]?.stock?.available === 0
+                                  }
+                                  onChange={(e) =>
+                                    handleCheck(e, item?.variants?.[0])
+                                  }
+                                  style={checkboxInputStyle}
+                                />
+                              </div>
+                            )}
+
+                            <div style={avatarStyle}>
+                              {item.title
+                                ? item.title.charAt(0).toUpperCase()
+                                : "P"}
+                            </div>
+
+                            <div style={productInfoStyle}>
+                              <div style={productNameStyle}>
+                                {item.title || ""}
+                              </div>
+                              <div style={productDescriptionStyle}>
+                                {item.category || ""}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "16px",
+                            }}
+                          >
+                            <div style={availabilityStyle}>
+                              {item?.variants?.[0]?.stock?.available === 0 ? (
+                                <span>
+                                  {item?.variants?.[0]?.stock?.available} out of
+                                  stock
+                                </span>
+                              ) : (
+                                <span>
+                                  {formatPrice(
+                                    item?.variants?.[0]?.stock?.available
+                                  ) || ""}{" "}
+                                  Available
+                                </span>
+                              )}
+                            </div>
+
+                            <div style={priceStyle}>
+                              Rs. {formatPrice(item?.variants?.[0]?.price) || 0}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Variants Section */}
+                        {!isSingleVariant && (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "12px",
+                              marginLeft: "48px",
+                              marginTop: "16px",
+                              paddingBottom: "16px",
+                              borderBottom: "2px solid #e0e0e0",
+                            }}
+                          >
+                            {item?.variants?.map((variant) => (
+                              <div
+                                key={variant?.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  margin: "8px 0",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "12px",
+                                    width: "400px",
+                                  }}
+                                >
+                                  <div style={checkboxStyle}>
+                                    <input
+                                      type="checkbox"
+                                      checked={variant?.checked || false}
+                                      disabled={variant?.stock?.available === 0}
+                                      onChange={(e) => handleCheck(e, variant)}
+                                      style={checkboxInputStyle}
+                                    />
+                                  </div>
+
+                                  <div style={avatarStyle}>
+                                    {variant?.sku
+                                      ? variant.sku.charAt(0).toUpperCase()
+                                      : "V"}
+                                  </div>
+
+                                  <div style={productNameStyle}>
+                                    {variant?.sku || ""}
+                                  </div>
+                                </div>
+
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "flex-end",
+                                    gap: "24px",
+                                    width: "100%",
+                                  }}
+                                >
+                                  <div style={availabilityStyle}>
+                                    {variant?.stock?.available === 0 ? (
+                                      <span>
+                                        {variant?.stock?.available} out of stock
+                                      </span>
+                                    ) : (
+                                      <span>
+                                        {formatPrice(
+                                          variant?.stock?.available
+                                        ) || ""}{" "}
+                                        Available
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div style={priceStyle}>
+                                    Rs. {formatPrice(variant?.price) || ""}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+
+                {!modalLoading && modalProducts.length === 0 && (
+                  <div style={noProductsStyle}>
+                    <p>No products found</p>
+                  </div>
+                )}
+              </div>
+
+              <div style={modalFooterStyle}>
+                <div style={paginationStyle}>
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    style={paginationButtonStyle}
+                  >
+                    &lt;&lt;
                   </button>
                   <button
-                    onClick={() => {
-                      // Handle add checked items
-                      const checkedItems = [];
-
-                      modalProducts.forEach((item) => {
-                        if (
-                          item?.variants?.length === 1 &&
-                          item?.variants?.[0]?.checked
-                        ) {
-                          // Single variant checked
-                          checkedItems.push({
-                            product: item,
-                            variant: item.variants[0],
-                          });
-                        } else if (item?.variants?.length > 1) {
-                          // Multiple variants - check each one
-                          item.variants.forEach((variant) => {
-                            if (variant?.checked) {
-                              checkedItems.push({
-                                product: item,
-                                variant: variant,
-                              });
-                            }
-                          });
-                        } else if (item?.checked) {
-                          // Product without variants checked
-                          checkedItems.push({
-                            product: item,
-                            variant: null,
-                          });
-                        }
-                      });
-
-                      // Add all checked items to selected items
-                      checkedItems.forEach(({ product, variant }) => {
-                        handleModalProductSelect(product, variant);
-                      });
-
-                      // Clear checked states
-                      const clearedProducts = modalProducts.map((item) => ({
-                        ...item,
-                        checked: false,
-                        variants: item.variants?.map((variant) => ({
-                          ...variant,
-                          checked: false,
-                        })),
-                      }));
-                      setModalProducts(clearedProducts);
-                      setSelectedProducts([]);
-                    }}
-                    style={addButtonStyle}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
+                    disabled={currentPage === 1}
+                    style={paginationButtonStyle}
                   >
-                    Add
+                    &lt;
                   </button>
+                  <span style={paginationInfoStyle}>
+                    {currentPage} / {modalTotalPages}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) =>
+                        Math.min(modalTotalPages, prev + 1)
+                      )
+                    }
+                    disabled={currentPage === modalTotalPages}
+                    style={paginationButtonStyle}
+                  >
+                    &gt;
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(modalTotalPages)}
+                    disabled={currentPage === modalTotalPages}
+                    style={paginationButtonStyle}
+                  >
+                    &gt;&gt;
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItemstems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                  }}
+                >
+                  <div style={selectionSummaryStyle}>
+                    {selectedProducts.length} /{" "}
+                    {modalProducts.reduce((acc, item) => {
+                      const variantsLength = item?.variants?.length || 0;
+                      return acc + (variantsLength > 1 ? variantsLength : 1);
+                    }, 0)}{" "}
+                    products selected
+                  </div>
+
+                  <div style={actionButtonsStyle}>
+                    <button
+                      onClick={handleModalClose}
+                      style={cancelButtonStyle}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Handle add checked items
+                        const checkedItems = [];
+
+                        modalProducts.forEach((item) => {
+                          if (
+                            item?.variants?.length === 1 &&
+                            item?.variants?.[0]?.checked
+                          ) {
+                            // Single variant checked
+                            checkedItems.push({
+                              product: item,
+                              variant: item.variants[0],
+                            });
+                          } else if (item?.variants?.length > 1) {
+                            // Multiple variants - check each one
+                            item.variants.forEach((variant) => {
+                              if (variant?.checked) {
+                                checkedItems.push({
+                                  product: item,
+                                  variant: variant,
+                                });
+                              }
+                            });
+                          } else if (item?.checked) {
+                            // Product without variants checked
+                            checkedItems.push({
+                              product: item,
+                              variant: null,
+                            });
+                          }
+                        });
+
+                        // Add all checked items to selected items
+                        checkedItems.forEach(({ product, variant }) => {
+                          handleModalProductSelect(product, variant);
+                        });
+
+                        // Clear checked states
+                        const clearedProducts = modalProducts.map((item) => ({
+                          ...item,
+                          checked: false,
+                          variants: item.variants?.map((variant) => ({
+                            ...variant,
+                            checked: false,
+                          })),
+                        }));
+                        setModalProducts(clearedProducts);
+                        setSelectedProducts([]);
+                      }}
+                      style={addButtonStyle}
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div style={actionsStyle}>
-        <button
-          type="button"
-          onClick={onClose}
-          style={secondaryButtonStyle}
-          disabled={isLoading || isSending}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          style={primaryButtonStyle}
-          disabled={isLoading || isSending}
-        >
-          {isSending
-            ? "Sending..."
-            : isLoading
-            ? "Processing..."
-            : "Place Order"}
-        </button>
-      </div>
-    </form>
+        <div style={actionsStyle}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={secondaryButtonStyle}
+            disabled={isLoading || isSending}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            style={primaryButtonStyle}
+            disabled={isLoading || isSending}
+          >
+            {isSending
+              ? "Sending..."
+              : isLoading
+              ? "Processing..."
+              : "Place Order"}
+          </button>
+        </div>
+      </form>
+    </>
   );
 };
 

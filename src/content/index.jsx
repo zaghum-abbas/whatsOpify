@@ -2563,9 +2563,9 @@ window.switchToChatSidebar = (contact) => {
 
 window.switchToOrderFormSidebar = (contact) => {
   console.log("🔄 Switching to order form sidebar mode");
-  if (contact) {
-    sidebarProps.contact = contact;
-  }
+  // if (contact) {
+  //   sidebarProps.contact = contact;
+  // }
   switchSidebarMode("orderForm");
 };
 

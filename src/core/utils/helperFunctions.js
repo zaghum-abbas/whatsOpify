@@ -248,3 +248,8 @@ export const getLatestOrder = (orders) => {
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   )[0];
 };
+
+export const formatImageUrl = (url) => {
+  if (!url) return "";
+  return url.startsWith("https") ? url : `https://static.shopilam.com/${url}`;
+};
