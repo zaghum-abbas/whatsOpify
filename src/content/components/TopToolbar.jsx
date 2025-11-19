@@ -519,8 +519,13 @@ const TopToolbar = (props) => {
         >
           <FaBell size={20} />
         </button>
-        {/* <button
-          onClick={() => handleClick("CreateOrder")}
+        <button
+          // onClick={() => handleClick("CreateOrder")}
+          onClick={() => {
+            // onCreateOrderClick();
+            window.switchToOrderFormSidebar("dsdsd");
+            // onClose();
+          }}
           style={{
             color: "#4a5568",
             transition: "all 0.2s",
@@ -542,7 +547,7 @@ const TopToolbar = (props) => {
           }}
         >
           🛒 Create Order
-        </button> */}
+        </button>
         <button
           onClick={() => handleClick("Orders")}
           style={{

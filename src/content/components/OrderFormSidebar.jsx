@@ -20,7 +20,7 @@ const OrderFormSidebar = ({
       }}
     >
       {/* Header Section */}
-      <div
+      {/* <div
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -67,7 +67,7 @@ const OrderFormSidebar = ({
         >
           ← Back
         </button>
-      </div>
+      </div> */}
 
       {/* Contact Info Card (if available) */}
       {contact && (contact.name || contact.phone) && (
@@ -133,7 +133,7 @@ const OrderFormSidebar = ({
           boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
           padding: "20px",
           border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-          flex: 1,
+          // flex: 1,
         }}
       >
         <ModalForm
@@ -152,7 +152,7 @@ const OrderFormSidebar = ({
       </div>
 
       {/* Footer Info */}
-      <div
+      {/* <div
         style={{
           marginTop: "20px",
           padding: "15px",
@@ -166,13 +166,9 @@ const OrderFormSidebar = ({
       >
         ℹ️ Fill out the form to create a new order for this customer. The order
         will be sent to WhatsApp upon completion.
-      </div>
+      </div> */}
     </div>
   );
 };
 
 export default OrderFormSidebar;
-
-
-
-

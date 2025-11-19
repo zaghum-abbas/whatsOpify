@@ -39,7 +39,7 @@ const ModalForm = ({ onClose, theme }) => {
       ],
     },
     financialStatus: "pending",
-    status: "open",
+    status: "confirm",
     pricing: {
       subTotal: 0,
       currentTotalPrice: 0,
@@ -87,21 +87,35 @@ const ModalForm = ({ onClose, theme }) => {
   const [modalTotalPages, setModalTotalPages] = useState(1);
   const [modalTotalProducts, setModalTotalProducts] = useState(0);
   const [selectedItems, setSelectedItems] = useState([]);
+  const [showNoProductModal, setShowNoProductModal] = useState(false);
+  const [manualProductDetails, setManualProductDetails] = useState({
+    price: "",
+  });
+  const [manualErrors, setManualErrors] = useState({});
 
   // State for cart totals
   const [cartTotals, setCartTotals] = useState({
-    subtotal: 0,
-    shipping: 0,
-    orderTax: 0,
-    extraCharges: 0,
-    discount: 0,
-    paidAlready: 0,
+    subtotal: 0, // Keep as 0 since it's readOnly and calculated
+    shipping: "", // Empty string for editable fields
+    orderTax: "",
+    extraCharges: "",
+    discount: "",
+    paidAlready: "",
   });
+
+  // Helper function to get numeric value from cartTotals (handles empty strings)
+  const getNumericValue = (value) => {
+    if (value === "" || value === null || value === undefined) return 0;
+    return Number(value) || 0;
+  };
 
   // State for uploaded payment proof image
   const [paymentProofImage, setPaymentProofImage] = useState(null);
   const [paymentProofImageUrl, setPaymentProofImageUrl] = useState("");
   const [isUploadingPaymentProof, setIsUploadingPaymentProof] = useState(false);
+
+  // State for shipper info
+  const [shipper, setShipper] = useState(null);
 
   // Calculate totals whenever selectedItems change
   useEffect(() => {
@@ -185,10 +199,10 @@ const ModalForm = ({ onClose, theme }) => {
             window.whatsapofyUserInfo.userInfo
           );
           // Pre-fill email if available from user info
-          setFormData((prev) => ({
-            ...prev,
-            email: window.whatsapofyUserInfo.userInfo.email || prev.email,
-          }));
+          // setFormData((prev) => ({
+          //   ...prev,
+          //   email: window.whatsapofyUserInfo.userInfo.email || prev.email,
+          // }));
         } else {
           console.warn(
             "⚠️ window.whatsapofyUserInfo.userInfo not available. Ensure user info is fetched."
@@ -203,6 +217,57 @@ const ModalForm = ({ onClose, theme }) => {
 
     loadInitialData();
   }, []); // Empty dependency array means this effect runs once on mount
+
+  // Fetch shipper info on component mount
+  useEffect(() => {
+    const fetchShipperInfo = async () => {
+      try {
+        const token = getToken();
+        if (!token) {
+          console.error("[SHIPPER] No token available");
+          return;
+        }
+
+        console.log(`[SHIPPER] Fetching shipper info for order`);
+
+        const response = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage(
+            {
+              action: "FETCH_SHIPPER_INFO",
+              token: token,
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                console.error(
+                  "[SHIPPER] Chrome runtime error:",
+                  chrome.runtime.lastError.message
+                );
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+              }
+              resolve(response);
+            }
+          );
+        });
+
+        console.log("[SHIPPER] API Response:", response);
+
+        if (response && response.success && response.shipper) {
+          console.log(`[SHIPPER] ✅ Found shipper:`, response.shipper);
+          setShipper(response.shipper);
+        } else {
+          console.error(
+            "[SHIPPER] API failed:",
+            response?.error || "Unknown error"
+          );
+        }
+      } catch (error) {
+        console.error("[SHIPPER] Error fetching shipper info:", error);
+      }
+    };
+
+    fetchShipperInfo();
+  }, []);
 
   // Effect to automatically update selectedVariant when selectedProduct changes
   useEffect(() => {
@@ -239,13 +304,9 @@ const ModalForm = ({ onClose, theme }) => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.phone.trim()) newErrors.phone = "Phone is required";
-    if (!formData.variantId.trim()) newErrors.variantId = "Variant is required";
     if (!formData.address.trim()) newErrors.address = "Address is required";
     if (!formData.city.trim()) newErrors.city = "City is required";
-    if (!formData.email.trim()) newErrors.email = "Email is required";
-    if (formData.quantity < 1)
-      newErrors.quantity = "Quantity must be at least 1";
-
+    // if (!formData.email.trim()) newErrors.email = "Email is required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -260,7 +321,7 @@ const ModalForm = ({ onClose, theme }) => {
 
     // Reset paidAlready and payment proof image when switching from prepaid to COD
     if (name === "paymentMethod" && value === "COD") {
-      setCartTotals((prev) => ({ ...prev, paidAlready: 0 }));
+      setCartTotals((prev) => ({ ...prev, paidAlready: "" }));
       setPaymentProofImage(null);
       setPaymentProofImageUrl("");
     }
@@ -524,26 +585,66 @@ const ModalForm = ({ onClose, theme }) => {
     }
   }, [currentPage, showProductModal]);
 
-  /**
-   * Handles the form submission, creates an order, and sends a WhatsApp message.
-   * @param {Object} e - The event object.
-   */
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmissionError(""); // Clear previous submission errors
-    if (!validateForm()) return; // Validate form before proceeding
+  const handleManualProductChange = (e) => {
+    const { name, value } = e.target;
+    setManualProductDetails((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
 
-    setIsSending(true); // Set sending state to true
+    // If price is being changed, also update extraCharges
+    if (name === "price") {
+      const priceValue = parseFloat(value) || 0;
+      setCartTotals((prev) => ({
+        ...prev,
+        extraCharges: priceValue > 0 ? String(priceValue) : "",
+      }));
+    }
 
-    try {
-      // Validate that at least one item is selected
-      if (selectedItems.length === 0) {
-        setSubmissionError("Please select at least one product.");
-        setIsSending(false);
+    if (manualErrors[name]) {
+      setManualErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const submitOrder = async ({ bypassProductCheck = false } = {}) => {
+    setSubmissionError("");
+
+    if (!validateForm()) {
+      return;
+    }
+
+    if (selectedItems.length === 0 && !bypassProductCheck) {
+      setShowNoProductModal(true);
+      return;
+    }
+
+    let manualPriceValue = 0;
+
+    if (bypassProductCheck) {
+      const errors = {};
+      const priceValue = parseFloat(manualProductDetails.price);
+
+      if (
+        !manualProductDetails.price.toString().trim() ||
+        Number.isNaN(priceValue) ||
+        priceValue <= 0
+      ) {
+        errors.price = "Enter a valid price greater than 0";
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setManualErrors(errors);
         return;
       }
 
-      // Get store ID
+      setManualErrors({});
+      manualPriceValue = priceValue;
+      setShowNoProductModal(false);
+    }
+
+    setIsSending(true);
+
+    try {
       let storeId = window.whatsapofyProducts?.storeId;
       if (!storeId) {
         const selectedStore = localStorage.getItem(
@@ -566,56 +667,55 @@ const ModalForm = ({ onClose, theme }) => {
         }
       }
 
-      // Calculate totals
-      const taxValue = (cartTotals.subtotal * cartTotals.orderTax) / 100;
-      const totalOrder =
-        cartTotals.subtotal +
-        cartTotals.shipping +
-        taxValue +
-        cartTotals.extraCharges -
-        cartTotals.discount;
+      const effectiveSubtotal =
+        selectedItems.length > 0 ? cartTotals.subtotal : manualPriceValue;
 
-      // Build extra charges array
+      const taxValue =
+        (effectiveSubtotal * getNumericValue(cartTotals.orderTax)) / 100;
+      const totalOrder =
+        effectiveSubtotal +
+        getNumericValue(cartTotals.shipping) +
+        taxValue +
+        getNumericValue(cartTotals.extraCharges) -
+        getNumericValue(cartTotals.discount);
+
       const extraChargesArray = [];
-      if (cartTotals.extraCharges > 0) {
+      const extraChargesValue = getNumericValue(cartTotals.extraCharges);
+      if (extraChargesValue > 0) {
         extraChargesArray.push({
           key: "Extra Charges",
-          value: cartTotals.extraCharges,
+          value: extraChargesValue,
         });
       } else {
-        // Keep the structure with empty key if no extra charges
         extraChargesArray.push({
           key: "",
           value: 0,
         });
       }
 
-      // Get productId from first selected item
       const productId =
-        selectedItems[0]?.product?._id || selectedItems[0]?.product?.id || "";
+        selectedItems.length > 0 ? selectedItems[0]?.product?._id || "" : null;
 
-      // Validate productId
-      if (productId === "") {
+      if (!bypassProductCheck && (productId === "" || productId === null)) {
         setSubmissionError("Please select a product!");
         setIsSending(false);
         return;
       }
 
-      // Build shipperInfo from userInfo
+      // Use fetched shipper data, fallback to userInfo if shipper not available
       const shipperInfoWithExtras = {
-        _id: userInfo?._id || "",
-        accountId: userInfo?.shopilamSurvey?.accountId || "",
-        default: userInfo?.default || false,
-        labelStoreName: userInfo?.name || "",
-        phoneNumber: formData.phone || "",
-        locationName: userInfo?.location || "",
-        city: userInfo?.city || "",
-        returnAddress: userInfo?.address || "",
-        address: userInfo?.address || "",
-        country: userInfo?.country || "Pakistan",
+        _id: shipper._id || "",
+        accountId: shipper.accountId || "",
+        default: shipper.default || false,
+        labelStoreName: shipper.labelStoreName || "",
+        phoneNumber: shipper.phoneNumber || "",
+        locationName: shipper.locationName || "",
+        city: shipper.city || "",
+        returnAddress: shipper.returnAddress || "",
+        address: shipper.address || "",
+        country: shipper.country || "Pakistan",
       };
 
-      // Extract _id, accountId, and default from shipperInfo and exclude them
       const {
         _id,
         accountId,
@@ -623,43 +723,135 @@ const ModalForm = ({ onClose, theme }) => {
         ...shipperInfoData
       } = shipperInfoWithExtras;
 
-      // Build lineItems from selectedItems (similar to the provided logic)
-      const lineItems = selectedItems.map((item) => {
-        const variant = item.variant;
-        const product = item.product;
+      // If creating order without product, use different payload structure
+      if (bypassProductCheck) {
+        // Calculate totalCOD (total order minus prepaid amount)
+        const totalCOD =
+          formData.paymentMethod === "prepaid"
+            ? totalOrder - getNumericValue(cartTotals.paidAlready)
+            : totalOrder;
 
-        // Get image URL - prioritize variant image, then product image
-        let imageUrl = "";
-        if (variant?.image) {
-          imageUrl = variant.image;
-        } else if (product?.images && product.images.length > 0) {
-          imageUrl = formatImageUrl(
-            product.images[0]?.url || product.images[0] || ""
-          );
-        } else if (product?.image) {
-          imageUrl = product.image;
-        } else {
-          imageUrl = "https://placehold.co/50x50/cccccc/000000?text=Product";
-        }
-
-        return {
-          variantId: variant?.id || variant?.variantId || "",
-          sku: variant?.sku || item.sku || "",
-          quantity: item.quantity || 1,
-          name:
-            variant?.title ||
-            variant?.name ||
-            item.name ||
-            product?.title ||
-            "",
-          price: parseFloat(variant?.price || item.price || 0),
-          image: formatImageUrl(imageUrl),
-          vendor: product?.vendor || "",
-          weight: variant?.weight || 0,
+        const payload = {
+          totalCOD: Number(totalCOD),
+          shipmentDetails: {
+            shipmentType: formData.shipmentType || "",
+            email: formData.email || "",
+            addresses: [
+              {
+                company: formData.company || "",
+                address1: formData.address || formData.address1 || "",
+                address2: formData.address2 || "",
+                city: {
+                  city: formData.city || "",
+                  typo: "",
+                },
+                province: formData.province || "",
+                country: "Pakistan",
+                zip: formData.zip || "",
+                phone: formatPhoneNumber(formData.phone || ""),
+                name: formData.name || "",
+              },
+            ],
+          },
+          shipperInfo: {
+            labelStoreName: shipperInfoData.labelStoreName || "",
+            phoneNumber: shipperInfoData.phoneNumber || "",
+            locationName: shipperInfoData.locationName || "",
+            city: shipperInfoData.city || "",
+            returnAddress: shipperInfoData.returnAddress || "",
+            address: shipperInfoData.address || "",
+            country: shipperInfoData.country || "Pakistan",
+          },
+          note: formData.note || "",
         };
-      });
 
-      // Build initial payload
+        console.log(
+          "📤 Sending order without product (values after modification):",
+          payload
+        );
+
+        // Use manual-order endpoint if creating order without product
+        const apiEndpoint =
+          "https://api.shopilam.com/api/v1/orders/manual-order";
+
+        const response = await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          console.log("📦 Order created:", data);
+          alert(data.message);
+          // Reset manual product details and close modals
+          setManualProductDetails({ name: "", price: "" });
+          setShowNoProductModal(false);
+          setManualErrors({});
+          onClose();
+        } else {
+          const errorMessage =
+            (data && data.message) || "Order creation failed";
+          console.error("Order creation failed:", errorMessage);
+          setSubmissionError(`Failed to create order: ${errorMessage}`);
+        }
+        setIsSending(false);
+        return;
+      }
+
+      const lineItems =
+        selectedItems.length > 0
+          ? selectedItems.map((item) => {
+              const variant = item.variant;
+              const product = item.product;
+
+              let imageUrl = "";
+              if (variant?.image) {
+                imageUrl = variant.image;
+              } else if (product?.images && product.images.length > 0) {
+                imageUrl = formatImageUrl(
+                  product.images[0]?.url || product.images[0] || ""
+                );
+              } else if (product?.image) {
+                imageUrl = product.image;
+              } else {
+                imageUrl =
+                  "https://placehold.co/50x50/cccccc/000000?text=Product";
+              }
+
+              return {
+                variantId: variant?.id || variant?.variantId || "",
+                sku: variant?.sku || item.sku || "",
+                quantity: item.quantity || 1,
+                name:
+                  variant?.title ||
+                  variant?.name ||
+                  item.name ||
+                  product?.title ||
+                  "",
+                price: parseFloat(variant?.price || item.price || 0),
+                image: formatImageUrl(imageUrl),
+                vendor: product?.vendor || "",
+                weight: variant?.weight || 0,
+              };
+            })
+          : [
+              {
+                variantId: "",
+                sku: "",
+                quantity: 1,
+                name: "",
+                price: manualPriceValue,
+                image: "",
+                vendor: "",
+                weight: 0,
+              },
+            ];
+
       let payload = {
         storeId: storeId,
         productId: productId,
@@ -682,21 +874,22 @@ const ModalForm = ({ onClose, theme }) => {
           ],
         },
         financialStatus: "pending",
-        status: "open",
+        status: "confirm",
         pricing: {
-          subTotal: Number(cartTotals.subtotal),
+          subTotal: Number(effectiveSubtotal),
           currentTotalPrice: Number(totalOrder),
           paid:
-            formData.paymentMethod === "prepaid" ? cartTotals.paidAlready : 0,
-          shipping: Number(cartTotals.shipping),
-          taxPercentage: cartTotals.orderTax,
+            formData.paymentMethod === "prepaid"
+              ? getNumericValue(cartTotals.paidAlready)
+              : 0,
+          shipping: getNumericValue(cartTotals.shipping),
+          taxPercentage: getNumericValue(cartTotals.orderTax),
           taxValue: Number(taxValue),
           paymentProof: paymentProofImageUrl || "",
           extra: extraChargesArray,
         },
       };
 
-      // If payment method is COD, set paid to 0 and paymentProof to empty string
       if (payload.paymentMethod === "COD") {
         payload = {
           ...payload,
@@ -707,7 +900,6 @@ const ModalForm = ({ onClose, theme }) => {
           },
         };
       } else {
-        // For prepaid, ensure we use the uploaded URL, not base64
         payload = {
           ...payload,
           pricing: {
@@ -717,7 +909,6 @@ const ModalForm = ({ onClose, theme }) => {
         };
       }
 
-      // Ensure paymentProof is set (fallback to empty string)
       const updatedValues = {
         ...payload,
         pricing: {
@@ -731,7 +922,10 @@ const ModalForm = ({ onClose, theme }) => {
         updatedValues
       );
 
-      const response = await fetch("https://api.shopilam.com/api/v1/orders", {
+      // Use standard orders endpoint for orders with products
+      const apiEndpoint = "https://api.shopilam.com/api/v1/orders";
+
+      const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -747,9 +941,12 @@ const ModalForm = ({ onClose, theme }) => {
 
         alert(data.message);
 
-        onClose(); // Close the modal on successful order creation
+        // Reset manual product details and close modals
+        setManualProductDetails({ name: "", price: "" });
+        setShowNoProductModal(false);
+        setManualErrors({});
+        onClose();
       } else {
-        // Handle order creation failure
         const errorMessage = (data && data.message) || "Order creation failed";
         console.error("Order creation failed:", errorMessage);
         setSubmissionError(`Failed to create order: ${errorMessage}`);
@@ -758,8 +955,13 @@ const ModalForm = ({ onClose, theme }) => {
       console.error("Order error:", error);
       setSubmissionError(`Failed to create order: ${error.message}`);
     } finally {
-      setIsSending(false); // Turn off sending state regardless of success or failure
+      setIsSending(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await submitOrder({ bypassProductCheck: false });
   };
 
   // Filter selectedProduct.variants to ensure they are valid and have an ID for the second dropdown (Variant)
@@ -776,6 +978,17 @@ const ModalForm = ({ onClose, theme }) => {
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+          }
+          
+          /* Hide number input spinners */
+          input[type="number"]::-webkit-inner-spin-button,
+          input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+          }
+          
+          input[type="number"] {
+            -moz-appearance: textfield;
           }
         `}
       </style>
@@ -936,7 +1149,7 @@ const ModalForm = ({ onClose, theme }) => {
               )}
 
               {/* Payment Method Section */}
-              <div style={sectionStyle}>
+              {/* <div style={sectionStyle}>
                 <h3
                   style={{
                     ...sectionHeaderStyle,
@@ -962,15 +1175,97 @@ const ModalForm = ({ onClose, theme }) => {
                     </label>
                   ))}
                 </div>
+              </div> */}
+              {/* Shipping Information Section */}
+              <div style={sectionStyle}>
+                <h3
+                  style={{
+                    ...sectionHeaderStyle,
+                    color: theme === "dark" ? "white" : "#222",
+                  }}
+                >
+                  Shipping Information
+                </h3>
+                <div style={fieldGroupStyle}>
+                  <div style={fieldStyle}>
+                    {/* <label style={labelStyle}>Name*</label> */}
+                    <input
+                      name="name"
+                      placeholder="Name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                      style={{ ...inputStyle }}
+                    />
+                    {errors.name && (
+                      <span style={errorStyle}>{errors.name}</span>
+                    )}
+                  </div>
+                  <div style={fieldStyle}>
+                    {/* <label style={labelStyle}>Phone Number*</label> */}
+                    <input
+                      type="tel"
+                      name="phone"
+                      placeholder="Phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      style={inputStyle}
+                    />
+                    {errors.phone && (
+                      <span style={errorStyle}>{errors.phone}</span>
+                    )}
+                  </div>
+                  {/* <div style={fieldStyle}>
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="Enter your email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      style={inputStyle}
+                    />
+                    {errors.email && (
+                      <span style={errorStyle}>{errors.email}</span>
+                    )}
+                  </div> */}
+                  <div style={fieldStyle}>
+                    {/* <label style={labelStyle}>City*</label> */}
+                    <input
+                      // type="text"
+                      name="city"
+                      placeholder="City"
+                      value={formData.city}
+                      onChange={handleChange}
+                      style={inputStyle}
+                    />
+                    {errors.city && (
+                      <span style={errorStyle}>{errors.city}</span>
+                    )}
+                  </div>
+                  <div style={fieldStyle}>
+                    {/* <label style={labelStyle}>Address*</label> */}
+                    <textarea
+                      type="text"
+                      name="address"
+                      placeholder="Address"
+                      value={formData.address}
+                      onChange={handleChange}
+                      required
+                      style={inputStyle}
+                    />
+                    {errors.address && (
+                      <span style={errorStyle}>{errors.address}</span>
+                    )}
+                  </div>
+                </div>
               </div>
-
               {/* Cart Totals Section */}
               <div style={sectionStyle}>
                 <h3
                   style={{
                     ...sectionHeaderStyle,
                     color: theme === "dark" ? "white" : "#222",
-                    marginBottom: "16px",
+                    marginBottom: "8px",
                   }}
                 >
                   Cart Totals
@@ -980,7 +1275,7 @@ const ModalForm = ({ onClose, theme }) => {
                     borderTop: `1px solid ${
                       theme === "dark" ? "#333" : "#e2e8f0"
                     }`,
-                    paddingTop: "16px",
+                    paddingTop: "8px",
                   }}
                 >
                   {/* Subtotal */}
@@ -989,7 +1284,7 @@ const ModalForm = ({ onClose, theme }) => {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      marginBottom: "12px",
+                      marginBottom: "8px",
                     }}
                   >
                     <div
@@ -1024,9 +1319,8 @@ const ModalForm = ({ onClose, theme }) => {
                         ...inputStyle,
                         width: "120px",
                         textAlign: "right",
-                        backgroundColor:
-                          theme === "dark" ? "#2a2a2a" : "#f5f5f5",
-                        color: theme === "dark" ? "white" : "#222",
+                        backgroundColor: "white",
+                        color: "#222",
                       }}
                     />
                   </div>
@@ -1070,21 +1364,22 @@ const ModalForm = ({ onClose, theme }) => {
                       onChange={(e) =>
                         setCartTotals((prev) => ({
                           ...prev,
-                          shipping: parseFloat(e.target.value) || 0,
+                          shipping: e.target.value,
                         }))
                       }
                       style={{
                         ...inputStyle,
                         width: "120px",
                         textAlign: "right",
-                        backgroundColor: theme === "dark" ? "#1a1a1a" : "#fff",
-                        color: theme === "dark" ? "white" : "#222",
+                        backgroundColor: "white",
+                        color: "#222",
                       }}
+                      min={0}
                     />
                   </div>
 
                   {/* Order Tax */}
-                  <div
+                  {/* <div
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
@@ -1108,35 +1403,33 @@ const ModalForm = ({ onClose, theme }) => {
                         onChange={(e) =>
                           setCartTotals((prev) => ({
                             ...prev,
-                            orderTax: parseFloat(e.target.value) || 0,
+                            orderTax: e.target.value,
                           }))
                         }
                         style={{
                           ...inputStyle,
                           width: "80px",
                           textAlign: "right",
-                          backgroundColor:
-                            theme === "dark" ? "#2a2a2a" : "#f5f5f5",
-                          color: theme === "dark" ? "white" : "#222",
+                          backgroundColor: "white",
+                          color: "#222",
                         }}
                       />
                       <input
                         type="number"
                         value={
-                          (cartTotals.subtotal * cartTotals.orderTax) / 100 || 0
+                          (cartTotals.subtotal * getNumericValue(cartTotals.orderTax)) / 100 || 0
                         }
                         readOnly
                         style={{
                           ...inputStyle,
                           width: "120px",
                           textAlign: "right",
-                          backgroundColor:
-                            theme === "dark" ? "#2a2a2a" : "#f5f5f5",
-                          color: theme === "dark" ? "white" : "#222",
+                          backgroundColor: "white",
+                          color: "#222",
                         }}
                       />
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* Extra Charges */}
                   <div
@@ -1162,9 +1455,8 @@ const ModalForm = ({ onClose, theme }) => {
                         style={{
                           ...inputStyle,
                           width: "120px",
-                          backgroundColor:
-                            theme === "dark" ? "#1a1a1a" : "#fff",
-                          color: theme === "dark" ? "white" : "#222",
+                          backgroundColor: "white",
+                          color: "#222",
                         }}
                       />
                       <input
@@ -1173,23 +1465,22 @@ const ModalForm = ({ onClose, theme }) => {
                         onChange={(e) =>
                           setCartTotals((prev) => ({
                             ...prev,
-                            extraCharges: parseFloat(e.target.value) || 0,
+                            extraCharges: e.target.value,
                           }))
                         }
                         style={{
                           ...inputStyle,
                           width: "120px",
                           textAlign: "right",
-                          backgroundColor:
-                            theme === "dark" ? "#2a2a2a" : "#f5f5f5",
-                          color: theme === "dark" ? "white" : "#222",
+                          backgroundColor: "white",
+                          color: "#222",
                         }}
                       />
                     </div>
                   </div>
 
                   {/* Discount */}
-                  <div
+                  {/* <div
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
@@ -1211,19 +1502,18 @@ const ModalForm = ({ onClose, theme }) => {
                       onChange={(e) =>
                         setCartTotals((prev) => ({
                           ...prev,
-                          discount: parseFloat(e.target.value) || 0,
+                          discount: e.target.value,
                         }))
                       }
                       style={{
                         ...inputStyle,
                         width: "120px",
                         textAlign: "right",
-                        backgroundColor:
-                          theme === "dark" ? "#2a2a2a" : "#f5f5f5",
-                        color: theme === "dark" ? "white" : "#222",
+                        backgroundColor: "white",
+                        color: "#222",
                       }}
                     />
-                  </div>
+                  </div> */}
 
                   {/* Paid Already - Only show for Prepaid */}
                   {formData.paymentMethod === "prepaid" && (
@@ -1250,7 +1540,7 @@ const ModalForm = ({ onClose, theme }) => {
                           onChange={(e) =>
                             setCartTotals((prev) => ({
                               ...prev,
-                              paidAlready: parseFloat(e.target.value) || 0,
+                              paidAlready: e.target.value,
                             }))
                           }
                           style={{
@@ -1453,8 +1743,8 @@ const ModalForm = ({ onClose, theme }) => {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      marginTop: "16px",
-                      paddingTop: "16px",
+                      marginTop: "8px",
+                      paddingTop: "8px",
                       borderTop: `1px solid ${
                         theme === "dark" ? "#333" : "#e2e8f0"
                       }`,
@@ -1480,10 +1770,12 @@ const ModalForm = ({ onClose, theme }) => {
                       Rs.{" "}
                       {formatPrice(
                         cartTotals.subtotal +
-                          cartTotals.shipping +
-                          (cartTotals.subtotal * cartTotals.orderTax) / 100 +
-                          cartTotals.extraCharges -
-                          cartTotals.discount
+                          getNumericValue(cartTotals.shipping) +
+                          (cartTotals.subtotal *
+                            getNumericValue(cartTotals.orderTax)) /
+                            100 +
+                          getNumericValue(cartTotals.extraCharges) -
+                          getNumericValue(cartTotals.discount)
                       )}
                     </span>
                   </div>
@@ -1515,96 +1807,17 @@ const ModalForm = ({ onClose, theme }) => {
                       Rs.{" "}
                       {formatPrice(
                         cartTotals.subtotal +
-                          cartTotals.shipping +
-                          (cartTotals.subtotal * cartTotals.orderTax) / 100 +
-                          cartTotals.extraCharges -
-                          cartTotals.discount -
+                          getNumericValue(cartTotals.shipping) +
+                          (cartTotals.subtotal *
+                            getNumericValue(cartTotals.orderTax)) /
+                            100 +
+                          getNumericValue(cartTotals.extraCharges) -
+                          getNumericValue(cartTotals.discount) -
                           (formData.paymentMethod === "prepaid"
-                            ? cartTotals.paidAlready
+                            ? getNumericValue(cartTotals.paidAlready)
                             : 0)
                       )}
                     </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Shipping Information Section */}
-              <div style={sectionStyle}>
-                <h3
-                  style={{
-                    ...sectionHeaderStyle,
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  Shipping Information
-                </h3>
-                <div style={fieldGroupStyle}>
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>Name*</label>
-                    <input
-                      name="name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                      style={{ ...inputStyle }}
-                    />
-                    {errors.name && (
-                      <span style={errorStyle}>{errors.name}</span>
-                    )}
-                  </div>
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>Phone Number*</label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      style={inputStyle}
-                    />
-                    {errors.phone && (
-                      <span style={errorStyle}>{errors.phone}</span>
-                    )}
-                  </div>
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>Email</label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      style={inputStyle}
-                    />
-                    {errors.email && (
-                      <span style={errorStyle}>{errors.email}</span>
-                    )}
-                  </div>
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>City*</label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                      required
-                      style={inputStyle}
-                    />
-                    {errors.city && (
-                      <span style={errorStyle}>{errors.city}</span>
-                    )}
-                  </div>
-                  <div style={fieldStyle}>
-                    <label style={labelStyle}>Address*</label>
-                    <textarea
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      required
-                      style={inputStyle}
-                    />
-                    {errors.address && (
-                      <span style={errorStyle}>{errors.address}</span>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1976,6 +2189,126 @@ const ModalForm = ({ onClose, theme }) => {
           </div>
         )}
 
+        {showNoProductModal && (
+          <div style={modalOverlayStyle}>
+            <div style={{ ...modalStyle, maxWidth: "420px" }}>
+              <div style={modalHeaderStyle}>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: "1.3rem",
+                    color: "#333",
+                    fontWeight: "600",
+                  }}
+                >
+                  Create Order Without Product
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowNoProductModal(false);
+                    setManualErrors({});
+                  }}
+                  style={closeButtonStyle}
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "16px",
+                }}
+              >
+                <p style={{ margin: 0, color: "#555", lineHeight: 1.5 }}>
+                  Are you sure you want to create an order without selecting a
+                  product? Please provide the product name and price to
+                  continue.
+                </p>
+
+                {/* <div style={fieldStyle}>
+                  <label style={labelStyle}>Product Name</label>
+                  <input
+                    name="name"
+                    placeholder="Enter product name"
+                    value={manualProductDetails.name}
+                    onChange={handleManualProductChange}
+                    style={inputStyle}
+                  />
+                  {manualErrors.name && (
+                    <span style={errorStyle}>{manualErrors.name}</span>
+                  )}
+                </div> */}
+
+                <div style={fieldStyle}>
+                  <label style={labelStyle}>Price</label>
+                  <input
+                    type="number"
+                    name="price"
+                    placeholder="Enter price"
+                    value={manualProductDetails.price}
+                    onChange={handleManualProductChange}
+                    style={inputStyle}
+                  />
+                  {manualErrors.price && (
+                    <span style={errorStyle}>{manualErrors.price}</span>
+                  )}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  ...actionsStyle,
+                  justifyContent: "flex-end",
+                  marginTop: "24px",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNoProductModal(false);
+                    setManualErrors({});
+                  }}
+                  style={secondaryButtonStyle}
+                  disabled={isSending}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => submitOrder({ bypassProductCheck: true })}
+                  style={{
+                    ...primaryButtonStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                    opacity: isSending ? 0.7 : 1,
+                    cursor: isSending ? "not-allowed" : "pointer",
+                  }}
+                  disabled={isSending}
+                >
+                  {isSending && (
+                    <div
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        border: "2px solid white",
+                        borderTop: "2px solid transparent",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite",
+                      }}
+                    />
+                  )}
+                  {isSending ? "Creating Order..." : "Create Order"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={actionsStyle}>
           <button
             type="button"
@@ -2068,7 +2401,7 @@ const headerStyle = {
 const sectionContainerStyle = {
   display: "flex",
   flexDirection: "column",
-  gap: "25px",
+  gap: "10px",
 };
 
 const sectionStyle = {};
@@ -2081,7 +2414,7 @@ const sectionHeaderStyle = {
 const fieldGroupStyle = {
   display: "flex",
   flexDirection: "column",
-  gap: "15px",
+  gap: "10px",
 };
 
 const fieldStyle = {};
@@ -2110,7 +2443,6 @@ const errorStyle = {
 
 const radioGroupStyle = {
   display: "flex",
-  flexDirection: "column",
   gap: "10px",
 };
 

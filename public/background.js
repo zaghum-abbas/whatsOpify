@@ -690,6 +690,86 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       return true;
 
+    case "FETCH_SHIPPER_INFO":
+      const shipperToken = request.token;
+
+      console.log("[BG] FETCH_SHIPPER_INFO request received:", {
+        token: shipperToken ? shipperToken.substring(0, 20) + "..." : "undefined",
+      });
+
+      if (!shipperToken) {
+        console.error("[BG] No token provided in FETCH_SHIPPER_INFO request");
+        sendResponse({
+          success: false,
+          error: "No authentication token provided",
+        });
+        return false;
+      }
+
+      const shipperApiUrl = "https://api.shopilam.com/api/v1/shipper-info";
+
+      const shipperHeaders = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${shipperToken}`,
+      };
+
+      console.log("[BG] Making shipper info request to:", shipperApiUrl);
+      console.log("[BG] Request headers:", shipperHeaders);
+
+      fetch(shipperApiUrl, {
+        method: "GET",
+        headers: shipperHeaders,
+      })
+        .then((response) => {
+          console.log("[BG] Shipper info API response status:", response.status);
+          console.log(
+            "[BG] Shipper info API response headers:",
+            Object.fromEntries(response.headers.entries())
+          );
+
+          // Check for 401 Unauthorized status
+          if (response.status === 401) {
+            console.warn("[BG] 401 Unauthorized - Token expired or invalid");
+            handleUnauthorizedResponse();
+            return response.text().then((text) => {
+              throw new Error("Authentication required. Please log in again.");
+            });
+          }
+
+          if (!response.ok) {
+            return response.text().then((text) => {
+              console.error("[BG] Shipper info API error response:", text);
+              throw new Error(
+                `HTTP error! status: ${response.status}, message: ${text}`
+              );
+            });
+          }
+          return response.json();
+        })
+        .then((shipperData) => {
+          console.log("[BG] Shipper info API success response:", shipperData);
+          
+          // Get shipper from index 0
+          let shipper = null;
+          if (Array.isArray(shipperData)) {
+            shipper = shipperData[0] || null;
+          } else if (Array.isArray(shipperData?.data)) {
+            shipper = shipperData.data[0] || null;
+          } else if (shipperData?.shipper) {
+            shipper = Array.isArray(shipperData.shipper) 
+              ? shipperData.shipper[0] || null
+              : shipperData.shipper;
+          }
+          
+          console.log("[BG] Shipper (index 0):", shipper);
+          sendResponse({ success: true, shipper: shipper });
+        })
+        .catch((error) => {
+          console.error("[BG] Shipper info fetch error:", error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true;
+
     default:
       console.warn("Unknown message action:", request.action);
       return false;
