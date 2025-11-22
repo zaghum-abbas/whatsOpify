@@ -238,9 +238,7 @@ const DefaultSidebar = ({
             background: whatsappTheme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-            border: `1px solid ${
-              whatsappTheme === "dark" ? "#333" : "#e2e8f0"
-            }`,
+            border: `1px solid #333`,
           }}
         >
           <OrdersSection whatsappTheme={whatsappTheme} />

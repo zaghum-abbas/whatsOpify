@@ -251,33 +251,26 @@ export const getActiveChatDetails = async () => {
 
   const result = { name, phone };
 
-  // Close the contact info panel after a longer delay
   setTimeout(() => {
-    const closeSelectors = [
-      'div[aria-expanded="false"][aria-label="Close"]',
-      'div[aria-label="Close"]',
-      'button[aria-label="Close"]',
-      '[data-testid="close"]',
-    ];
+    const candidates = document.querySelectorAll(
+      "button[aria-disabled='false'][aria-expanded='false'][tabindex='0'][type='button']"
+    );
 
-    let closeDiv = null;
-    for (const selector of closeSelectors) {
-      closeDiv = document.querySelector(selector);
-      if (closeDiv) {
-        console.log("🔍 Found close button with selector:", selector);
-        break;
+    candidates.forEach((candidate) => {
+      const titleTag = candidate.querySelector("title");
+
+      if (titleTag) {
+        const text = titleTag.textContent.trim();
+        console.log("Title text:", text);
+
+        if (text === "ic-close") {
+          console.log("Clicked close button");
+          candidate.click();
+        }
       }
-    }
+    });
+  }, 100);
 
-    if (closeDiv) {
-      closeDiv.click();
-      console.log("❌ Closed contact info panel");
-    } else {
-      console.warn("⚠️ Could not find close button!");
-    }
-  }, 100); // Wait 1 second before closing
-
-  // Reset the flag after a delay to allow for proper cleanup
   setTimeout(() => {
     isExtractingContact = false;
     console.log("✅ Contact extraction completed, flag reset");
@@ -1289,9 +1282,12 @@ const htmlThemeObserver = new MutationObserver(() => {
   }
 });
 
+// Observe all changes in the DOM (attributes, child elements, subtree)
 htmlThemeObserver.observe(document.documentElement, {
   attributes: true,
   attributeFilter: ["data-theme", "class"],
+  childList: true,
+  subtree: true,
 });
 
 // Inject Top Toolbar
@@ -1510,6 +1506,17 @@ function injectChatListEnhancer() {
 }
 
 function ensureMainContentMargin(applyToSecond = false) {
+  const mainAppContent = document.getElementById("app");
+
+  if (mainAppContent) {
+    mainAppContent.style.setProperty("top", "48px", "important");
+    mainAppContent.style.setProperty(
+      "max-height",
+      "calc(100vh - 48px)",
+      "important"
+    );
+  }
+
   const allDivs = document.querySelectorAll("div");
 
   const matchingDivs = [];
@@ -1532,37 +1539,36 @@ function ensureMainContentMargin(applyToSecond = false) {
   let targetDiv = null;
   let otherDiv = null;
 
-  if (applyToSecond && matchingDivs.length >= 2) {
-    targetDiv = matchingDivs[1];
-    otherDiv = matchingDivs[0];
-  } else if (matchingDivs.length >= 1) {
-    targetDiv = matchingDivs[0];
-    if (matchingDivs.length >= 2) {
-      otherDiv = matchingDivs[1];
-    }
-  }
+  // if (applyToSecond && matchingDivs.length >= 2) {
+  //   targetDiv = matchingDivs[1];
+  //   otherDiv = matchingDivs[0];
+  // } else if (matchingDivs.length >= 1) {
+  //   targetDiv = matchingDivs[0];
+  //   if (matchingDivs.length >= 2) {
+  //     otherDiv = matchingDivs[1];
+  //   }
+  // }
 
-  // Check if sidebar is open
   const sidebarElement = document.getElementById("whatsapp-sidebar-root");
   const isSidebarOpen =
     sidebarElement && sidebarElement.style.display !== "none";
   const marginRight = isSidebarOpen ? "400px" : "0px";
 
-  if (targetDiv) {
-    // targetDiv.style.marginTop = "48px";
-    targetDiv.style.paddingTop = "48px";
-    targetDiv.style.marginRight = marginRight;
+  // if (targetDiv) {
+  //   targetDiv.style.marginTop = "0px";
+  //   targetDiv.style.paddingTop = "48px";
+  //   targetDiv.style.marginRight = marginRight;
 
-    const divIndex =
-      applyToSecond && matchingDivs.length >= 2 ? "SECOND" : "FIRST";
-  }
+  //   const divIndex =
+  //     applyToSecond && matchingDivs.length >= 2 ? "SECOND" : "FIRST";
+  // }
 
-  if (otherDiv) {
-    otherDiv.style.marginTop = "0px";
-    otherDiv.style.marginRight = "0px";
-    otherDiv.style.maxHeight = "calc(100vh - 48px)";
-    otherDiv.style.overflow = "hidden";
-  }
+  // if (otherDiv) {
+  //   otherDiv.style.marginTop = "0px";
+  //   otherDiv.style.marginRight = "0px";
+  //   otherDiv.style.maxHeight = "calc(100vh - 48px)";
+  //   otherDiv.style.overflow = "hidden";
+  // }
 }
 
 function setupMainContentMarginObserver() {
@@ -1742,63 +1748,31 @@ waitForElement("#pane-side", () => {
   observeActiveChat();
 });
 
-// Function to add multiple images to WhatsApp chat in bulk
 async function addImagesToChat(imageFiles) {
   try {
-    console.log(
-      "[BULK_IMAGE] Adding multiple images to chat:",
-      imageFiles.length
+    const attachButtonCandidates = document.querySelectorAll(
+      "button[aria-disabled='false'][aria-expanded='false'][tabindex='0'][type='button']"
     );
+    attachButtonCandidates.forEach((candidate) => {
+      const titleTag = candidate.querySelector("title");
+      if (titleTag) {
+        const text = titleTag.textContent.trim();
+        console.log("Title text:", text);
 
-    // Enhanced selectors for attachment button
-    const attachButtonSelectors = [
-      '[data-testid="clip"]',
-      'button[aria-label*="Attach"]',
-      'span[data-testid="clip"]',
-      '[title*="Attach"]',
-      '[aria-label*="Attach"]',
-      'button[title*="Attach"]',
-      ".attach-button",
-      '[data-icon="clip"]',
-    ];
-
-    let attachButton = null;
-    for (const selector of attachButtonSelectors) {
-      attachButton = document.querySelector(selector);
-      if (attachButton) {
-        console.log(
-          "[BULK_IMAGE] Found attachment button with selector:",
-          selector
-        );
-        break;
+        if (text === "plus-rounded") {
+          console.log("Clicked close button");
+          candidate.click();
+        }
       }
-    }
+    });
 
-    if (!attachButton) {
-      console.error(
-        "[BULK_IMAGE] Attachment button not found. Available buttons:",
-        document.querySelectorAll('button, span[role="button"]')
-      );
-      return false;
-    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
 
-    console.log("[BULK_IMAGE] Clicking attachment button...");
-    attachButton.click();
-
-    // Wait for attachment menu to appear
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    // Enhanced selectors for photo/image option
     const photoButtonSelectors = [
-      '[data-testid="mi-attach-photo"]',
       'input[accept*="image"]',
-      'button[aria-label*="Photos"]',
-      '[title*="Photos"]',
-      '[aria-label*="Photos"]',
-      'button[title*="Photos"]',
-      '[data-testid="attach-photo"]',
-      'li[data-testid="mi-attach-photo"]',
-      'div[data-testid="mi-attach-photo"]',
+      'input[accept*="video/mp4"]',
+      'input[accept*="video/3gpp"]',
+      'input[accept*="video/quicktime"]',
     ];
 
     let photoButton = null;
@@ -2218,68 +2192,6 @@ window.sendMessageToCurrentChat = function (
 // as the toggleWhatsappSidebar function creates it if it doesn't exist
 // and adjusts mainAppContent's margin.
 
-// Debug function to inspect WhatsApp DOM structure
-window.debugWhatsAppDOM = function () {
-  console.log("🔍 [DEBUG] WhatsApp DOM Structure Analysis:");
-
-  // Check for attachment button
-  const attachSelectors = [
-    '[data-testid="clip"]',
-    'button[aria-label*="Attach"]',
-    'span[data-testid="clip"]',
-    '[title*="Attach"]',
-  ];
-
-  console.log("📎 Attachment Button Check:");
-  attachSelectors.forEach((selector) => {
-    const element = document.querySelector(selector);
-    console.log(
-      `  ${selector}: ${element ? "✅ FOUND" : "❌ NOT FOUND"}`,
-      element
-    );
-  });
-
-  // Check for photo button (after clicking attachment)
-  const photoSelectors = [
-    '[data-testid="mi-attach-photo"]',
-    'input[accept*="image"]',
-    'button[aria-label*="Photos"]',
-    '[title*="Photos"]',
-  ];
-
-  console.log("📷 Photo Button Check:");
-  photoSelectors.forEach((selector) => {
-    const element = document.querySelector(selector);
-    console.log(
-      `  ${selector}: ${element ? "✅ FOUND" : "❌ NOT FOUND"}`,
-      element
-    );
-  });
-
-  // Check for file inputs
-  const fileInputs = document.querySelectorAll('input[type="file"]');
-  console.log(`📁 File Inputs Found: ${fileInputs.length}`, fileInputs);
-
-  // Check message input
-  const messageInputs = document.querySelectorAll('[contenteditable="true"]');
-  console.log(
-    `💬 Message Inputs Found: ${messageInputs.length}`,
-    messageInputs
-  );
-
-  // Check send button
-  const sendButtons = document.querySelectorAll('[data-testid="send"]');
-  console.log(`📤 Send Buttons Found: ${sendButtons.length}`, sendButtons);
-
-  return {
-    attachmentButton: document.querySelector('[data-testid="clip"]'),
-    photoButton: document.querySelector('[data-testid="mi-attach-photo"]'),
-    fileInputs: fileInputs,
-    messageInputs: messageInputs,
-    sendButtons: sendButtons,
-  };
-};
-
 // Debug functions for testing
 window.clearProductsCache = function () {
   console.log("[PRODUCTS] 🗑️ Clearing products cache...");
@@ -2573,25 +2485,6 @@ window.getCurrentSidebarMode = () => {
   return sidebarMode;
 };
 
-// Debug function to check sidebar state
-window.debugSidebarState = () => {
-  console.log("🔍 ===== SIDEBAR DEBUG STATE =====");
-  console.log("📊 Current sidebarMode:", sidebarMode);
-  console.log("📊 isSidebarOpen:", isSidebarOpen);
-  console.log("📊 sidebarRoot exists:", !!sidebarRoot);
-  console.log("📊 mainAppContent exists:", !!mainAppContent);
-  console.log("📊 lastActiveChatId:", lastActiveChatId);
-  console.log("📊 sidebarProps.contact:", sidebarProps.contact);
-  console.log("📊 #pane-side exists:", !!document.querySelector("#pane-side"));
-  console.log(
-    "📊 Sidebar container exists:",
-    !!document.getElementById("whatsapp-sidebar-root")
-  );
-  const theme = getWhatsAppTheme();
-  console.log("📊 Current theme:", theme.isDark ? "Dark 🌙" : "Light ☀️");
-  console.log("🔍 ================================");
-};
-
 // Function to manually update sidebar theme
 window.updateSidebarTheme = () => {
   const sidebarContainer = document.getElementById("whatsapp-sidebar-root");
@@ -2623,7 +2516,18 @@ Object.defineProperty(window, "sidebarProps", {
 
 // Expose margin management functions for debugging
 window.whatsappMarginManager = {
-  ensureMainContentMargin,
+  applyAppContainerStyle: () => {
+    const appContainer = document.getElementById("app");
+    if (appContainer) {
+      appContainer.style.setProperty("top", "48px", "important");
+    } else {
+      console.warn("⚠️ App container not found");
+    }
+  },
+  ensureMainContentMargin: () => {
+    ensureMainContentMargin();
+    applyAppContainerStyle();
+  },
   forceMarginUpdate: (applyToSecond = false) => {
     ensureMainContentMargin(applyToSecond);
     const target = applyToSecond ? "SECOND" : "FIRST";
@@ -2684,19 +2588,6 @@ window.whatsappMarginManager = {
       const marginRight = computedStyle.marginRight;
       const classCount = element.classList.length;
       const isTarget = index === targetIndex;
-
-      console.log(`${isTarget ? "👉 TARGET" : "  "} Element ${index + 1}:`);
-      console.log(
-        `  - This is ${
-          isTarget
-            ? "THE TARGET (margins applied here)"
-            : "NOT the target (ignored)"
-        }`
-      );
-      console.log(`  - Class count: ${classCount} (must be exactly 3)`);
-      console.log(`  - Classes: ${element.className}`);
-      console.log(`  - margin-top: ${marginTop}`);
-      console.log(`  - margin-right: ${marginRight}`);
     });
 
     return exactMatches;

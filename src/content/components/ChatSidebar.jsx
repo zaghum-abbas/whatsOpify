@@ -164,465 +164,478 @@ const CatalogItem = ({ item, handleProductClick, theme }) => {
   }, [item.variants, item.images]);
 
   return (
-    <div
-      style={{
-        background: colors.card,
-        borderRadius: "8px",
-        padding: "12px",
-        marginBottom: "12px",
-        border: `1px solid ${colors.border}`,
-        transition: "all 0.2s ease",
-      }}
-      onMouseEnter={(e) => {
-        e.target.style.transform = "translateY(-1px)";
-        e.target.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
-      }}
-      onMouseLeave={(e) => {
-        e.target.style.transform = "translateY(0)";
-        e.target.style.boxShadow = "0 1px 4px rgba(0,0,0,0.07)";
-      }}
-    >
-      {/* Main Product Row */}
+    <>
       <div
-        onClick={() => handleProductClick(item)}
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          cursor: "pointer",
+          background: colors.card,
+          // borderRadius: "8px",
+          // paddingBottom: "12px",
+          // marginBottom: "12px",
+          transition: "all 0.2s ease",
         }}
+        onMouseEnter={(e) => {
+          e.target.style.transform = "translateY(-1px)";
+          e.target.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.transform = "translateY(0)";
+          e.target.style.boxShadow = "0 1px 4px rgba(0,0,0,0.07)";
+        }}
+        onClick={() => handleProductClick(item)}
       >
-        {console.log("showimages", imageState.preview)}
-
+        {/* Main Product Row */}
         <div
+          // onClick={() => handleProductClick(item)}
           style={{
-            width: "50px",
-            height: "50px",
-            borderRadius: "6px",
-            overflow: "hidden",
-            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-            flexShrink: 0,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            position: "relative",
+            gap: "12px",
+            cursor: "pointer",
           }}
         >
-          {item.images && item.images.length > 0 ? (
-            <>
-              {imageState.loading ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "100%",
-                    height: "100%",
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    background: theme === "dark" ? "#23272a" : "#f8f9fa",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "20px",
-                      height: "20px",
-                      border: `2px solid ${
-                        theme === "dark" ? "#333" : "#e2e8f0"
-                      }`,
-                      borderTop: `2px solid ${
-                        theme === "dark" ? "#25d366" : "#25d366"
-                      }`,
-                      borderRadius: "50%",
-                      animation: "spin 1s linear infinite",
-                    }}
-                  />
-                </div>
-              ) : imageState.preview ? (
-                <img
-                  src={imageState.preview}
-                  alt={item.title}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                  onError={(e) => {
-                    e.target.style.display = "none";
-                    e.target.nextSibling.style.display = "flex";
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "100%",
-                    height: "100%",
-                    fontSize: "1.2em",
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  🛒
-                </div>
-              )}
-            </>
-          ) : (
-            <div
-              style={{
-                display: item.image ? "none" : "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-                height: "100%",
-                fontSize: "1.2em",
-                color: theme === "dark" ? "white" : "#222",
-              }}
-            >
-              🛒
-            </div>
-          )}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
+          {console.log("showimages", imageState.preview)}
+
           <div
             style={{
-              color: theme === "dark" ? "white" : "#222",
-              fontWeight: 600,
-              fontSize: "0.95rem",
-              marginBottom: "4px",
+              width: "50px",
+              height: "50px",
+              borderRadius: "6px",
               overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
             }}
           >
-            {item?.title}
+            {item.images && item.images.length > 0 ? (
+              <>
+                {imageState.loading ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "100%",
+                      height: "100%",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      background: theme === "dark" ? "#23272a" : "#f8f9fa",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "20px",
+                        height: "20px",
+                        border: `2px solid ${
+                          theme === "dark" ? "#333" : "#e2e8f0"
+                        }`,
+                        borderTop: `2px solid ${
+                          theme === "dark" ? "#25d366" : "#25d366"
+                        }`,
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite",
+                      }}
+                    />
+                  </div>
+                ) : imageState.preview ? (
+                  <img
+                    src={imageState.preview}
+                    alt={item.title}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.nextSibling.style.display = "flex";
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: "100%",
+                      height: "100%",
+                      fontSize: "1.2em",
+                      color: theme === "dark" ? "white" : "#222",
+                    }}
+                  >
+                    🛒
+                  </div>
+                )}
+              </>
+            ) : (
+              <div
+                style={{
+                  display: item.image ? "none" : "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                  height: "100%",
+                  fontSize: "1.2em",
+                  color: theme === "dark" ? "white" : "#222",
+                }}
+              >
+                🛒
+              </div>
+            )}
           </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                color: theme === "dark" ? "white" : "#222",
+                fontWeight: 600,
+                fontSize: "0.95rem",
+                marginBottom: "4px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {item?.title}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "0.8em",
+              }}
+            >
+              {item.vendor && (
+                <span style={{ color: theme === "dark" ? "white" : "#222" }}>
+                  {item.vendor}
+                </span>
+              )}
+              {item.category && (
+                <span style={{ color: theme === "dark" ? "white" : "#222" }}>
+                  🏷️ {item.category}
+                </span>
+              )}
+            </div>
+          </div>
+          {/* Price and Toggle/Click Indicator */}
           <div
             style={{
               display: "flex",
-              alignItems: "center",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              flexShrink: 0,
               gap: "8px",
-              fontSize: "0.8em",
             }}
           >
-            {item.vendor && (
-              <span style={{ color: theme === "dark" ? "white" : "#222" }}>
-                👤 {item.vendor}
-              </span>
-            )}
-            {item.category && (
-              <span style={{ color: theme === "dark" ? "white" : "#222" }}>
-                🏷️ {item.category}
-              </span>
-            )}
-          </div>
-        </div>
-        {/* Price and Toggle/Click Indicator */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            flexShrink: 0,
-            gap: "8px",
-          }}
-        >
-          <div
-            style={{
-              color: theme === "dark" ? "white" : "#222",
-              fontWeight: 700,
-              fontSize: "1rem",
-            }}
-          >
-            {hasVariants ? (
-              <span
-                style={{
-                  fontSize: "0.8em",
-                  color: theme === "dark" ? "#25d366" : "#25d366",
-                }}
-              >
-                From Rs.{" "}
-                {formatPrice(Math.min(...item.variants.map((v) => v.price)))}
-              </span>
-            ) : (
-              `Rs. ${formatPrice(item?.variants?.[0]?.price)}`
-            )}
-          </div>
-
-          {hasVariants ? (
-            <button
-              onClick={handleToggleExpand}
-              style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                padding: "4px 8px",
-                borderRadius: "4px",
-                fontSize: "0.7em",
-                color: theme === "dark" ? "#25d366" : "#25d366",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background =
-                  theme === "dark" ? "#333" : "#f0f0f0";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = "transparent";
-              }}
-            >
-              {isExpanded ? "▼ Hide" : "▶ Show"} variants
-            </button>
-          ) : (
             <div
               style={{
-                fontSize: "0.7em",
                 color: theme === "dark" ? "white" : "#222",
-                fontStyle: "italic",
+                fontWeight: 500,
+                fontSize: "0.95rem",
               }}
             >
-              Click to add
+              {hasVariants ? (
+                <span
+                  style={{
+                    fontSize: "0.8em",
+                    color: theme === "dark" ? "#25d366" : "#25d366",
+                  }}
+                >
+                  From Rs.{" "}
+                  {formatPrice(Math.min(...item.variants.map((v) => v.price)))}
+                </span>
+              ) : (
+                `Rs. ${formatPrice(item?.variants?.[0]?.price)}`
+              )}
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Variants Section */}
-      {hasVariants && isExpanded && (
-        <div
-          style={{
-            marginTop: "12px",
-            paddingTop: "12px",
-            borderTop: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-          }}
-        >
-          <div
-            style={{
-              fontSize: "0.8em",
-              fontWeight: 600,
-              color: theme === "dark" ? "white" : "#222",
-              marginBottom: "8px",
-            }}
-          >
-            Available Variants:
-          </div>
-          <div style={{ paddingInline: `10px` }}>
-            {item.variants.map((variant, index) => (
-              <div
-                key={index}
-                onClick={(e) => handleVariantClick(e, variant)}
+            {hasVariants ? (
+              <button
+                onClick={handleToggleExpand}
                 style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                  fontSize: "0.7em",
+                  color: theme === "dark" ? "#25d366" : "#25d366",
                   display: "flex",
                   alignItems: "center",
-                  gap: "8px",
-                  padding: "8px",
-                  marginBottom: "6px",
-                  background: theme === "dark" ? "#1a1a1a" : "#f8f9fa",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+                  gap: "4px",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background =
+                    theme === "dark" ? "#333" : "#f0f0f0";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = "transparent";
                 }}
               >
-                {/* Variant Image */}
+                {isExpanded ? "▼ Hide" : "▶ Show"} variants
+              </button>
+            ) : (
+              <div
+                style={{
+                  fontSize: "0.7em",
+                  color: theme === "dark" ? "white" : "#222",
+                  fontStyle: "italic",
+                }}
+              >
+                Click to add
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Variants Section */}
+        {hasVariants && isExpanded && (
+          <div
+            style={{
+              marginTop: "12px",
+              paddingTop: "12px",
+              borderTop: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.8em",
+                fontWeight: 600,
+                color: theme === "dark" ? "white" : "#222",
+                marginBottom: "8px",
+              }}
+            >
+              Available Variants:
+            </div>
+            <div style={{ paddingInline: `10px` }}>
+              {item.variants.map((variant, index) => (
                 <div
+                  key={index}
+                  onClick={(e) => handleVariantClick(e, variant)}
                   style={{
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "4px",
-                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px",
+                    marginBottom: "6px",
+                    background: theme === "dark" ? "#1a1a1a" : "#f8f9fa",
+                    borderRadius: "6px",
+                    cursor: "pointer",
                     border: `1px solid ${
                       theme === "dark" ? "#333" : "#e2e8f0"
                     }`,
-                    flexShrink: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    position: "relative",
                   }}
                 >
-                  {(() => {
-                    const variantKey =
-                      variant.id || variant.title || `variant_${index}`;
-                    const variantImageState = variantImages[variantKey] || {
-                      loading: false,
-                      downloaded: false,
-                      error: null,
-                      preview: null,
-                    };
+                  {/* Variant Image */}
+                  <div
+                    style={{
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "4px",
+                      overflow: "hidden",
+                      border: `1px solid ${
+                        theme === "dark" ? "#333" : "#e2e8f0"
+                      }`,
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      position: "relative",
+                    }}
+                  >
+                    {(() => {
+                      const variantKey =
+                        variant.id || variant.title || `variant_${index}`;
+                      const variantImageState = variantImages[variantKey] || {
+                        loading: false,
+                        downloaded: false,
+                        error: null,
+                        preview: null,
+                      };
 
-                    if (variantImageState.loading) {
-                      return (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: "100%",
-                            height: "100%",
-                            background:
-                              theme === "dark" ? "#23272a" : "#f8f9fa",
-                          }}
-                        >
+                      if (variantImageState.loading) {
+                        return (
                           <div
                             style={{
-                              width: "16px",
-                              height: "16px",
-                              border: `2px solid ${
-                                theme === "dark" ? "#333" : "#e2e8f0"
-                              }`,
-                              borderTop: `2px solid ${
-                                theme === "dark" ? "#25d366" : "#25d366"
-                              }`,
-                              borderRadius: "50%",
-                              animation: "spin 1s linear infinite",
-                            }}
-                          />
-                        </div>
-                      );
-                    } else if (variantImageState.preview) {
-                      return (
-                        <>
-                          <img
-                            src={variantImageState.preview}
-                            alt={variant.title}
-                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                               width: "100%",
                               height: "100%",
-                              objectFit: "cover",
+                              background:
+                                theme === "dark" ? "#23272a" : "#f8f9fa",
                             }}
-                            onError={(e) => {
-                              e.target.style.display = "none";
-                              e.target.nextSibling.style.display = "flex";
-                            }}
-                          />
-                          {variantImageState.downloaded && (
+                          >
                             <div
                               style={{
-                                position: "absolute",
-                                top: "1px",
-                                right: "1px",
-                                width: "6px",
-                                height: "6px",
-                                backgroundColor: "#10B981",
+                                width: "16px",
+                                height: "16px",
+                                border: `2px solid ${
+                                  theme === "dark" ? "#333" : "#e2e8f0"
+                                }`,
+                                borderTop: `2px solid ${
+                                  theme === "dark" ? "#25d366" : "#25d366"
+                                }`,
                                 borderRadius: "50%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "4px",
-                                color: "white",
+                                animation: "spin 1s linear infinite",
                               }}
-                              title="Variant image downloaded and cached"
-                            >
-                              ✓
-                            </div>
-                          )}
-                        </>
-                      );
-                    } else if (variantImageState.error) {
-                      return (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: "100%",
-                            height: "100%",
-                            fontSize: "0.6em",
-                            color: "#ef4444",
-                            textAlign: "center",
-                            padding: "2px",
-                          }}
-                          title={`Image failed to load: ${variantImageState.error}`}
-                        >
-                          ❌
-                        </div>
-                      );
-                    } else if (variant?.imageId) {
-                      return (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: "100%",
-                            height: "100%",
-                            fontSize: "0.8em",
-                            color: theme === "dark" ? "white" : "#222",
-                          }}
-                        >
-                          🛒
-                        </div>
-                      );
-                    } else {
-                      return (
-                        <div
-                          style={{
-                            display: item.image ? "none" : "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: "100%",
-                            height: "100%",
-                            fontSize: "0.8em",
-                            color: theme === "dark" ? "white" : "#222",
-                          }}
-                        >
-                          🛒
-                        </div>
-                      );
-                    }
-                  })()}
-                </div>
+                            />
+                          </div>
+                        );
+                      } else if (variantImageState.preview) {
+                        return (
+                          <>
+                            <img
+                              src={variantImageState.preview}
+                              alt={variant.title}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                                e.target.nextSibling.style.display = "flex";
+                              }}
+                            />
+                            {variantImageState.downloaded && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "1px",
+                                  right: "1px",
+                                  width: "6px",
+                                  height: "6px",
+                                  backgroundColor: "#10B981",
+                                  borderRadius: "50%",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "4px",
+                                  color: "white",
+                                }}
+                                title="Variant image downloaded and cached"
+                              >
+                                ✓
+                              </div>
+                            )}
+                          </>
+                        );
+                      } else if (variantImageState.error) {
+                        return (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: "100%",
+                              height: "100%",
+                              fontSize: "0.6em",
+                              color: "#ef4444",
+                              textAlign: "center",
+                              padding: "2px",
+                            }}
+                            title={`Image failed to load: ${variantImageState.error}`}
+                          >
+                            ❌
+                          </div>
+                        );
+                      } else if (variant?.imageId) {
+                        return (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: "100%",
+                              height: "100%",
+                              fontSize: "0.8em",
+                              color: theme === "dark" ? "white" : "#222",
+                            }}
+                          >
+                            🛒
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div
+                            style={{
+                              display: item.image ? "none" : "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: "100%",
+                              height: "100%",
+                              fontSize: "0.8em",
+                              color: theme === "dark" ? "white" : "#222",
+                            }}
+                          >
+                            🛒
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
 
-                {/* Variant Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Variant Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        color: theme === "dark" ? "white" : "#222",
+                        fontWeight: 500,
+                        fontSize: "0.85rem",
+                        marginBottom: "2px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {variant.title || `Variant ${index + 1}`}
+                    </div>
+                    {variant.option1 && (
+                      <div
+                        style={{
+                          fontSize: "0.7em",
+                          color: theme === "dark" ? "#aaa" : "#666",
+                        }}
+                      >
+                        {variant.option1}
+                        {variant.option2 && ` • ${variant.option2}`}
+                        {variant.option3 && ` • ${variant.option3}`}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Variant Price */}
                   <div
                     style={{
                       color: theme === "dark" ? "white" : "#222",
-                      fontWeight: 500,
+                      fontWeight: 600,
                       fontSize: "0.85rem",
-                      marginBottom: "2px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      flexShrink: 0,
                     }}
                   >
-                    {variant.title || `Variant ${index + 1}`}
+                    Rs. {formatPrice(variant.price)}
                   </div>
-                  {variant.option1 && (
-                    <div
-                      style={{
-                        fontSize: "0.7em",
-                        color: theme === "dark" ? "#aaa" : "#666",
-                      }}
-                    >
-                      {variant.option1}
-                      {variant.option2 && ` • ${variant.option2}`}
-                      {variant.option3 && ` • ${variant.option3}`}
-                    </div>
-                  )}
                 </div>
-
-                {/* Variant Price */}
-                <div
-                  style={{
-                    color: theme === "dark" ? "white" : "#222",
-                    fontWeight: 600,
-                    fontSize: "0.85rem",
-                    flexShrink: 0,
-                  }}
-                >
-                  Rs. {formatPrice(variant.price)}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      <hr
+        style={{
+          margin: "4px 0",
+          border: "none",
+          height: "1px",
+          backgroundColor: "#333333",
+        }}
+      />
+    </>
   );
 };
 
@@ -1192,73 +1205,46 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
               background: theme === "dark" ? "#23272a" : "#fff",
               borderRadius: "10px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-              padding: "16px",
+              padding: "8px",
               fontSize: "0.98rem",
               color: theme === "dark" ? "white" : "#222",
               border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
             }}
           >
-            <div>
-              <div
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "8px",
+              }}
+            >
+              <strong>Name:</strong>
+              <p
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px",
+                  color: theme === "dark" ? "white" : "#222",
                 }}
               >
-                <strong>Name:</strong>
-                <p
-                  style={{
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  {userOrders?.userInfo?.name || "Not available"}
-                </p>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px",
-                }}
-              >
-                <strong>Phone:</strong>
-                <p
-                  style={{
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  {contact?.phone ? `${userOrders?.userInfo?.phone}` : ""}
-                </p>
-              </div>
+                {userOrders?.userInfo?.name || "Not available"}
+              </p>
             </div>
-            {contact?.about && (
-              <div
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                // marginBottom: "8px",
+              }}
+            >
+              <strong>Phone:</strong>
+              <p
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
+                  color: theme === "dark" ? "white" : "#222",
                 }}
               >
-                <span style={{ fontSize: "1.1em" }}>💬</span>
-                <strong>About:</strong>
-                <span
-                  style={{
-                    color: contact?.about
-                      ? theme === "dark"
-                        ? "white"
-                        : "#222"
-                      : theme === "dark"
-                      ? "white"
-                      : "#222",
-                  }}
-                >
-                  {contact?.about || "Not available"}
-                </span>
-              </div>
-            )}
+                {contact?.phone ? `${userOrders?.userInfo?.phone}` : ""}
+              </p>
+            </div>
           </div>
         </section>
       )}
@@ -1278,115 +1264,113 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
               background: theme === "dark" ? "#23272a" : "#fff",
               borderRadius: "10px",
               boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-              padding: "16px",
+              padding: "8px",
               fontSize: "0.98rem",
               color: theme === "dark" ? "white" : "#222",
               border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
             }}
           >
-            <div>
-              <div
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "8px",
+              }}
+            >
+              <strong>Total Orders:</strong>
+              <p
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px",
+                  color: theme === "dark" ? "white" : "#222",
                 }}
               >
-                <strong>Total Orders:</strong>
-                <p
-                  style={{
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  {userOrders?.userStatus?.totalOrders || 0}
-                </p>
-              </div>
-              <div
+                {userOrders?.userStatus?.totalOrders || 0}
+              </p>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "8px",
+              }}
+            >
+              <strong>Total Spent:</strong>
+              <p
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px",
+                  color: theme === "dark" ? "white" : "#222",
                 }}
               >
-                <strong>Total Spent:</strong>
-                <p
-                  style={{
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  Rs. {formatPrice(userOrders?.userStatus?.totalSpent) || 0}
-                </p>
-              </div>
-              <div
+                Rs. {formatPrice(userOrders?.userStatus?.totalSpent) || 0}
+              </p>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "8px",
+              }}
+            >
+              <strong>First Order Date:</strong>
+              <p
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px",
+                  color: theme === "dark" ? "white" : "#222",
                 }}
               >
-                <strong>First Order Date:</strong>
-                <p
-                  style={{
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  {formatDate(userOrders?.userStatus?.firstOrderDate) || ""}
-                </p>
-              </div>
-              <div
+                {formatDate(userOrders?.userStatus?.firstOrderDate) || ""}
+              </p>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "8px",
+              }}
+            >
+              <strong>Last Order Date:</strong>
+              <p
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px",
+                  color: theme === "dark" ? "white" : "#222",
                 }}
               >
-                <strong>Last Order Date:</strong>
-                <p
-                  style={{
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  {formatDate(userOrders?.userStatus?.lastOrderDate) || ""}
-                </p>
-              </div>
-              <div
+                {formatDate(userOrders?.userStatus?.lastOrderDate) || ""}
+              </p>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "8px",
+              }}
+            >
+              <strong>Cancelled orders:</strong>
+              <p
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px",
+                  color: theme === "dark" ? "white" : "#222",
                 }}
               >
-                <strong>Cancelled orders:</strong>
-                <p
-                  style={{
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  {formatDate(userOrders?.userStatus?.cancelledOrders) || 0}
-                </p>
-              </div>
-              <div
+                {formatDate(userOrders?.userStatus?.cancelledOrders) || 0}
+              </p>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                // marginBottom: "8px",
+              }}
+            >
+              <strong>Returned orders:</strong>
+              <p
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "8px",
+                  color: theme === "dark" ? "white" : "#222",
                 }}
               >
-                <strong>Returned orders:</strong>
-                <p
-                  style={{
-                    color: theme === "dark" ? "white" : "#222",
-                  }}
-                >
-                  {formatDate(userOrders?.userStatus?.returnedOrders) || 0}
-                </p>
-              </div>
+                {formatDate(userOrders?.userStatus?.returnedOrders) || 0}
+              </p>
             </div>
           </div>
         </section>
@@ -1408,7 +1392,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
             background: theme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-            padding: "16px",
+            padding: "8px",
             border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
             color: theme === "dark" ? "white" : "#222",
           }}
@@ -1453,7 +1437,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
             <div
               style={{
                 overflowX: "auto",
-                border: "1px solid #e0e0e0",
+                border: "1px solid #333333",
                 borderRadius: "8px",
               }}
             >
@@ -1474,7 +1458,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                       style={{
                         padding: "12px 8px",
                         textAlign: "left",
-                        borderBottom: "1px solid #e0e0e0",
+                        borderBottom: "1px solid #333333",
                         fontWeight: "600",
                       }}
                     >
@@ -1485,7 +1469,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                       style={{
                         padding: "12px 8px",
                         textAlign: "left",
-                        borderBottom: "1px solid #e0e0e0",
+                        borderBottom: "1px solid #333333",
                         fontWeight: "600",
                       }}
                     >
@@ -1495,7 +1479,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                       style={{
                         padding: "12px 8px",
                         textAlign: "left",
-                        borderBottom: "1px solid #e0e0e0",
+                        borderBottom: "1px solid #333333",
                         fontWeight: "600",
                         width: "120px",
                       }}
@@ -1506,7 +1490,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                       style={{
                         padding: "12px 8px",
                         textAlign: "center",
-                        borderBottom: "1px solid #e0e0e0",
+                        borderBottom: "1px solid #333333",
                         fontWeight: "600",
                       }}
                     >
@@ -1516,7 +1500,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                       style={{
                         padding: "12px 8px",
                         textAlign: "center",
-                        borderBottom: "1px solid #e0e0e0",
+                        borderBottom: "1px solid #333333",
                         fontWeight: "600",
                       }}
                     >
@@ -1533,7 +1517,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                     return (
                       <tr
                         key={order.id}
-                        style={{ borderBottom: "1px solid #f0f0f0" }}
+                        style={{ borderBottom: "1px solid #333333" }}
                       >
                         <td
                           style={{
@@ -1677,7 +1661,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                               >
                                 Total:
                               </span>
-                              <span style={{ fontWeight: "600" }}>
+                              <span style={{ fontWeight: "400" }}>
                                 Rs.{" "}
                                 {formatPrice(order?.pricing?.currentTotalPrice)}
                               </span>
@@ -1995,7 +1979,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
           }}
           style={{
             width: "100%",
-            padding: "16px",
+            padding: "8px",
             background: "#10b981",
             color: "white",
             border: "none",
@@ -2030,14 +2014,14 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
           Notes
         </h2> */}
         <div
-          style={{
-            background: theme === "dark" ? "#23272a" : "#fff",
-            borderRadius: "10px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-            padding: "16px",
-            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-            color: theme === "dark" ? "white" : "#222",
-          }}
+        // style={{
+        //   background: theme === "dark" ? "#23272a" : "#fff",
+        //   borderRadius: "10px",
+        //   boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+        //   padding: "8px",
+        //   border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+        //   color: theme === "dark" ? "white" : "#222",
+        // }}
         >
           <textarea
             style={{
@@ -2061,16 +2045,16 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
       {/* Tags Section */}
       <section style={{ marginBottom: "10px" }}>
         <div
-          style={{
-            background: theme === "dark" ? "#23272a" : "#fff",
-            borderRadius: "10px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-            padding: "16px",
-            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-            color: theme === "dark" ? "white" : "#222",
-          }}
+        // style={{
+        //   background: theme === "dark" ? "#23272a" : "#fff",
+        //   borderRadius: "10px",
+        //   boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+        //   padding: "8px",
+        //   border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+        //   color: theme === "dark" ? "white" : "#222",
+        // }}
         >
-          <h2
+          {/* <h2
             style={{
               margin: "0 0 12px 0",
               fontSize: "1.1rem",
@@ -2079,14 +2063,14 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
             }}
           >
             Tags
-          </h2>
+          </h2> */}
 
           {/* Input and Add Button */}
           <div
             style={{
               display: "flex",
               gap: "8px",
-              marginBottom: "12px",
+              // marginBottom: "12px",
             }}
           >
             <input
@@ -2229,7 +2213,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
           style={{
             background: theme === "dark" ? "#23272a" : "#fff",
             borderRadius: "10px",
-            padding: "16px",
+            padding: "8px",
             border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
             color: theme === "dark" ? "white" : "#222",
           }}
