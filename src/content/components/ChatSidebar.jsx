@@ -2131,6 +2131,7 @@ You can follow your parcel using the link above — it'll be with you soon! 😄
                 display: "flex",
                 flexWrap: "wrap",
                 gap: "8px",
+                marginTop: "4px",
               }}
             >
               {tags.map((tag, index) => (

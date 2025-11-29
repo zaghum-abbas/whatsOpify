@@ -14,7 +14,7 @@ const OrderFormSidebar = ({
         padding: "20px",
         fontFamily: "inherit",
         background: theme === "dark" ? "#18191a" : "#fff",
-        minHeight: "100vh",
+        // minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
       }}
@@ -149,6 +149,76 @@ const OrderFormSidebar = ({
           }}
           theme={theme}
         />
+      </div>
+
+      <div
+        style={{
+          marginTop: "20px",
+          background: theme === "dark" ? "#23272a" : "#fff",
+          borderRadius: "10px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+          padding: "20px",
+          border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+        }}
+      >
+        <label
+          style={{
+            display: "block",
+            marginBottom: "10px",
+            fontSize: "0.95rem",
+            fontWeight: "500",
+            color: theme === "dark" ? "white" : "#222",
+          }}
+        >
+          Notes (Optional)
+        </label>
+        <textarea
+          // value={notes}
+          // onChange={(e) => setNotes(e.target.value)}
+          placeholder="Add any additional notes about this order..."
+          rows={4}
+          style={{
+            width: "100%",
+            padding: "12px",
+            borderRadius: "6px",
+            border: `1px solid ${theme === "dark" ? "#444" : "#ddd"}`,
+            fontSize: "0.95rem",
+            fontFamily: "inherit",
+            backgroundColor: theme === "dark" ? "#18191a" : "#fff",
+            color: theme === "dark" ? "white" : "#222",
+            resize: "vertical",
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+
+      {/* Create Order Button */}
+      <div
+        style={{
+          marginTop: "20px",
+          display: "flex",
+          justifyContent: "center",
+          marginBottom: "20px",
+        }}
+      >
+        <button
+          onClick={() => console.log("create order clicked")}
+          style={{
+            width: "100%",
+            padding: "14px 24px",
+            backgroundColor: "#10b981",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            fontSize: "1rem",
+            fontWeight: "600",
+            cursor: "pointer",
+            transition: "all 0.2s",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          }}
+        >
+          Create Order
+        </button>
       </div>
 
       {/* Footer Info */}

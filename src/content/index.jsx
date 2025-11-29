@@ -24,6 +24,120 @@ import {
 
 console.log("🚀 Whatsapofy content script loaded at 12:30 PM PKT, 17/07/2025");
 
+/**
+ * Global Drag-and-Drop Auto-Fill Function
+ * Enables dragging text from chat messages and dropping it into input fields
+ * to automatically fill them with the dragged text.
+ * This runs immediately when the content script loads.
+ */
+(function setupDragAndDropAutoFill() {
+  console.log(
+    "🔄 Setting up drag-and-drop auto-fill for all extension inputs..."
+  );
+
+  // Global drag and drop handler for all extension inputs
+  const handleDragOver = (e) => {
+    const target = e.target;
+    // Only prevent default if target is an input field
+    const isInputField =
+      (target.tagName === "INPUT" &&
+        (target.type === "text" ||
+          target.type === "number" ||
+          target.type === "tel" ||
+          target.type === "email" ||
+          target.type === "search" ||
+          !target.type)) ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable;
+
+    if (isInputField) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  };
+
+  const handleDrop = async (e) => {
+    const target = e.target;
+
+    // Check if target is an input field
+    const isInputField =
+      (target.tagName === "INPUT" &&
+        (target.type === "text" ||
+          target.type === "number" ||
+          target.type === "tel" ||
+          target.type === "email" ||
+          target.type === "search" ||
+          !target.type)) ||
+      target.tagName === "TEXTAREA" ||
+      target.isContentEditable;
+
+    if (!isInputField) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    let text =
+      e.dataTransfer.getData("text") || e.dataTransfer.getData("text/plain");
+
+    // If a file is dropped, read its text
+    if (!text && e.dataTransfer.files?.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith("text")) {
+        text = await file.text();
+      }
+    }
+
+    // Fallback: try to get selected text
+    if (!text) {
+      text = window.getSelection().toString().trim();
+    }
+
+    if (text) {
+      if (target.isContentEditable) {
+        target.innerText = text;
+        target.dispatchEvent(new Event("input", { bubbles: true }));
+        target.dispatchEvent(new Event("change", { bubbles: true }));
+      } else if (target.tagName === "INPUT") {
+        if (target.type === "number") {
+          // For number inputs, extract numeric value
+          const numericValue = text.replace(/[^\d.-]/g, "");
+          if (numericValue) {
+            target.value = numericValue;
+            // Trigger React events
+            target.dispatchEvent(new Event("input", { bubbles: true }));
+            target.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        } else {
+          target.value = text;
+          // Trigger React events
+          target.dispatchEvent(new Event("input", { bubbles: true }));
+          target.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      } else if (target.tagName === "TEXTAREA") {
+        target.value = text;
+        // Trigger React events
+        target.dispatchEvent(new Event("input", { bubbles: true }));
+        target.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      console.log(
+        "✅ Text auto-filled via drag-and-drop:",
+        text,
+        "into",
+        target.tagName,
+        target.type || ""
+      );
+    }
+  };
+
+  // Apply globally to document - runs immediately
+  document.addEventListener("dragover", handleDragOver, false);
+  document.addEventListener("drop", handleDrop, false);
+
+  console.log("✅ Drag-and-Drop Auto-Fill enabled for all extension inputs");
+})();
+
 // Utility function to get selected store ID
 function getSelectedStoreId() {
   const selectedStore = localStorage.getItem("whatshopify_selected_store");
