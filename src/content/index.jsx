@@ -684,11 +684,14 @@ async function fetchProductsFromAPI() {
 
   try {
     console.log("[PRODUCTS] Fetching products from API...");
+   const isSeller=JSON.parse(localStorage.getItem("whatshopify_token"))?.data?.shopilamSurvey?.currentlySelling;
 
+    console.log("[PRODUCTS] isSeller", isSeller);
     const response = await chrome.runtime.sendMessage({
       action: "FETCH_PRODUCTS",
       token: getToken(),
       storeId: getSelectedStoreId(),
+      isSeller: isSeller,
     });
 
     console.log("[PRODUCTS] 🔍 Full API response:", response);

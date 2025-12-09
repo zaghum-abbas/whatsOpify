@@ -741,6 +741,7 @@ const ChatSidebar = ({
         storeId: localStorage.getItem("whatshopify_selected_store")
           ? JSON.parse(localStorage.getItem("whatshopify_selected_store"))?._id
           : null,
+        isSeller: JSON.parse(localStorage.getItem("whatshopify_token"))?.data?.shopilamSurvey?.currentlySelling,
       });
 
       console.log("[CATALOG] Search API Response:", response);

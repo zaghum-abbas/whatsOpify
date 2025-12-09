@@ -230,9 +230,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return false;
       }
 
-      // Get store ID from request or use default
+
+
       const storeId = request.storeId;
-      const productsApiUrl = `https://api.shopilam.com/api/v1/products?limit=3&page=1status=active&store=${storeId}`;
+
+      console.log("[BG] isSeller",storeId, request.isSeller);
+
+      const productsApiUrl = request.isSeller ? `https://api.shopilam.com/api/v1/products?limit=3&page=1status=active&store=${storeId}` : `https://api.shopilam.com/api/v1/products/listed?isPublic=true&page=1&limit=3&search=&category=&min_price=null&max_price=null`;
 
       const productsHeaders = {
         Authorization: `Bearer ${token}`,

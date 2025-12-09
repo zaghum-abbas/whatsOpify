@@ -232,7 +232,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       // Get store ID from request or use default
       const storeId = request.storeId;
-      const productsApiUrl = `https://api.shopilam.com/api/v1/products?limit=3&page=1&status=active&store=${storeId}`;
+      const productsApiUrl = request.isSeller ? `https://api.shopilam.com/api/v1/products?limit=3&page=1&status=active&store=${storeId}`:`https://api.shopilam.com/api/v1/products/listed?isPublic=true&page=1&limit=3&search=&category=&min_price=null&max_price=null`;
 
       const productsHeaders = {
         Authorization: `Bearer ${token}`,
@@ -277,7 +277,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               ? productsData?.data?.length
               : "Not an array",
             productsData
-          );
+          );https://api.shopilam.com/api/v1/products/listed?isPublic=true&page=1&limit=3&search=&category=&min_price=null&max_price=null
           sendResponse({ success: true, products: productsData });
         })
         .catch((error) => {
@@ -539,7 +539,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       // Get store ID from request or use default
       const searchStoreId = request.storeId;
-      const searchApiUrl = `https://api.shopilam.com/api/v1/products?${searchQuery}limit=${searchLimit}&page=${searchPage}&status=active&store=${searchStoreId}`;
+      const searchApiUrl = request.isSeller ? `https://api.shopilam.com/api/v1/products?${searchQuery}limit=${searchLimit}&page=${searchPage}&status=active&store=${searchStoreId}`:`https://api.shopilam.com/api/v1/products/listed?isPublic=true&page=${searchPage}&limit=${searchLimit}&search=${searchQuery}&category=&min_price=null&max_price=null`;
 
       const searchHeaders = {
         "Content-Type": "application/json",

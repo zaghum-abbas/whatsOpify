@@ -101,7 +101,11 @@ const ModalForm = ({ onClose, theme }) => {
     extraCharges: "",
     discount: "",
     paidAlready: "",
+    profit: "", // Profit field for reseller orders
   });
+
+  // State to check if user is a reseller (not a seller)
+  const [isReseller, setIsReseller] = useState(false);
 
   // Helper function to get numeric value from cartTotals (handles empty strings)
   const getNumericValue = (value) => {
@@ -207,6 +211,15 @@ const ModalForm = ({ onClose, theme }) => {
           console.warn(
             "⚠️ window.whatsapofyUserInfo.userInfo not available. Ensure user info is fetched."
           );
+        }
+
+        // Check if user is a reseller (not a seller)
+        try {
+          const tokenData = JSON.parse(localStorage.getItem("whatshopify_token"));
+          const currentlySelling = tokenData?.data?.shopilamSurvey?.currentlySelling;
+          setIsReseller(currentlySelling);
+        } catch (error) {
+          console.warn("[MODAL] Could not determine reseller status:", error);
         }
       } catch (error) {
         console.error("Error loading initial data:11", error);
@@ -413,6 +426,7 @@ const ModalForm = ({ onClose, theme }) => {
         storeId: localStorage.getItem("whatshopify_selected_store")
           ? JSON.parse(localStorage.getItem("whatshopify_selected_store"))?._id
           : null,
+        isSeller: JSON.parse(localStorage.getItem("whatshopify_token"))?.data?.shopilamSurvey?.currentlySelling,
       });
 
       if (response.success) {
@@ -672,25 +686,33 @@ const ModalForm = ({ onClose, theme }) => {
 
       const taxValue =
         (effectiveSubtotal * getNumericValue(cartTotals.orderTax)) / 100;
-      const totalOrder =
-        effectiveSubtotal +
-        getNumericValue(cartTotals.shipping) +
-        taxValue +
-        getNumericValue(cartTotals.extraCharges) -
-        getNumericValue(cartTotals.discount);
+      
+      // Calculate totalOrder - for resellers, exclude extra charges and discount
+      const totalOrder = isReseller
+        ? effectiveSubtotal +
+          getNumericValue(cartTotals.shipping) +
+          taxValue
+        : effectiveSubtotal +
+          getNumericValue(cartTotals.shipping) +
+          taxValue +
+          getNumericValue(cartTotals.extraCharges) -
+          getNumericValue(cartTotals.discount);
 
       const extraChargesArray = [];
-      const extraChargesValue = getNumericValue(cartTotals.extraCharges);
-      if (extraChargesValue > 0) {
-        extraChargesArray.push({
-          key: "Extra Charges",
-          value: extraChargesValue,
-        });
-      } else {
-        extraChargesArray.push({
-          key: "",
-          value: 0,
-        });
+      // Only include extra charges for non-resellers
+      if (!isReseller) {
+        const extraChargesValue = getNumericValue(cartTotals.extraCharges);
+        if (extraChargesValue > 0) {
+          extraChargesArray.push({
+            key: "Extra Charges",
+            value: extraChargesValue,
+          });
+        } else {
+          extraChargesArray.push({
+            key: "",
+            value: 0,
+          });
+        }
       }
 
       const productId =
@@ -852,77 +874,127 @@ const ModalForm = ({ onClose, theme }) => {
               },
             ];
 
-      let payload = {
-        storeId: storeId,
-        productId: productId,
-        lineItems: lineItems,
-        shipperInfo: shipperInfoData,
-        tags: [],
-        paymentMethod: formData.paymentMethod || "COD",
-        shipmentDetails: {
-          email: formData.email || "",
-          addresses: [
-            {
-              name: formData.name || "",
-              phone: formatPhoneNumber(formData.phone || ""),
-              city: { city: formData.city || "" },
-              address1: formData.address || formData.address1 || "",
-              address2: formData.address2 || "",
-              company: formData.company || "",
-              country: "Pakistan",
-            },
-          ],
-        },
-        financialStatus: "pending",
-        status: "confirm",
-        pricing: {
-          subTotal: Number(effectiveSubtotal),
-          currentTotalPrice: Number(totalOrder),
-          paid:
-            formData.paymentMethod === "prepaid"
-              ? getNumericValue(cartTotals.paidAlready)
-              : 0,
-          shipping: getNumericValue(cartTotals.shipping),
-          taxPercentage: getNumericValue(cartTotals.orderTax),
-          taxValue: Number(taxValue),
-          paymentProof: paymentProofImageUrl || "",
-          extra: extraChargesArray,
-        },
-      };
-
-      if (payload.paymentMethod === "COD") {
+      let payload;
+      
+      if (!isReseller) {
         payload = {
-          ...payload,
-          pricing: {
-            ...payload.pricing,
-            paid: 0,
+          lineItems: lineItems,
+          fulfillmentStatus: "confirm",
+          tags: [],
+          paymentMethod: formData.paymentMethod || "COD",
+          shipmentDetails: {
+            email: formData.email || "",
+            addresses: [
+              {
+                name: formData.name || "",
+                phone: formatPhoneNumber(formData.phone || ""),
+                city: { city: formData.city || "" },
+                address1: formData.address || formData.address1 || "",
+                address2: formData.address2 || "",
+                company: formData.company || "",
+                country: "Pakistan",
+              },
+            ],
+          },
+          financialStatus: "pending",
+          status: "reselling",
+          resellerOrder: {
+            profit: getNumericValue(cartTotals.profit) || 0,
             paymentProof: "",
           },
+          pricing: {
+            subTotal: Number(effectiveSubtotal),
+            currentTotalPrice: Number(totalOrder),
+            paid: 0, // Resellers always start with 0 paid
+            balance: 0,
+            shipping: getNumericValue(cartTotals.shipping),
+            taxPercentage: getNumericValue(cartTotals.orderTax),
+            taxValue: Number(taxValue),
+          },
+          createdAt: new Date().toISOString().split("T")[0], // Format: YYYY-MM-DD
+          productId: productId,
         };
+
+        if (payload.paymentMethod === "COD") {
+          payload.resellerOrder.paymentProof = "";
+        } else if (formData.paymentMethod === "prepaid") {
+          payload.resellerOrder.paymentProof = paymentProofImageUrl || "";
+        }
       } else {
         payload = {
-          ...payload,
+          storeId: storeId,
+          productId: productId,
+          lineItems: lineItems,
+          shipperInfo: shipperInfoData,
+          tags: [],
+          paymentMethod: formData.paymentMethod || "COD",
+          shipmentDetails: {
+            email: formData.email || "",
+            addresses: [
+              {
+                name: formData.name || "",
+                phone: formatPhoneNumber(formData.phone || ""),
+                city: { city: formData.city || "" },
+                address1: formData.address || formData.address1 || "",
+                address2: formData.address2 || "",
+                company: formData.company || "",
+                country: "Pakistan",
+              },
+            ],
+          },
+          financialStatus: "pending",
+          status: "confirm",
           pricing: {
-            ...payload.pricing,
+            subTotal: Number(effectiveSubtotal),
+            currentTotalPrice: Number(totalOrder),
+            paid:
+              formData.paymentMethod === "prepaid"
+                ? getNumericValue(cartTotals.paidAlready)
+                : 0,
+            shipping: getNumericValue(cartTotals.shipping),
+            taxPercentage: getNumericValue(cartTotals.orderTax),
+            taxValue: Number(taxValue),
             paymentProof: paymentProofImageUrl || "",
+            extra: extraChargesArray,
           },
         };
+
+        if (payload.paymentMethod === "COD") {
+          payload = {
+            ...payload,
+            pricing: {
+              ...payload.pricing,
+              paid: 0,
+              paymentProof: "",
+            },
+          };
+        } else {
+          payload = {
+            ...payload,
+            pricing: {
+              ...payload.pricing,
+              paymentProof: paymentProofImageUrl || "",
+            },
+          };
+        }
       }
 
-      const updatedValues = {
-        ...payload,
-        pricing: {
-          ...payload.pricing,
-          paymentProof: payload.pricing.paymentProof || "",
-        },
-      };
+
+      const updatedValues = isReseller
+        ? payload
+        : {
+            ...payload,
+            pricing: {
+              ...payload.pricing,
+              paymentProof: payload.pricing.paymentProof || "",
+            },
+          };
 
       console.log(
         "📤 Sending order (values after modification):",
         updatedValues
       );
 
-      // Use standard orders endpoint for orders with products
       const apiEndpoint = "https://api.shopilam.com/api/v1/orders";
 
       const response = await fetch(apiEndpoint, {
@@ -941,7 +1013,6 @@ const ModalForm = ({ onClose, theme }) => {
 
         alert(data.message);
 
-        // Reset manual product details and close modals
         setManualProductDetails({ name: "", price: "" });
         setShowNoProductModal(false);
         setManualErrors({});
@@ -1431,41 +1502,81 @@ const ModalForm = ({ onClose, theme }) => {
                     </div>
                   </div> */}
 
-                  {/* Extra Charges */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    <span
+                  {/* Extra Charges - Hide for resellers */}
+                  {isReseller && (
+                    <div
                       style={{
-                        color: theme === "dark" ? "white" : "#222",
-                        fontSize: "0.95rem",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "12px",
                       }}
                     >
-                      Extra Charges
-                    </span>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <input
-                        type="text"
-                        placeholder="charges"
+                      <span
                         style={{
-                          ...inputStyle,
-                          width: "120px",
-                          backgroundColor: "white",
-                          color: "#222",
+                          color: theme === "dark" ? "white" : "#222",
+                          fontSize: "0.95rem",
                         }}
-                      />
+                      >
+                        Extra Charges
+                      </span>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <input
+                          type="text"
+                          placeholder="charges"
+                          style={{
+                            ...inputStyle,
+                            width: "120px",
+                            backgroundColor: "white",
+                            color: "#222",
+                          }}
+                        />
+                        <input
+                          type="number"
+                          value={cartTotals.extraCharges}
+                          onChange={(e) =>
+                            setCartTotals((prev) => ({
+                              ...prev,
+                              extraCharges: e.target.value,
+                            }))
+                          }
+                          style={{
+                            ...inputStyle,
+                            width: "120px",
+                            textAlign: "right",
+                            backgroundColor: "white",
+                            color: "#222",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Discount - Hide for resellers */}
+                  {isReseller && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: theme === "dark" ? "white" : "#222",
+                          fontSize: "0.95rem",
+                        }}
+                      >
+                        Discount
+                      </span>
                       <input
                         type="number"
-                        value={cartTotals.extraCharges}
+                        value={cartTotals.discount}
                         onChange={(e) =>
                           setCartTotals((prev) => ({
                             ...prev,
-                            extraCharges: e.target.value,
+                            discount: e.target.value,
                           }))
                         }
                         style={{
@@ -1477,43 +1588,46 @@ const ModalForm = ({ onClose, theme }) => {
                         }}
                       />
                     </div>
-                  </div>
+                  )}
 
-                  {/* Discount */}
-                  {/* <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    <span
+                  {/* Profit - Only show for resellers */}
+                  {!isReseller && (
+                    <div
                       style={{
-                        color: theme === "dark" ? "white" : "#222",
-                        fontSize: "0.95rem",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "12px",
                       }}
                     >
-                      Discount
-                    </span>
-                    <input
-                      type="number"
-                      value={cartTotals.discount}
-                      onChange={(e) =>
-                        setCartTotals((prev) => ({
-                          ...prev,
-                          discount: e.target.value,
-                        }))
-                      }
-                      style={{
-                        ...inputStyle,
-                        width: "120px",
-                        textAlign: "right",
-                        backgroundColor: "white",
-                        color: "#222",
-                      }}
-                    />
-                  </div> */}
+                      <span
+                        style={{
+                          color: theme === "dark" ? "white" : "#222",
+                          fontSize: "0.95rem",
+                        }}
+                      >
+                        Profit (%)
+                      </span>
+                      <input
+                        type="number"
+                        value={cartTotals.profit}
+                        onChange={(e) =>
+                          setCartTotals((prev) => ({
+                            ...prev,
+                            profit: e.target.value,
+                          }))
+                        }
+                        placeholder="Enter profit percentage"
+                        style={{
+                          ...inputStyle,
+                          width: "120px",
+                          textAlign: "right",
+                          backgroundColor: "white",
+                          color: "#222",
+                        }}
+                      />
+                    </div>
+                  )}
 
                   {/* Paid Already - Only show for Prepaid */}
                   {formData.paymentMethod === "prepaid" && (
