@@ -439,6 +439,72 @@ const AddProductSidebar = ({ onClose }) => {
     }
   };
 
+  const processVariantImageFromChat = async (responseData) => {
+    try {
+      const imageId = Date.now();
+
+      setVariantImageStates((prev) => ({
+        ...prev,
+        [imageId]: {
+          loading: true,
+          downloaded: false,
+          error: null,
+          preview: null,
+        },
+      }));
+      console.log("responseData (variant):", responseData);
+      const imageFile = await downloadImageAsFile(
+        responseData.thumbnail_url,
+        `${Date.now()}.jpg`
+      );
+      const objectUrl = URL.createObjectURL(imageFile);
+
+      setVariantImageStates((prev) => ({
+        ...prev,
+        [imageId]: {
+          loading: false,
+          downloaded: true,
+          error: null,
+          preview: objectUrl,
+        },
+      }));
+
+      setVariantImages((prev) => [
+        ...prev,
+        {
+          id: imageId,
+          name: responseData.original_filename || `variant-image-${imageId}`,
+          url:
+            responseData?.url ||
+            responseData?.image_url ||
+            responseData?.original_url ||
+            objectUrl ||
+            "",
+          thumbnailUrl:
+            responseData?.thumbnail_url ||
+            responseData?.url ||
+            responseData?.image_url ||
+            objectUrl ||
+            "",
+          loading: false,
+        },
+      ]);
+
+      console.log("✅ Variant image processed from chat:", imageId);
+    } catch (error) {
+      console.error("❌ Error processing variant image from chat:", error);
+      setVariantImageStates((prev) => ({
+        ...prev,
+        [imageId]: {
+          loading: false,
+          downloaded: false,
+          error: error.message,
+          preview: null,
+        },
+      }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -670,8 +736,66 @@ const AddProductSidebar = ({ onClose }) => {
             classList.length === classGroup.length &&
             classGroup.every((cls) => classList.includes(cls))
           ) {
-            if (el.querySelector(".my-extension-add-btn")) return;
+            if (el.querySelector(".my-extension-add-container")) return;
 
+            // Create container for select and button
+            // Position it at top-left to avoid covering the image
+            const container = document.createElement("div");
+            container.className = "my-extension-add-container";
+            container.style.cssText = `
+              display: flex;
+              align-items: center;
+              gap: 4px;
+              position: absolute;
+              top: 5px;
+              left: 5px;
+              z-index: 10000;
+              pointer-events: auto;
+              padding: 3px 5px;
+              border-radius: 6px;
+            `;
+
+            // Create select dropdown
+            const select = document.createElement("select");
+            select.className = "my-extension-add-select";
+            select.style.cssText = `
+              background-color: white;
+              color: #333;
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              padding: 3px 6px;
+              font-size: 11px;
+              cursor: pointer;
+              outline: none;
+              pointer-events: auto;
+              position: relative;
+              z-index: 10001;
+              max-width: 120px;
+              min-width: 100px;
+            `;
+            
+            // Prevent select from interfering with image visibility
+            select.addEventListener("mousedown", (e) => {
+              e.stopPropagation();
+            });
+            
+            select.addEventListener("click", (e) => {
+              e.stopPropagation();
+            });
+            
+            select.addEventListener("focus", (e) => {
+              e.stopPropagation();
+            });
+            
+            select.addEventListener("change", (e) => {
+              e.stopPropagation();
+            });
+            select.innerHTML = `
+              <option value="product">Add to Product</option>
+              <option value="variant">Add to Variants</option>
+            `;
+
+            // Create button
             const button = document.createElement("button");
             button.textContent = "Add";
             button.className = "my-extension-add-btn";
@@ -679,88 +803,142 @@ const AddProductSidebar = ({ onClose }) => {
               background-color: #21c063;
               color: white;
               border: none;
-              border-radius: 6px;
-              padding: 4px 8px;
-              font-size: 12px;
+              border-radius: 4px;
+              padding: 3px 8px;
+              font-size: 11px;
               cursor: pointer;
-              margin: 5px 0 5px 5px;
-              position: absolute;
-              z-index: 10000;
+              white-space: nowrap;
             `;
 
             button.addEventListener("click", async (e) => {
               e.stopPropagation();
-              console.log("✅ Add button clicked for:", el);
+              const selectedOption = select.value;
+              console.log("✅ Add button clicked for:", el, "Option:", selectedOption);
 
-              // Get all valid blob images inside this chat container
-              const imgs = Array.from(el.querySelectorAll("img"))
-                .map((img) => img.src)
-                .filter((src) => src.startsWith("blob:"));
+              // Set loading state
+              const originalText = button.textContent;
+              const originalCursor = button.style.cursor;
+              const originalBgColor = button.style.backgroundColor;
+              button.disabled = true;
+              select.disabled = true;
+              button.style.cursor = "not-allowed";
+              button.style.backgroundColor = "#9ca3af";
+              button.innerHTML = `
+                <span style="display: inline-block; width: 12px; height: 12px; border: 2px solid #ffffff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: middle;"></span>
+                Loading...
+              `;
 
-              if (imgs.length === 0) {
-                console.log("⚠️ No valid blob images found in this chat.");
-                return;
+              // Add spinner animation if not already added
+              if (!document.getElementById("button-spinner-style")) {
+                const style = document.createElement("style");
+                style.id = "button-spinner-style";
+                style.textContent = `
+                  @keyframes spin {
+                    to { transform: rotate(360deg); }
+                  }
+                  .my-extension-add-select {
+                    appearance: none;
+                    -webkit-appearance: none;
+                    -moz-appearance: none;
+                  }
+                  .my-extension-add-select option {
+                    background: white;
+                    padding: 8px;
+                  }
+                `;
+                document.head.appendChild(style);
               }
 
-              console.log("🖼️ Found blob images:", imgs);
-
-              // Convert all blob URLs to base64
-              const base64Images = await Promise.all(
-                imgs.map(async (src) => {
-                  try {
-                    const base64 = await blobToBase64(src);
-                    return base64;
-                  } catch (err) {
-                    console.error("❌ Error converting to base64:", err);
-                    return null;
-                  }
-                })
-              );
-
-              // Build payloads
-              const payloads = base64Images.filter(Boolean).map((base64) => ({
-                image_base64: base64,
-                module: "product",
-              }));
-
-              console.log("🚀 Payload ready to send:", payloads);
-
-              // Example: Send to your backend (optional)
               try {
-                // Loop through all base64 payloads
-                for (const payload of payloads) {
-                  try {
-                    const response = await fetch(
-                      "https://api.shopilam.com/api/v1/image/upload",
-                      {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${getToken()}`,
-                        },
-                        body: JSON.stringify(payload),
-                      }
-                    );
+                // Get all valid blob images inside this chat container
+                const imgs = Array.from(el.querySelectorAll("img"))
+                  .map((img) => img.src)
+                  .filter((src) => src.startsWith("blob:"));
 
-                    const data = await response.json();
-
-                    if (response.ok) {
-                      console.log("✅ Uploaded:", data);
-                      // Process the image using the new function
-                      await processImageFromChat(data);
-                    } else {
-                      console.error("❌ Upload failed:", data);
-                    }
-                  } catch (err) {
-                    console.error("❌ Error uploading image:", err);
-                  }
+                if (imgs.length === 0) {
+                  console.log("⚠️ No valid blob images found in this chat.");
+                  // Restore button state
+                  button.disabled = false;
+                  select.disabled = false;
+                  button.style.cursor = originalCursor;
+                  button.style.backgroundColor = originalBgColor;
+                  button.textContent = originalText;
+                  return;
                 }
-              } catch (err) {
-                console.error("❌ Unexpected upload error:", err);
+
+                console.log("🖼️ Found blob images:", imgs);
+
+                // Convert all blob URLs to base64
+                const base64Images = await Promise.all(
+                  imgs.map(async (src) => {
+                    try {
+                      const base64 = await blobToBase64(src);
+                      return base64;
+                    } catch (err) {
+                      console.error("❌ Error converting to base64:", err);
+                      return null;
+                    }
+                  })
+                );
+
+                // Build payloads
+                const payloads = base64Images.filter(Boolean).map((base64) => ({
+                  image_base64: base64,
+                  module: "product",
+                }));
+
+                console.log("🚀 Payload ready to send:", payloads);
+
+                // Example: Send to your backend (optional)
+                try {
+                  // Loop through all base64 payloads
+                  for (const payload of payloads) {
+                    try {
+                      const response = await fetch(
+                        "https://api.shopilam.com/api/v1/image/upload",
+                        {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${getToken()}`,
+                          },
+                          body: JSON.stringify(payload),
+                        }
+                      );
+
+                      const data = await response.json();
+
+                      if (response.ok) {
+                        console.log("✅ Uploaded:", data);
+                        // Process the image based on selected option
+                        if (selectedOption === "variant") {
+                          await processVariantImageFromChat(data);
+                        } else {
+                          await processImageFromChat(data);
+                        }
+                      } else {
+                        console.error("❌ Upload failed:", data);
+                      }
+                    } catch (err) {
+                      console.error("❌ Error uploading image:", err);
+                    }
+                  }
+                } catch (err) {
+                  console.error("❌ Unexpected upload error:", err);
+                }
+              } finally {
+                // Restore button state
+                button.disabled = false;
+                select.disabled = false;
+                button.style.cursor = originalCursor;
+                button.style.backgroundColor = originalBgColor;
+                button.textContent = originalText;
               }
             });
 
-            el.prepend(button);
+            container.appendChild(select);
+            container.appendChild(button);
+            el.prepend(container);
           }
         });
       });
