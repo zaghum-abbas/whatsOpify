@@ -12,6 +12,7 @@ const OrderFormSidebar = ({
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [selectedOption, setSelectedOption] = useState("createOrder"); // Default to "createOrder"
 
   return (
     <div
@@ -130,53 +131,103 @@ const OrderFormSidebar = ({
         </div>
       )}
 
-      {/* Order Form Section */}
-      <div
-        style={{
-          background: theme === "dark" ? "#23272a" : "#fff",
-          borderRadius: "10px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-          padding: "20px",
-          border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
-          // flex: 1,
-        }}
-      >
-        <ModalForm
-          onClose={() => {
-            // Switch back to chat sidebar after order is created
-            if (typeof window.switchToChatSidebar === "function") {
-              window.switchToChatSidebar(contact);
-            }
-          }}
-          initialData={{
-            name: contact?.name || "",
-            phone: contact?.phone || "",
-          }}
-          theme={theme}
-        />
-      </div>
-
+      {/* Radio Buttons for Toggle */}
       <div
         style={{
           marginTop: "20px",
+          marginBottom: "20px",
           background: theme === "dark" ? "#23272a" : "#fff",
           borderRadius: "10px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
-          padding: "20px",
+          padding: "16px",
           border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
         }}
       >
-        <label
+        <div
           style={{
-            display: "block",
-            marginBottom: "10px",
-            fontSize: "0.95rem",
-            fontWeight: "500",
-            color: theme === "dark" ? "white" : "#222",
+            display: "flex",
+            gap: "24px",
+            alignItems: "center",
           }}
         >
-         Create Orders
-        </label>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+              fontSize: "0.95rem",
+              color: theme === "dark" ? "white" : "#222",
+              fontWeight: "500",
+            }}
+          >
+            <input
+              type="radio"
+              name="orderType"
+              value="createOrder"
+              checked={selectedOption === "createOrder"}
+              onChange={(e) => setSelectedOption(e.target.value)}
+              style={{
+                width: "18px",
+                height: "18px",
+                cursor: "pointer",
+                accentColor: "#10b981",
+              }}
+            />
+            Create Orders
+          </label>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer",
+              fontSize: "0.95rem",
+              color: theme === "dark" ? "white" : "#222",
+              fontWeight: "500",
+            }}
+          >
+            <input
+              type="radio"
+              name="orderType"
+              value="orderDetail"
+              checked={selectedOption === "orderDetail"}
+              onChange={(e) => setSelectedOption(e.target.value)}
+              style={{
+                width: "18px",
+                height: "18px",
+                cursor: "pointer",
+                accentColor: "#10b981",
+              }}
+            />
+            Order Detail
+          </label>
+        </div>
+      </div>
+
+      {/* Create Orders Section */}
+      {selectedOption === "createOrder" && (
+        <>
+          <div
+            style={{
+              marginTop: "20px",
+              background: theme === "dark" ? "#23272a" : "#fff",
+              borderRadius: "10px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+              padding: "20px",
+              border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            }}
+          >
+            <label
+              style={{
+                display: "block",
+                marginBottom: "10px",
+                fontSize: "0.95rem",
+                fontWeight: "500",
+                color: theme === "dark" ? "white" : "#222",
+              }}
+            >
+              Create Orders
+            </label>
         <textarea
           value={orderDetails}
           onChange={(e) => {
@@ -234,102 +285,133 @@ const OrderFormSidebar = ({
             {success}
           </div>
         )}
-      </div>
+          </div>
 
-      {/* Create Order Button */}
-      <div
-        style={{
-          marginTop: "20px",
-          display: "flex",
-          justifyContent: "center",
-          marginBottom: "20px",
-        }}
-      >
-        <button
-          onClick={async () => {
-            try {
-              setIsCreating(true);
-              setError("");
-              setSuccess("");
-
-              if (!orderDetails.trim()) {
-                setError("Please enter order details");
-                setIsCreating(false);
-                return;
-              }
-
-              const token = getToken();
-              if (!token) {
-                setError("Authentication required. Please log in again.");
-                setIsCreating(false);
-                return;
-              }
-
-              // Send payload as JSON string
-              const response = await fetch(
-                "https://api.shopilam.com/api/v1/orders/orders/create-from-message",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify(orderDetails.trim()), // Send as string
-                }
-              );
-
-              // Handle response
-              const data = await response.json();
-
-              console.log("@@data", data);
-
-              if (response.ok) {
-                console.log("✅ Order created from message:", data);
-                const successMessage = data.message || data.data?.message || "Order created successfully!";
-                setSuccess(successMessage);
-                // Clear the textarea after successful creation
-                setTimeout(() => {
-                  setOrderDetails("");
+          {/* Create Order Button */}
+          <div
+            style={{
+              marginTop: "20px",
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: "20px",
+            }}
+          >
+            <button
+              onClick={async () => {
+                try {
+                  setIsCreating(true);
+                  setError("");
                   setSuccess("");
-                }, 3000);
-              } else {
-                // Handle error response
-                const errorMessage = 
-                  data.message || 
-                  data.detail || 
-                  data.error || 
-                  `Failed to create order (Status: ${response.status})`;
-                setError(errorMessage);
-                console.error("❌ Order creation failed:", errorMessage);
-              }
-            } catch (error) {
-              console.error("❌ Error creating order:", error);
-              setError(
-                error.message || "An error occurred while creating the order. Please try again."
-              );
-            } finally {
-              setIsCreating(false);
-            }
-          }}
-          disabled={isCreating}
+
+                  if (!orderDetails.trim()) {
+                    setError("Please enter order details");
+                    setIsCreating(false);
+                    return;
+                  }
+
+                  const token = getToken();
+                  if (!token) {
+                    setError("Authentication required. Please log in again.");
+                    setIsCreating(false);
+                    return;
+                  }
+
+                  // Send payload as JSON string
+                  const response = await fetch(
+                    "https://api.shopilam.com/api/v1/orders/orders/create-from-message",
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify(orderDetails.trim()), // Send as string
+                    }
+                  );
+
+                  // Handle response
+                  const data = await response.json();
+
+                  console.log("@@data", data);
+
+                  if (response.ok) {
+                    console.log("✅ Order created from message:", data);
+                    const successMessage = data.message || data.data?.message || "Order created successfully!";
+                    setSuccess(successMessage);
+                    // Clear the textarea after successful creation
+                    setTimeout(() => {
+                      setOrderDetails("");
+                      setSuccess("");
+                    }, 3000);
+                  } else {
+                    // Handle error response
+                    const errorMessage = 
+                      data.message || 
+                      data.detail || 
+                      data.error || 
+                      `Failed to create order (Status: ${response.status})`;
+                    setError(errorMessage);
+                    console.error("❌ Order creation failed:", errorMessage);
+                  }
+                } catch (error) {
+                  console.error("❌ Error creating order:", error);
+                  setError(
+                    error.message || "An error occurred while creating the order. Please try again."
+                  );
+                } finally {
+                  setIsCreating(false);
+                }
+              }}
+              disabled={isCreating}
+              style={{
+                width: "100%",
+                padding: "14px 24px",
+                backgroundColor: isCreating ? "#6b7280" : "#10b981",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "1rem",
+                fontWeight: "600",
+                cursor: isCreating ? "not-allowed" : "pointer",
+                transition: "all 0.2s",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                opacity: isCreating ? 0.7 : 1,
+              }}
+            >
+              {isCreating ? "Creating Order..." : "Create Order"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Modal Form Section */}
+      {selectedOption === "orderDetail" && (
+        <div
           style={{
-            width: "100%",
-            padding: "14px 24px",
-            backgroundColor: isCreating ? "#6b7280" : "#10b981",
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "1rem",
-            fontWeight: "600",
-            cursor: isCreating ? "not-allowed" : "pointer",
-            transition: "all 0.2s",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-            opacity: isCreating ? 0.7 : 1,
+            background: theme === "dark" ? "#23272a" : "#fff",
+            borderRadius: "10px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+            padding: "20px",
+            border: `1px solid ${theme === "dark" ? "#333" : "#e2e8f0"}`,
+            // flex: 1,
           }}
         >
-          {isCreating ? "Creating Order..." : "Create Order"}
-        </button>
-      </div>
+          <ModalForm
+            onClose={() => {
+              // Switch back to chat sidebar after order is created
+              if (typeof window.switchToChatSidebar === "function") {
+                window.switchToChatSidebar(contact);
+              }
+            }}
+            initialData={{
+              name: contact?.name || "",
+              phone: contact?.phone || "",
+            }}
+            theme={theme}
+          />
+        </div>
+      )}
+
 
       {/* Footer Info */}
       {/* <div
